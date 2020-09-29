@@ -246,7 +246,7 @@ _nc_console_fd2handle(int fd) {
 }
 
 NCURSES_EXPORT(int)
-    _nc_console_setmode(HANDLE hdl, const TTY *arg)
+_nc_console_setmode(HANDLE hdl, const TTY *arg)
 {
     DWORD dwFlag = 0;
     int code = ERR;
@@ -337,7 +337,7 @@ _nc_console_getmode(HANDLE hdl, TTY *arg)
 }
 
 NCURSES_EXPORT(int)
-    _nc_console_flush(HANDLE hdl)
+_nc_console_flush(HANDLE hdl)
 {
     int code=OK;
     
