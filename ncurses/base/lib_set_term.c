@@ -407,6 +407,11 @@ NCURSES_SP_NAME(_nc_setupscreen) (
     fflush(output);
     setmode(output, O_BINARY);
 #endif
+#if defined(EXP_WIN32_DRIVER)
+    T(("setting output mode to binary"));
+    fflush(output);
+    _setmode(fileno(output), _O_BINARY);
+#endif
     NCURSES_SP_NAME(_nc_set_buffer) (NCURSES_SP_ARGx output, TRUE);
     sp->_lines = (NCURSES_SIZE_T) slines;
     sp->_lines_avail = (NCURSES_SIZE_T) slines;
