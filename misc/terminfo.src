@@ -4301,7 +4301,7 @@ ms-terminal|Windows10 terminal,
 	npc,
 	rmkx=\E[?1l, rmm@, smkx=\E[?1h, smm@, use=xterm+256setaf,
 	use=xterm+pcfkeys, use=ansi+rep, use=ecma+index,
-	use=xterm-basic,
+	use=xterm-basic, cud1=\E[B,
 
 #### Visual Studio
 # Visual Studio Code 1.45.0 uses xterm.js 12.8.1 (see https://xtermjs.org/).
