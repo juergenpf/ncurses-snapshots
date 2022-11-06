@@ -2161,7 +2161,7 @@ extern NCURSES_EXPORT(int) _nc_eventlist_timeout(_nc_eventlist *);
  */
 #if USE_WIDEC_SUPPORT
 
-#if defined(_NC_WINDOWS) && !defined(_NC_MSC) && !defined(EXP_WIN32_DRIVER)
+#if defined(_NC_WINDOWS) && !defined(_NC_MSC) && !defined(EXP_WIN32_DRIVER0)
 /*
  * MinGW has wide-character functions, but they do not work correctly.
  */
