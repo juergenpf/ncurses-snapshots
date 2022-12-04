@@ -34,7 +34,7 @@
 
 #if USE_WIDEC_SUPPORT
 
-#if defined(_NC_WINDOWS) && !defined(_MSC_VER) && !defined(EXP_WIN32_DRIVER)
+#if defined(_NC_WINDOWS) && !defined(_MSC_VER) && !defined(EXP_WIN32_DRIVER0)
 /*
  * MinGW has wide-character functions, but they do not work correctly.
  */
