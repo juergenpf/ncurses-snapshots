@@ -53,9 +53,15 @@ MODULE_ID("$Id: lib_win32con.c,v 1.7 2021/09/04 10:54:35 tom Exp $")
 #if USE_WIDEC_SUPPORT
 #define write_screen WriteConsoleOutputW
 #define read_screen  ReadConsoleOutputW
+#define read_input   ReadConsoleInputW
+#define peek_input   PeekConsoleInputW
+#define get_evt_char(inp_rec) ((inp_rec).Event.KeyEvent.uChar.UnicodeChar)
 #else
 #define write_screen WriteConsoleOutput
 #define read_screen  ReadConsoleOutput
+#define read_input   ReadConsoleInput
+#define peek_input   PeekConsoleInput
+#define get_evt_char(inp_rec) (0xff & (inp_rec).Event.KeyEvent.uChar.AsciiChar)
 #endif
 
 static BOOL IsConsoleHandle(HANDLE hdl);
@@ -866,7 +872,7 @@ _nc_console_twait(
 
 #define IGNORE_CTRL_KEYS (SHIFT_PRESSED|LEFT_ALT_PRESSED|RIGHT_ALT_PRESSED| \
                           LEFT_CTRL_PRESSED|RIGHT_CTRL_PRESSED)
-#define CONSUME() ReadConsoleInput(hdl, &inp_rec, 1, &nRead)
+#define CONSUME() read_input(hdl, &inp_rec, 1, &nRead)
 
     assert(sp);
 
@@ -909,7 +915,7 @@ _nc_console_twait(
                             DWORD i;
                             BOOL f;
                             memset(pInpRec, 0, sizeof(INPUT_RECORD)*nRead);
-                            f = PeekConsoleInput(hdl, pInpRec, nRead, &n);
+                            f = peek_input(hdl, pInpRec, nRead, &n);
                             if (f) {
                                 for(i = 0; i < n; i++) {
                                     if (pInpRec[i].EventType==KEY_EVENT) {
@@ -935,7 +941,7 @@ _nc_console_twait(
                     }
                 }
                 if (b && nRead > 0) {
-                    b = PeekConsoleInput(hdl, &inp_rec, 1, &nRead);
+                    b = peek_input(hdl, &inp_rec, 1, &nRead);
                     if (!b) {
                         T(("twait:err PeekConsoleInput"));
                     }
@@ -945,8 +951,7 @@ _nc_console_twait(
                             if (mode & TW_INPUT) {
                                 WORD vk =
                                     inp_rec.Event.KeyEvent.wVirtualKeyCode;
-                                char ch =
-                                    inp_rec.Event.KeyEvent.uChar.AsciiChar;
+                                int ch = get_evt_char(inp_rec);
                                 T(("twait:event KEY_EVENT"));
                                 T(("twait vk=%d, ch=%d, keydown=%d",
                                    vk, ch, inp_rec.Event.KeyEvent.bKeyDown));
@@ -1053,7 +1058,7 @@ _nc_console_read(
 
     T((T_CALLED("lib_win32con::_nc_console_read(%p)"), sp));
 
-    while ((b = ReadConsoleInput(hdl, &inp_rec, 1, &nRead))) {
+    while ((b = read_input(hdl, &inp_rec, 1, &nRead))) {
         if (b && nRead > 0) {
             if (rc < 0)
                 rc = 0;
@@ -1061,7 +1066,7 @@ _nc_console_read(
             if (inp_rec.EventType == KEY_EVENT) {
                 if (!inp_rec.Event.KeyEvent.bKeyDown)
                     continue;
-                *buf = (int) inp_rec.Event.KeyEvent.uChar.AsciiChar;
+                *buf = (int) get_evt_char(inp_rec);
                 vk = inp_rec.Event.KeyEvent.wVirtualKeyCode;
                 /*
                  * There are 24 virtual function-keys, and typically
@@ -1219,7 +1224,26 @@ _nc_console_checkinit(bool initFlag, bool assumeTermInfo)
                                                   NULL);
                     buffered = TRUE;
                 }
-            }
+            } else {
+		UINT cp = 0;
+		char *env_wincp = getenv("NC_WINCP");
+		if (0 != env_wincp) { 
+		    int nc_wincp;
+ 		    T(("NC_WINCP environment is %s", env_wincp));
+		    nc_wincp = _nc_getenv_num("NC_WINCP");
+		    if (nc_wincp > 0) cp=nc_wincp; 
+ 		} else {
+ 		    cp = CP_UTF8;
+ 		}
+		if (cp > 0) {
+		    BOOL rescp = SetConsoleOutputCP(cp);
+		    T(("SetConsoleOutputCP(%d) returns %d", cp, rescp));
+		    rescp = SetConsoleCP(cp);
+		    T(("SetConsoleCP(%d) returns %d", cp, rescp));
+ 		} else {
+ 		    T(("Console Codepage not modified"));
+ 		}
+	    }
 
             /* We set binary I/O even when using the console
                driver to cover the situation, that the
