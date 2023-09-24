@@ -35,7 +35,7 @@
  ****************************************************************************/
 
 /*
- * $Id: curses.priv.h,v 1.672 2023/09/09 23:13:32 tom Exp $
+ * $Id: curses.priv.h,v 1.676 2023/09/23 18:46:47 tom Exp $
  *
  *	curses.priv.h
  *
@@ -312,7 +312,6 @@ extern NCURSES_EXPORT(void *) _nc_memmove (void *, const void *, size_t);
 #define NO_TERMINAL "unknown"
 #define USE_SP_RIPOFF     1
 #define USE_SP_TERMTYPE   1
-#define USE_SP_WINDOWLIST 1
 #else
 #define NO_TERMINAL 0
 #endif
@@ -322,6 +321,12 @@ extern NCURSES_EXPORT(void *) _nc_memmove (void *, const void *, size_t);
 		     ? term_env \
 		     : no_terminal), \
 	 NonEmpty(term_env))
+
+/*
+ * Originally a terminal-driver option, the window-list is per-screen to allow
+ * freeing memory used for windows when a screen is deleted.
+ */
+#define USE_SP_WINDOWLIST 1
 
 /*
  * Note:  ht/cbt expansion flakes out randomly under Linux 1.1.47, but only
@@ -345,6 +350,11 @@ typedef TRIES {
  */
 #define StringOf(ch) {ch, 0}
 
+#define CSI_CHR 0x9b
+#define ESC_CHR 0x1b
+
+#define L_BLOCK '['
+#define R_BLOCK ']'
 #define L_BRACE '{'
 #define R_BRACE '}'
 #define S_QUOTE '\''
@@ -876,6 +886,12 @@ typedef int (*TYPE_Gpm_GetEvent) (Gpm_Event *);
 #endif /* USE_GPM_SUPPORT */
 
 /*
+ * Limit delay-times to 30 seconds, which is consistent with signed 16-bit
+ * numbers in legacy terminfo.
+ */
+#define MAX_DELAY_MSECS 30000
+
+/*
  * When converting from terminfo to termcap, check for cases where we can trim
  * octal escapes down to 2-character form.  It is useful for terminfo format
  * also, but not as important.
@@ -1292,12 +1308,12 @@ extern NCURSES_EXPORT_VAR(SIG_ATOMIC_T) _nc_have_sigwinch;
 /* Checks for isprint() should be done on 8-bit characters (non-wide) */
 #define is8bits(c)	((unsigned)(c) <= UCHAR_MAX)
 
-#ifndef min
-#define min(a,b)	((a) > (b)  ?  (b)  :  (a))
+#ifndef Min
+#define Min(a,b)	((a) > (b)  ?  (b)  :  (a))
 #endif
 
-#ifndef max
-#define max(a,b)	((a) < (b)  ?  (b)  :  (a))
+#ifndef Max
+#define Max(a,b)	((a) < (b)  ?  (b)  :  (a))
 #endif
 
 /* usually in <unistd.h> */

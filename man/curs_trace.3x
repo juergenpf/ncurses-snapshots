@@ -27,7 +27,8 @@
 .\" authorization.                                                           *
 .\"***************************************************************************
 .\"
-.\" $Id: curs_trace.3x,v 1.29 2023/07/01 15:46:10 tom Exp $
+.\" $Id: curs_trace.3x,v 1.37 2023/09/23 20:53:33 tom Exp $
+.TH curs_trace 3X 2023-09-23 "ncurses 6.4" "Library calls"
 .ie \n(.g .ds `` \(lq
 .el       .ds `` ``
 .ie \n(.g .ds '' \(rq
@@ -36,55 +37,44 @@
 .ie n  .IP \(bu 4
 .el    .IP \(bu 2
 ..
-.TH curs_trace 3X 2023-07-01 "ncurses 6.4" "Library calls"
-.na
-.hy 0
 .SH NAME
-\fBcurses_trace\fP,
-\fBtrace\fP,
-\fB_tracef\fP,
-\fB_traceattr\fP,
-\fB_traceattr2\fP,
-\fB_tracecchar_t\fP,
-\fB_tracecchar_t2\fP,
-\fB_tracechar\fP,
-\fB_tracechtype\fP,
-\fB_tracechtype2\fP,
-\fB_nc_tracebits\fP,
-\fB_tracedump\fP,
-\fB_tracemouse\fP \- \fBcurses\fP debugging routines
-.ad
-.hy
+\fB\%curses_trace\fP,
+\fB\%trace\fP,
+\fB\%_tracef\fP,
+\fB\%_traceattr\fP,
+\fB\%_traceattr2\fP,
+\fB\%_tracecchar_t\fP,
+\fB\%_tracecchar_t2\fP,
+\fB\%_tracechar\fP,
+\fB\%_tracechtype\fP,
+\fB\%_tracechtype2\fP,
+\fB\%_nc_tracebits\fP,
+\fB\%_tracedump\fP,
+\fB\%_tracemouse\fP \-
+\fIcurses\fR debugging routines
 .SH SYNOPSIS
+.nf
 \fB#include <curses.h>\fP
-.sp
+.PP
 \fBunsigned curses_trace(const unsigned \fIparam\fB);\fR
-.sp
+.PP
 \fBvoid _tracef(const char *\fIformat\fB, ...);\fR
-.sp
+.PP
 \fBchar *_traceattr(attr_t \fIattr\fB);\fR
-.br
 \fBchar *_traceattr2(int \fIbuffer\fB, chtype \fIch\fB);\fR
-.br
 \fBchar *_tracecchar_t(const cchar_t *\fIstring\fB);\fR
-.br
 \fBchar *_tracecchar_t2(int \fIbuffer\fB, const cchar_t *\fIstring\fB);\fR
-.br
 \fBchar *_tracechar(int \fIch\fB);\fR
-.br
 \fBchar *_tracechtype(chtype \fIch\fB);\fR
-.br
 \fBchar *_tracechtype2(int \fIbuffer\fB, chtype \fIch\fB);\fR
-.sp
+.PP
 \fBvoid _tracedump(const char *\fIlabel\fB, WINDOW *\fIwin\fB);\fR
-.br
 \fBchar *_nc_tracebits(void);\fP
-.br
 \fBchar *_tracemouse(const MEVENT *\fIevent\fB);\fR
-.sp
+.PP
 /* deprecated */
-.br
 \fBvoid trace(const unsigned int \fIparam\fB);\fR
+.fi
 .SH DESCRIPTION
 The \fIcurses trace\fP routines are used for debugging the ncurses libraries,
 as well as applications which use the ncurses libraries.
@@ -199,8 +189,6 @@ These functions check the \fBNCURSES_TRACE\fP environment variable,
 to set the tracing feature as if \fBcurses_trace\fP was called:
 .RS 4
 .PP
-.na
-.hy 0
 filter,
 initscr,
 new_prescr,
@@ -214,8 +202,6 @@ tgetent,
 use_env,
 use_extended_names,
 use_tioctl
-.hy
-.ad
 .RE
 .SS Command-line Utilities
 The command-line utilities such as \fBtic\fP(1) provide a verbose option
