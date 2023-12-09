@@ -27,7 +27,7 @@
 .\" authorization.                                                           *
 .\"***************************************************************************
 .\"
-.\" $Id: terminfo.tail,v 1.134 2023/10/14 19:18:14 tom Exp $
+.\" $Id: terminfo.tail,v 1.137 2023/12/03 00:17:23 tom Exp $
 .ps +1
 .SS User-Defined Capabilities
 .
@@ -247,7 +247,7 @@ in the example above.
 Terminal descriptions in \fBncurses\fP are stored in terminal databases.
 These databases, which are found by their pathname,
 may be configured either as directory trees or hashed databases
-(see \fBterm\fR(\*n)),
+(see \fBterm\fR(5)),
 .PP
 The library uses a compiled-in list of pathnames,
 which can be overridden by environment variables.
@@ -261,13 +261,14 @@ The environment variable \fBTERMINFO\fR is checked first, for
 a terminal database containing the terminal description.
 .bP
 Next,
-\fBncurses\fP looks in \fB$HOME/.terminfo\fP
+\fBncurses\fP looks in \fI$HOME/.terminfo\fP
 for a compiled description.
 .IP
 This is an optional feature which may be omitted entirely from
 the library, or limited to prevent accidental use by privileged applications.
 .bP
-Next, if the environment variable \fBTERMINFO_DIRS\fR is set,
+Next,
+if the environment variable \fI\%TERMINFO_DIRS\fP is set,
 \fBncurses\fP interprets the contents of that variable
 as a list of colon-separated pathnames of terminal databases to be searched.
 .IP
@@ -296,8 +297,10 @@ The preceding addresses the usual configuration of \fBncurses\fP,
 which uses terminal descriptions prepared in \fIterminfo\fP format.
 While \fItermcap\fP is less expressive,
 \fBncurses\fP can also be configured to read \fItermcap\fP descriptions.
-In that configuration, it checks the \fBTERMCAP\fP and \fBTERMPATH\fP
-variables (for content and search path, respectively)
+In that configuration,
+it checks the \fI\%TERMCAP\fP and \fI\%TERMPATH\fP variables
+(for content and search path,
+respectively)
 after the system terminal database.
 .SS Preparing Descriptions
 We now outline how to prepare descriptions of terminals.
@@ -1810,7 +1813,7 @@ A prototype command character is chosen which is used in all capabilities.
 This character is given in the
 .B cmdch
 capability to identify it.
-The following convention is supported on some UNIX systems:
+The following convention is supported on some Unix systems:
 The environment is to be searched for a
 .B CC
 variable, and if found, all
@@ -1852,7 +1855,7 @@ A value of
 indicates that the number of lines is not fixed,
 but that there is still more memory than fits on the screen.
 .PP
-If the terminal is one of those supported by the \s-1UNIX\s+1 virtual
+If the terminal is one of those supported by the Unix virtual
 terminal protocol, the terminal number can be given as
 .BR vt .
 .PP
@@ -1984,7 +1987,7 @@ termcap library truncates long entries, like OSF/1 3.0, it is immune to dying
 here but will return incorrect data for the terminal.
 .PP
 The \*(``after tc expansion\*('' length will have a similar effect to the
-above, but only for people who actually set TERM to that terminal
+above, but only for people who actually set \fITERM\fP to that terminal
 type, since \fBtgetent\fP only does \*(``tc\*('' expansion once it is found the
 terminal type it was looking for, not while searching.
 .PP
@@ -1993,7 +1996,7 @@ on various combinations of termcap libraries and applications, a core
 dump, warnings, or incorrect operation.
 If it is too long even before
 \*(``tc\*('' expansion, it will have this effect even for users of some other
-terminal types and users whose TERM variable does not have a termcap
+terminal types and users whose \fITERM\fP variable does not have a termcap
 entry.
 .PP
 When in \-C (translate to termcap) mode, the \fBncurses\fP implementation of
@@ -2001,16 +2004,18 @@ When in \-C (translate to termcap) mode, the \fBncurses\fP implementation of
 translation is too long.
 The \-c (check) option also checks resolved (after tc
 expansion) lengths.
-.SS Binary Compatibility
-It is not wise to count on portability of binary terminfo entries between
-commercial UNIX versions.
-The problem is that there are at least two versions
-of terminfo (under HP\-UX and AIX) which diverged from System V terminfo after
-SVr1, and have added extension capabilities to the string table that (in the
-binary format) collide with System V and XSI Curses extensions.
+.SH PORTABILITY
+Do not count on compiled (binary) \fI\%terminfo\fP entries being
+portable between commercial Unix systems.
+At least two implementations of \fI\%terminfo\fP
+(those of HP-UX and AIX)
+diverged from those of other System V Unices after SVr1,
+adding extension capabilities to the string table that
+(in the binary format)
+collide with subsequent System V and XSI Curses extensions.
 .SH EXTENSIONS
 Searching for terminal descriptions in
-\fB$HOME/.terminfo\fP and TERMINFO_DIRS
+\fI$HOME/.terminfo\fP and \fI\%TERMINFO_DIRS\fP
 is not supported by older implementations.
 .PP
 Some SVr4 \fBcurses\fP implementations, and all previous to SVr4, do not
@@ -2049,36 +2054,45 @@ an absent or cancelled \fBncv\fP.
 If italics should work with colors,
 then the \fBncv\fP value must be specified, even if it is zero.
 .PP
-Different commercial ports of terminfo and curses support different subsets of
-the XSI Curses standard and (in some cases) different extension sets.
-Here
-is a summary, accurate as of October 1995:
+Different commercial ports of \fI\%terminfo\fP and \fIcurses\fP support
+different subsets of XSI Curses and
+(in some cases)
+different extensions.
+Here is a summary,
+accurate as of October 1995,
+after which the commercial Unix market contracted and lost diversity.
 .bP
-\fBSVR4, Solaris, ncurses\fP \-\-
-These support all SVr4 capabilities.
+SVr4,
+Solaris,
+and \fI\%ncurses\fP support all SVr4 capabilities.
 .bP
-\fBSGI\fP \-\-
-Supports the SVr4 set, adds one undocumented extended string
-capability (\fBset_pglen\fP).
+IRIX supports the SVr4 set and adds one undocumented extended string
+capability (\fB\%set_pglen\fP).
 .bP
-\fBSVr1, Ultrix\fP \-\-
-These support a restricted subset of terminfo capabilities.
-The booleans end with \fBxon_xoff\fP;
-the numerics with \fBwidth_status_line\fP;
-and the strings with \fBprtr_non\fP.
+SVr1 and Ultrix support a restricted subset of \fI\%terminfo\fP
+capabilities.
+The Booleans end with \fB\%xon_xoff\fP;
+the numerics with \fB\%width_status_line\fP;
+and the strings with \fB\%prtr_non\fP.
 .bP
-\fBHP/UX\fP \-\-
-Supports the SVr1 subset, plus the SVr[234] numerics \fBnum_labels\fP,
-\fBlabel_height\fP, \fBlabel_width\fP, plus function keys 11 through 63, plus
-\fBplab_norm\fP, \fBlabel_on\fP, and \fBlabel_off\fP, plus some incompatible
-extensions in the string table.
+HP/UX supports the SVr1 subset,
+plus the SVr[234] numerics
+\fB\%num_labels\fP,
+\fB\%label_height\fP,
+\fB\%label_width\fP,
+plus function keys 11 through 63,
+plus
+\fB\%plab_norm\fP,
+\fB\%label_on\fP,
+and
+\fB\%label_off\fP,
+plus a number of incompatible string table extensions.
 .bP
-\fBAIX\fP \-\-
-Supports the SVr1 subset, plus function keys 11 through 63, plus a number
-of incompatible string table extensions.
+AIX supports the SVr1 subset,
+plus function keys 11 through 63,
+plus a number of incompatible string table extensions.
 .bP
-\fBOSF\fP \-\-
-Supports both the SVr4 set and the AIX extensions.
+OSF/1 supports both the SVr4 set and the AIX extensions.
 .SH FILES
 .TP
 .I \*d
@@ -2096,5 +2110,5 @@ Based on \fIpcurses\fP by Pavel Curtis.
 \fB\%curs_variables\fP(3X),
 \fB\%printf\fP(3),
 \fB\%term_variables\fP(3X),
-\fB\%term\fP(\*n),
+\fB\%term\fP(5),
 \fB\%user_caps\fP(5)

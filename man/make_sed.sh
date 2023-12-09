@@ -1,5 +1,5 @@
 #!/bin/sh
-# $Id: make_sed.sh,v 1.17 2023/06/25 18:13:17 tom Exp $
+# $Id: make_sed.sh,v 1.19 2023/12/07 01:16:43 tom Exp $
 ##############################################################################
 # Copyright 2020-2022,2023 Thomas E. Dickey                                  #
 # Copyright 1998-2005,2017 Free Software Foundation, Inc.                    #
@@ -66,6 +66,7 @@ sed	-e 's/^/s\/\\</' \
 	-e 's/$/\//' >$UPPER
 
 {
+echo "# This script was generated from '$1' by man/make_sed.sh."
 echo "# Do the TH lines"
 sed	-e 's/\//\/TH /' \
 	-e 's/	/ /' \
@@ -75,9 +76,10 @@ sed	-e 's/\//\/TH /' \
 	$UPPER
 
 echo "# Do the embedded references"
-sed	-e 's/</<fB/' \
+sed	-e 's/</<fB\\(\\\\%\\)\\?/' \
+	-e 's/\\%</\\%/' \
 	-e 's/	/\\\\fP(/' \
-	-e 's/	/)\/fB/' \
+	-e 's/	/)\/fB\\\\%/' \
 	-e 's/	/\\\\fP(/' \
 	-e 's/\/$/)\//' \
 	$UPPER

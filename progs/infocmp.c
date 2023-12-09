@@ -43,7 +43,7 @@
 
 #include <dump_entry.h>
 
-MODULE_ID("$Id: infocmp.c,v 1.158 2023/11/11 18:25:52 tom Exp $")
+MODULE_ID("$Id: infocmp.c,v 1.161 2023/12/09 19:56:10 tom Exp $")
 
 #define MAX_STRING	1024	/* maximum formatted string */
 
@@ -191,6 +191,7 @@ static int
 use_predicate(unsigned type, PredIdx idx)
 /* predicate function to use for use decompilation */
 {
+    int result = FAIL;
     ENTRY *ep;
 
     switch (type) {
@@ -218,10 +219,10 @@ use_predicate(unsigned type, PredIdx idx)
 		    }
 		}
 		if (is_set != entries[0].tterm.Booleans[idx])
-		    return (!is_set);
+		    result = (!is_set);
 	    }
-	    return (FAIL);
 	}
+	break;
 
     case NUMBER:
 	{
@@ -241,16 +242,15 @@ use_predicate(unsigned type, PredIdx idx)
 		    }
 
 		if (value != entries[0].tterm.Numbers[idx])
-		    return (value != ABSENT_NUMERIC);
+		    result = (value != ABSENT_NUMERIC);
 	    }
-	    return (FAIL);
 	}
+	break;
 
     case STRING:
 	{
-	    char *termstr, *usestr = ABSENT_STRING;
-
-	    termstr = entries[0].tterm.Strings[idx];
+	    char *termstr = entries[0].tterm.Strings[idx];
+	    char *usestr = ABSENT_STRING;
 
 	    /*
 	     * We take the semantics of multiple uses to be 'each
@@ -265,16 +265,22 @@ use_predicate(unsigned type, PredIdx idx)
 			break;
 		    }
 
-		if (usestr == ABSENT_STRING && termstr == ABSENT_STRING)
-		    return (FAIL);
+		if (usestr == CANCELLED_STRING && termstr == ABSENT_STRING)
+		    result = (FAIL);
+		else if (usestr == ABSENT_STRING && termstr == ABSENT_STRING)
+		    result = (FAIL);
 		else if (!usestr || !termstr || capcmp(idx, usestr, termstr))
-		    return (TRUE);
+		    result = (TRUE);
 	    }
-	    return (FAIL);
 	}
+	break;
+
+    default:
+	result = FALSE;
+	break;
     }
 
-    return (FALSE);		/* pacify compiler */
+    return (result);
 }
 
 static bool
@@ -1865,8 +1871,16 @@ main(int argc, char *argv[])
 	}
 
 #if NCURSES_XNAMES
-	if (termcount > 1)
-	    _nc_align_termtype(&entries[0].tterm, &entries[1].tterm);
+	if (termcount > 1) {
+	    /*
+	     * User-defined capabilities in different terminal descriptions
+	     * may have the same name/type but different indices.  Line up
+	     * the names to use comparable indices.  We may have more than two
+	     * entries to compare when processing the "-u" option.
+	     */
+	    for (c = 1; c < termcount; ++c)
+		_nc_align_termtype(&entries[c].tterm, &entries[0].tterm);
+	}
 #endif
 
 	/* dump as C initializer for the terminal type */
