@@ -107,7 +107,7 @@ your MinGW build):
 	--without-ada \
 	--enable-warnings \
 	--enable-assertions \
-	--enable-exp-win32 \
+	--enable-named-pipes \
 	--enable-ext-funcs \
 	--disable-home-terminfo \
 	--disable-echo \
