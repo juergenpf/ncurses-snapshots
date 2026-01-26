@@ -853,11 +853,17 @@ win32_get_input_event(HANDLE hdl, NCWIN_EVENT *ev)
 
         if (!k->bKeyDown)
             return false;
-
-	if (k->uChar.UnicodeChar == 0 &&
-	    (k->wVirtualKeyCode < VK_SPACE || k->wVirtualKeyCode == VK_DELETE)) {
+	
+#if !USE_WIDEC_SUPPORT
+	bool has_unicode = (k->uChar.UnicodeChar != 0);
+	bool is_special  = (k->wVirtualKeyCode >= VK_F1 && k->wVirtualKeyCode <= VK_F24) ||
+	    (k->wVirtualKeyCode >= VK_LEFT && k->wVirtualKeyCode <= VK_DOWN) ||
+	    (k->wVirtualKeyCode == VK_HOME || k->wVirtualKeyCode == VK_END ||
+	     k->wVirtualKeyCode == VK_PRIOR || k->wVirtualKeyCode == VK_NEXT ||
+	     k->wVirtualKeyCode == VK_INSERT || k->wVirtualKeyCode == VK_DELETE);
+	if (!has_unicode && !is_special)
 	    return false;
-	}
+#endif
 	
         ev->is_key = true;
         ev->vk = k->wVirtualKeyCode;
@@ -902,7 +908,6 @@ win32_wait_for_event(const SCREEN *sp,
         if (rc != WAIT_OBJECT_0)
             return -1;
 
-        /* Peek – aber Unicode! */
         if (!PeekConsoleInputW(hdl, &rec, 1, &nread) || nread == 0)
             continue;
 
@@ -913,24 +918,19 @@ win32_wait_for_event(const SCREEN *sp,
                 return 0;
 
             if (!rec.Event.KeyEvent.bKeyDown) {
-                /* KeyUp verbrauchen */
                 ReadConsoleInputW(hdl, &rec, 1, &nread);
                 continue;
             }
-
-            /* KeyDown → sofort melden */
             return TW_INPUT;
 
         case MOUSE_EVENT:
             if (mode & TW_MOUSE)
                 return TW_MOUSE;
 
-            /* Maus verbrauchen */
             ReadConsoleInputW(hdl, &rec, 1, &nread);
             continue;
 
         default:
-            /* Andere Events verbrauchen */
             ReadConsoleInputW(hdl, &rec, 1, &nread);
             continue;
         }
