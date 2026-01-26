@@ -822,11 +822,10 @@ unicode_to_cp8Bit(wchar_t wc)
 typedef struct {
     bool is_key;
     bool is_mouse;
-
-    wchar_t unicode;       
-    unsigned char cp8Bit;  
-    WORD vk;               
-    DWORD modifiers;       
+    wchar_t unicode;
+    unsigned char cp8Bit;
+    WORD vk;  
+    DWORD modifiers;
     MOUSE_EVENT_RECORD mouse;
 } NCWIN_EVENT;
 
