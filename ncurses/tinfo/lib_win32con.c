@@ -716,24 +716,21 @@ static int
 MapKey(WORD vKey)
 {
     int code = -1;
+    WORD nKey = 0;
+    void *res;
+    LONG key = GenMap(vKey, 0);
 
-    if (!WINCONSOLE.isTermInfoConsole) {
-	WORD nKey = 0;
-	void *res;
-	LONG key = GenMap(vKey, 0);
-
-	res = bsearch(&key,
-		      WINCONSOLE.map,
-		      (size_t) (N_INI + FKEYS),
-		      sizeof(keylist[0]),
-		      keycompare);
-	if (res) {
-	    key = *((LONG *) res);
-	    nKey = LOWORD(key);
-	    code = (int) (nKey & 0x7fff);
-	    if (nKey & 0x8000)
-		code = -code;
-	}
+    res = bsearch(&key,
+		  WINCONSOLE.map,
+		  (size_t) (N_INI + FKEYS),
+		  sizeof(keylist[0]),
+		  keycompare);
+    if (res) {
+	key = *((LONG *) res);
+	nKey = LOWORD(key);
+	code = (int) (nKey & 0x7fff);
+	if (nKey & 0x8000)
+	    code = -code;
     }
     return code;
 }
@@ -742,25 +739,23 @@ static int
 AnsiKey(WORD vKey)
 {
     int code = -1;
-
-    if (!WINCONSOLE.isTermInfoConsole) {
-	WORD nKey = 0;
-	void *res;
-	LONG key = GenMap(vKey, 0);
-
-	res = bsearch(&key,
-		      WINCONSOLE.ansi_map,
-		      (size_t) (N_INI + FKEYS),
-		      sizeof(keylist[0]),
-		      keycompare);
-	if (res) {
-	    key = *((LONG *) res);
-	    nKey = LOWORD(key);
-	    code = (int) (nKey & 0x7fff);
-	    if (nKey & 0x8000)
-		code = -code;
-	}
+    WORD nKey = 0;
+    void *res;
+    LONG key = GenMap(vKey, 0);
+    
+    res = bsearch(&key,
+		  WINCONSOLE.ansi_map,
+		  (size_t) (N_INI + FKEYS),
+		  sizeof(keylist[0]),
+		  keycompare);
+    if (res) {
+	key = *((LONG *) res);
+	nKey = LOWORD(key);
+	code = (int) (nKey & 0x7fff);
+	if (nKey & 0x8000)
+	    code = -code;
     }
+    
     return code;
 }
 
@@ -854,7 +849,11 @@ win32_get_input_event(HANDLE hdl, NCWIN_EVENT *ev)
         if (!k->bKeyDown)
             return false;
 	
-#if !USE_WIDEC_SUPPORT
+	ev->is_key = true;
+        ev->vk = k->wVirtualKeyCode;
+        ev->modifiers = k->dwControlKeyState;
+
+#if 0 && !USE_WIDEC_SUPPORT //FIXME
 	bool has_unicode = (k->uChar.UnicodeChar != 0);
 	bool is_special  = (k->wVirtualKeyCode >= VK_F1 && k->wVirtualKeyCode <= VK_F24) ||
 	    (k->wVirtualKeyCode >= VK_LEFT && k->wVirtualKeyCode <= VK_DOWN) ||
@@ -864,11 +863,6 @@ win32_get_input_event(HANDLE hdl, NCWIN_EVENT *ev)
 	if (!has_unicode && !is_special)
 	    return false;
 #endif
-	
-        ev->is_key = true;
-        ev->vk = k->wVirtualKeyCode;
-        ev->modifiers = k->dwControlKeyState;
-
         /* Unicode immer korrekt */
         ev->unicode = k->uChar.UnicodeChar;
         ev->cp8Bit = unicode_to_cp8Bit(ev->unicode);
@@ -965,19 +959,32 @@ _nc_console_read(SCREEN *sp, HANDLE hdl, int *buf)
         if (!win32_get_input_event(hdl, &ev))
             continue;
 
-        if (ev.is_key) {
+	if (ev.is_key) {
 #if USE_WIDEC_SUPPORT
-            *buf = (int)ev.unicode;
+	    if (ev.unicode != 0) {
+		*buf = (int)ev.unicode;
+		return 1;
+	    }
 #else
-            *buf = (int)ev.cp8Bit;
+	    if (ev.cp8Bit != 0) {
+		*buf = (int)ev.cp8Bit;
+		return 1;
+	    }
 #endif
-            return 1;
-        }
+	    int code = MapKey(ev.vk);
 
-        if (ev.is_mouse) {
-            *buf = KEY_MOUSE;
-            return 1;
-        }
+	    if (code >= 0) {
+		*buf = code;
+		return 1;
+	    }
+
+	    if (ev.is_mouse) {
+		if (handle_mouse(sp,ev.mouse)) {
+		    *buf = KEY_MOUSE;
+		    return 1;
+		}
+	    }
+	}
     }
 }
 
