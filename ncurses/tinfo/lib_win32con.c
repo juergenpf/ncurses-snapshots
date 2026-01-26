@@ -38,6 +38,8 @@
 
 #define TTY int			/* FIXME: TTY originalMode */
 #include <curses.priv.h>
+#include <ctype.h>
+#include <locale.h>
 #include <nc_win32.h>
 
 #ifndef _O_BINARY
@@ -568,7 +570,6 @@ _nc_console_set_scrollback(bool normal, CONSOLE_SCREEN_BUFFER_INFO * info)
 	    info->srWindow.Left != 0) {
 	    changed = TRUE;
 	}
-
     }
 
     if (changed) {
@@ -813,172 +814,171 @@ _nc_console_keyExist(int keycode)
     returnCode(found);
 }
 
-NCURSES_EXPORT(int)
-_nc_console_twait(
-		     const SCREEN *sp,
-		     HANDLE hdl,
-		     int mode,
-		     int milliseconds,
-		     int *timeleft
-		     EVENTLIST_2nd(_nc_eventlist * evl))
+static unsigned char
+unicode_to_cp8Bit(wchar_t wc)
 {
-    INPUT_RECORD inp_rec;
-    BOOL b;
-    DWORD nRead = 0, rc = WAIT_FAILED;
-    int code = 0;
-    FILETIME fstart;
-    FILETIME fend;
-    int diff;
-    bool isNoDelay = (milliseconds == 0);
+    if (wc <= 0xFF)
+        return (unsigned char)wc;
 
-#ifdef NCURSES_WGETCH_EVENTS
-    (void) evl;			/* TODO: implement wgetch-events */
-#endif
+    /* Fallback */
+    return '?';
+}
 
-#define IGNORE_CTRL_KEYS (SHIFT_PRESSED | \
-                          LEFT_ALT_PRESSED | RIGHT_ALT_PRESSED | \
-                          LEFT_CTRL_PRESSED | RIGHT_CTRL_PRESSED)
-#define CONSUME() read_keycode(hdl, &inp_rec, 1, &nRead)
+typedef struct {
+    bool is_key;
+    bool is_mouse;
 
-    assert(sp);
+    wchar_t unicode;       
+    unsigned char cp8Bit;  
+    WORD vk;               
+    DWORD modifiers;       
+    MOUSE_EVENT_RECORD mouse;
+} NCWIN_EVENT;
 
-    TR(TRACE_IEVENT, ("start twait: hdl=%p, %d milliseconds, mode: %d",
-		      hdl, milliseconds, mode));
+static bool
+win32_get_input_event(HANDLE hdl, NCWIN_EVENT *ev)
+{
+    INPUT_RECORD rec;
+    DWORD nread = 0;
+
+    memset(ev, 0, sizeof(*ev));
+
+    if (!ReadConsoleInputW(hdl, &rec, 1, &nread) || nread == 0)
+        return false;
+
+    switch (rec.EventType) {
+
+    case KEY_EVENT: {
+        KEY_EVENT_RECORD *k = &rec.Event.KeyEvent;
+
+        if (!k->bKeyDown)
+            return false;
+
+	if (k->uChar.UnicodeChar == 0 &&
+	    (k->wVirtualKeyCode < VK_SPACE || k->wVirtualKeyCode == VK_DELETE)) {
+	    return false;
+	}
+	
+        ev->is_key = true;
+        ev->vk = k->wVirtualKeyCode;
+        ev->modifiers = k->dwControlKeyState;
+
+        /* Unicode immer korrekt */
+        ev->unicode = k->uChar.UnicodeChar;
+        ev->cp8Bit = unicode_to_cp8Bit(ev->unicode);
+        return true;
+    }
+
+    case MOUSE_EVENT:
+        ev->is_mouse = true;
+        ev->mouse = rec.Event.MouseEvent;
+        return true;
+
+    default:
+        return false;
+    }
+}
+
+static int
+win32_wait_for_event(const SCREEN *sp,
+                         HANDLE hdl,
+                         int mode,
+                         int milliseconds,
+                         NCWIN_EVENT *ev)
+{
+    DWORD rc;
+    INPUT_RECORD rec;
+    DWORD nread = 0;
 
     if (milliseconds < 0)
-	milliseconds = NC_INFINITY;
+        milliseconds = INFINITE;
 
-    memset(&inp_rec, 0, sizeof(inp_rec));
+    while (1) {
+        rc = WaitForSingleObject(hdl, milliseconds);
 
-    while (true) {
-	if (!isNoDelay) {
-	    GetSystemTimeAsFileTime(&fstart);
-	    rc = WaitForSingleObject(hdl, (DWORD) milliseconds);
-	    GetSystemTimeAsFileTime(&fend);
-	    diff = (int) tdiff(fstart, fend);
-	    milliseconds = Adjust(milliseconds, diff);
-	    if (milliseconds < 0)
-		break;
-	}
+        if (rc == WAIT_TIMEOUT)
+            return 0;
 
-	if (isNoDelay || (rc == WAIT_OBJECT_0)) {
-	    if (mode) {
-		nRead = 0;
-		b = GetNumberOfConsoleInputEvents(hdl, &nRead);
-		if (!b) {
-		    T(("twait:err GetNumberOfConsoleInputEvents"));
-		}
-		if (isNoDelay && b) {
-		    T(("twait: Events Available: %lu", (unsigned long) nRead));
-		    if (nRead == 0) {
-			code = 0;
-			goto end;
-		    } else {
-			DWORD n = 0;
-			MakeArray(pInpRec, INPUT_RECORD, nRead);
-			if (pInpRec != NULL) {
-			    DWORD i;
-			    BOOL f;
-			    memset(pInpRec, 0, sizeof(INPUT_RECORD) * nRead);
-			    f = PeekConsoleInput(hdl, pInpRec, nRead, &n);
-			    if (f) {
-				for (i = 0; i < n; i++) {
-				    if (pInpRec[i].EventType == KEY_EVENT) {
-					if (pInpRec[i].Event.KeyEvent.bKeyDown) {
-					    DWORD ctrlMask =
-					    (pInpRec[i].Event.KeyEvent.dwControlKeyState &
-					     IGNORE_CTRL_KEYS);
-					    if (!ctrlMask) {
-						code = TW_INPUT;
-						goto end;
-					    }
-					}
-				    }
-				}
-			    } else {
-				T(("twait:err PeekConsoleInput"));
-			    }
-			    code = 0;
-			    goto end;
-			} else {
-			    T(("twait:err could not alloca input records"));
-			}
-		    }
-		}
-		if (b && nRead > 0) {
-		    b = PeekConsoleInput(hdl, &inp_rec, 1, &nRead);
-		    if (!b) {
-			T(("twait:err PeekConsoleInput"));
-		    }
-		    if (b && nRead > 0) {
-			switch (inp_rec.EventType) {
-			case KEY_EVENT:
-			    if (mode & TW_INPUT) {
-				WORD vk = inp_rec.Event.KeyEvent.wVirtualKeyCode;
-				WORD ch = inp_rec.Event.KeyEventChar;
+        if (rc != WAIT_OBJECT_0)
+            return -1;
 
-				T(("twait:event KEY_EVENT"));
-				T(("twait vk=%d, ch=%d, keydown=%d",
-				   vk, ch, inp_rec.Event.KeyEvent.bKeyDown));
+        /* Peek – aber Unicode! */
+        if (!PeekConsoleInputW(hdl, &rec, 1, &nread) || nread == 0)
+            continue;
 
-				if (inp_rec.Event.KeyEvent.bKeyDown) {
-				    T(("twait:event KeyDown"));
-				    if (!WINCONSOLE.isTermInfoConsole &&
-					(0 == ch)) {
-					int nKey = MapKey(vk);
-					if (nKey < 0) {
-					    CONSUME();
-					    continue;
-					}
-				    }
-				    code = TW_INPUT;
-				    goto end;
-				} else {
-				    CONSUME();
-				}
-			    }
-			    continue;
-			case MOUSE_EVENT:
-			    T(("twait:event MOUSE_EVENT"));
-			    if (decode_mouse(sp,
-					     (inp_rec.Event.MouseEvent.dwButtonState
-					      & BUTTON_MASK)) == 0) {
-				CONSUME();
-			    } else if (mode & TW_MOUSE) {
-				code = TW_MOUSE;
-				goto end;
-			    }
-			    continue;
-			    /* e.g., FOCUS_EVENT */
-			default:
-			    T(("twait:event Type %d", inp_rec.EventType));
-			    CONSUME();
-			    _nc_console_selectActiveHandle();
-			    continue;
-			}
-		    }
-		}
-	    }
-	    continue;
-	} else {
-	    if (rc != WAIT_TIMEOUT) {
-		code = -1;
-		break;
-	    } else {
-		code = 0;
-		break;
-	    }
-	}
+        switch (rec.EventType) {
+
+        case KEY_EVENT:
+            if (!(mode & TW_INPUT))
+                return 0;
+
+            if (!rec.Event.KeyEvent.bKeyDown) {
+                /* KeyUp verbrauchen */
+                ReadConsoleInputW(hdl, &rec, 1, &nread);
+                continue;
+            }
+
+            /* KeyDown → sofort melden */
+            return TW_INPUT;
+
+        case MOUSE_EVENT:
+            if (mode & TW_MOUSE)
+                return TW_MOUSE;
+
+            /* Maus verbrauchen */
+            ReadConsoleInputW(hdl, &rec, 1, &nread);
+            continue;
+
+        default:
+            /* Andere Events verbrauchen */
+            ReadConsoleInputW(hdl, &rec, 1, &nread);
+            continue;
+        }
     }
-  end:
+}
 
-    TR(TRACE_IEVENT, ("end twait: returned %d (%lu), remaining time %d msec",
-		      code, (unsigned long) GetLastError(), milliseconds));
+NCURSES_EXPORT(int)
+_nc_console_twait(const SCREEN *sp,
+                  HANDLE hdl,
+                  int mode,
+                  int milliseconds,
+                  int *timeleft
+                  EVENTLIST_2nd(_nc_eventlist *evl))
+{
+    NCWIN_EVENT ev;
+    int rc;
+
+    rc = win32_wait_for_event(sp, hdl, mode, milliseconds, &ev);
 
     if (timeleft)
-	*timeleft = milliseconds;
+        *timeleft = milliseconds;
 
-    return code;
+    return rc;
+}
+
+NCURSES_EXPORT(int)
+_nc_console_read(SCREEN *sp, HANDLE hdl, int *buf)
+{
+    NCWIN_EVENT ev;
+
+    while (true) {
+        if (!win32_get_input_event(hdl, &ev))
+            continue;
+
+        if (ev.is_key) {
+#if USE_WIDEC_SUPPORT
+            *buf = (int)ev.unicode;
+#else
+            *buf = (int)ev.cp8Bit;
+#endif
+            return 1;
+        }
+
+        if (ev.is_mouse) {
+            *buf = KEY_MOUSE;
+            return 1;
+        }
+    }
 }
 
 NCURSES_EXPORT(int)
@@ -1003,81 +1003,6 @@ _nc_console_testmouse(
 			       EVENTLIST_2nd(evl));
     }
     return rc;
-}
-
-NCURSES_EXPORT(int)
-_nc_console_read(
-		    SCREEN *sp,
-		    HANDLE hdl,
-		    int *buf)
-{
-    int rc = -1;
-    INPUT_RECORD inp_rec;
-    BOOL b;
-    DWORD nRead;
-    WORD vk;
-
-    assert(sp);
-    assert(buf);
-
-    memset(&inp_rec, 0, sizeof(inp_rec));
-
-    T((T_CALLED("lib_win32con::_nc_console_read(%p)"), sp));
-
-    while ((b = read_keycode(hdl, &inp_rec, 1, &nRead))) {
-	if (b && nRead > 0) {
-	    if (rc < 0)
-		rc = 0;
-	    rc = rc + (int) nRead;
-	    if (inp_rec.EventType == KEY_EVENT) {
-		if (!inp_rec.Event.KeyEvent.bKeyDown)
-		    continue;
-		*buf = (int) inp_rec.Event.KeyEventChar;
-		vk = inp_rec.Event.KeyEvent.wVirtualKeyCode;
-		/*
-		 * There are 24 virtual function-keys, and typically
-		 * 12 function-keys on a keyboard.  Use the shift-modifier
-		 * to provide the remaining 12 keys.
-		 */
-		if (vk >= VK_F1 && vk <= VK_F12) {
-		    if (inp_rec.Event.KeyEvent.dwControlKeyState &
-			SHIFT_PRESSED) {
-			vk = (WORD) (vk + 12);
-		    }
-		}
-		if (*buf == 0) {
-		    int key = MapKey(vk);
-		    if (key < 0)
-			continue;
-		    if (sp->_keypad_on) {
-			*buf = key;
-		    } else {
-			ungetch('\0');
-			*buf = AnsiKey(vk);
-		    }
-		} else if (vk == VK_BACK) {
-		    if (!(inp_rec.Event.KeyEvent.dwControlKeyState
-			  & (SHIFT_PRESSED | CONTROL_PRESSED))) {
-			*buf = KEY_BACKSPACE;
-		    }
-		} else if (vk == VK_TAB) {
-		    if ((inp_rec.Event.KeyEvent.dwControlKeyState
-			 & (SHIFT_PRESSED | CONTROL_PRESSED))) {
-			*buf = KEY_BTAB;
-		    }
-		}
-		break;
-	    } else if (inp_rec.EventType == MOUSE_EVENT) {
-		if (handle_mouse(sp,
-				 inp_rec.Event.MouseEvent)) {
-		    *buf = KEY_MOUSE;
-		    break;
-		}
-	    }
-	    continue;
-	}
-    }
-    returnCode(rc);
 }
 
 #if USE_TERM_DRIVER && (USE_NAMED_PIPES || defined(USE_WIN32CON_DRIVER))
@@ -1222,8 +1147,9 @@ _nc_console_checkinit(bool assumeTermInfo)
 	   So if terminfo functions are used in this setup,
 	   they actually may work.
 	 */
-	_setmode(fileno(stdin), _O_BINARY);
-	_setmode(fileno(stdout), _O_BINARY);
+	_setmode(fileno(stdin),  _NC_STDIN_MODE);
+	_setmode(fileno(stdout), _NC_STDOUT_MODE);
+	_setmode(fileno(stderr), _NC_STDERR_MODE);
 
 	if (WINCONSOLE.hdl != INVALID_HANDLE_VALUE) {
 	    WINCONSOLE.buffered = buffered;
@@ -1263,6 +1189,126 @@ _nc_console_restore(void)
 	SetConsoleCursorInfo(WINCONSOLE.hdl, &WINCONSOLE.save_CI);
     }
     returnBool(res);
+}
+
+static int
+locale_is_utf8(const char *loc)
+{
+    if (!loc) return 0;
+    return strstr(loc, "UTF-8") ||
+           strstr(loc, "utf8")  ||
+           strstr(loc, "utf-8");
+}
+
+static int
+locale_compatible_with_ncurses(const char *loc)
+{
+#if USE_WIDEC_SUPPORT
+    return locale_is_utf8(loc);
+#else
+    return !locale_is_utf8(loc);
+#endif
+}
+
+static int
+codepage_compatible_with_ncurses(UINT cp)
+{
+#if USE_WIDEC_SUPPORT
+    return cp == 65001;   /* only UTF-8 */
+#else
+    return cp != 65001;   /* all but UTF-8 */
+#endif
+}
+
+/* Check Codepage exists */
+static int valid_codepage(UINT cp)
+{
+    CPINFOEX info;
+    return GetCPInfoEx(cp, 0, &info) != 0;
+}
+
+/* Check Windows Locale is valid */
+static int valid_locale(const char *loc)
+{
+    if (!loc || !*loc)
+        return 0;
+
+    const char *res = setlocale(LC_CTYPE, loc);
+    if (!res)
+        return 0;
+
+    /* Reset to previous value */
+    setlocale(LC_CTYPE, "");
+    return 1;
+}
+
+/* Encoding setup for Windows */
+NCURSES_EXPORT(void)
+_nc_win32_encoding_init(void)
+{
+#if USE_WIDEC_SUPPORT
+    UINT default_cp = 65001;            /* UTF-8 */
+    const char *default_ctype = "C.UTF-8";
+#else
+    UINT default_cp = 1252;             /* CP1252 */
+    const char *default_ctype = "English_United States.1252";
+#endif
+
+    const char *env_cp    = getenv("NC_WINCP");
+    const char *env_ctype = getenv("NC_WIN_CTYPE");
+
+    UINT cp = default_cp;
+    const char *ctype = default_ctype;
+
+    if (env_cp && *env_cp) {
+        UINT tmp = (UINT)atoi(env_cp);
+        if (valid_codepage(tmp) && codepage_compatible_with_ncurses(tmp))
+            cp = tmp;
+    }
+
+    if (env_ctype && *env_ctype) {
+        if (valid_locale(env_ctype) && locale_compatible_with_ncurses(env_ctype))
+            ctype = env_ctype;
+    }
+
+    UINT cur_in  = GetConsoleCP();
+    UINT cur_out = GetConsoleOutputCP();
+
+    if (!valid_codepage(cur_in) ||
+	!valid_codepage(cur_out) ||
+	!codepage_compatible_with_ncurses(cur_in) ||
+	!codepage_compatible_with_ncurses(cur_out)) {
+        cur_in = cur_out = default_cp;
+    }
+
+    if (!env_cp &&
+	valid_codepage(cur_out) &&
+	codepage_compatible_with_ncurses(cur_out))
+        cp = cur_out;
+
+    const char *cur_loc = setlocale(LC_CTYPE, NULL);
+    if (!env_ctype &&
+	cur_loc &&
+	valid_locale(cur_loc) &&
+	locale_compatible_with_ncurses(cur_loc))
+        ctype = cur_loc;
+
+    if (valid_codepage(cp) && codepage_compatible_with_ncurses(cp)) {
+        SetConsoleCP(cp);
+        SetConsoleOutputCP(cp);
+    } else {
+        SetConsoleCP(default_cp);
+        SetConsoleOutputCP(default_cp);
+    }
+
+    if (!setlocale(LC_CTYPE, ctype)) {
+        /* Fallback */
+        setlocale(LC_CTYPE, default_ctype);
+    }
+
+    _setmode(_fileno(stdin),  _NC_STDIN_MODE);
+    _setmode(_fileno(stdout), _NC_STDOUT_MODE);
+    _setmode(_fileno(stderr), _NC_STDERR_MODE);
 }
 
 #endif // _NC_WINDOWS

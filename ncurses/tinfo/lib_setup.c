@@ -855,6 +855,7 @@ TINFO_SETUP_TERM(TERMINAL **tp,
 	    T(("Failure with TERM=%s", NonNull(tname)));
 	    ret_error0(TGETENT_ERR, "TERM environment variable not set.\n");
 	}
+	_nc_win32_encoding_init();
 #elif USE_TERM_DRIVER
 	if (!NonEmpty(tname))
 	    tname = "unknown";
@@ -882,8 +883,10 @@ TINFO_SETUP_TERM(TERMINAL **tp,
     if (Filedes == STDOUT_FILENO && !NC_ISATTY(Filedes))
 	Filedes = STDERR_FILENO;
 #if USE_NAMED_PIPES
+#if 0
     if (Filedes != STDERR_FILENO && NC_ISATTY(Filedes))
-	_setmode(Filedes, _O_BINARY);
+	_setmode(Filedes, Filedes==STDIN_FILENO? _NC_STDIN_MODE : _NC_STDOUT_MODE);
+#endif
 #endif
 
     /*

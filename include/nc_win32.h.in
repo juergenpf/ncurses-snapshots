@@ -207,6 +207,16 @@ NCURSES_EXPORT(const char *) _nc_to_dospath(const char *, char *);
 #undef  ttyname
 #define ttyname(fd) NULL
 
+#if USE_WIDEC_SUPPORT
+#define _NC_STDIN_MODE  _O_U16TEXT
+#define _NC_STDOUT_MODE _O_BINARY
+#define _NC_STDERR_MODE _O_U8TEXT
+#else
+#define _NC_STDIN_MODE  _O_TEXT
+#define _NC_STDOUT_MODE _O_BINARY
+#define _NC_STDERR_MODE _O_TEXT
+#endif
+
 #endif /* _WIN32 || _WIN64 */
 
 #endif /* NC_WIN32_H */

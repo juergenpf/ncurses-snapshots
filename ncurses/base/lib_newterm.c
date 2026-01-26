@@ -202,8 +202,8 @@ NCURSES_SP_NAME(newterm) (NCURSES_SP_DCLx
     its_term = (current ? current->_term : NULL);
 
 #if USE_NAMED_PIPES
-    _setmode(fileno(_ifp), _O_BINARY);
-    _setmode(fileno(_ofp), _O_BINARY);
+    _setmode(fileno(_ifp), _NC_STDIN_MODE);
+    _setmode(fileno(_ofp), _NC_STDOUT_MODE);
 #endif
 
     INIT_TERM_DRIVER();
