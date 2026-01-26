@@ -882,12 +882,6 @@ TINFO_SETUP_TERM(TERMINAL **tp,
      */
     if (Filedes == STDOUT_FILENO && !NC_ISATTY(Filedes))
 	Filedes = STDERR_FILENO;
-#if USE_NAMED_PIPES
-#if 0
-    if (Filedes != STDERR_FILENO && NC_ISATTY(Filedes))
-	_setmode(Filedes, Filedes==STDIN_FILENO? _NC_STDIN_MODE : _NC_STDOUT_MODE);
-#endif
-#endif
 
     /*
      * Check if we have already initialized to use this terminal.  If so, we
