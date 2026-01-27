@@ -213,7 +213,7 @@ NCURSES_EXPORT(const char *) _nc_to_dospath(const char *, char *);
 #define _NC_STDERR_MODE _O_U8TEXT
 #else
 #define _NC_STDIN_MODE  _O_TEXT
-#define _NC_STDOUT_MODE _O_BINARY
+#define _NC_STDOUT_MODE _O_TEXT
 #define _NC_STDERR_MODE _O_TEXT
 #endif
 

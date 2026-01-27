@@ -272,7 +272,7 @@ _nc_console_setmode(HANDLE hdl, const TTY * arg)
 	    SetConsoleMode(hdl, dwFlag);
 
 	    alt = WINCONSOLE.inp;
-	    dwFlag = arg->dwFlagIn | ENABLE_MOUSE_INPUT;
+	    dwFlag = arg->dwFlagIn | ENABLE_MOUSE_INPUT | VT_FLAG_IN;
 	    TRCTTYIN(dwFlag);
 	    SetConsoleMode(alt, dwFlag);
 	    T(("effective mode set %s", _nc_trace_ttymode(&TRCTTY)));
@@ -405,7 +405,7 @@ restore_original_screen(void)
     bufferCoord.Y = (SHORT) (WINCONSOLE.window_only ?
 			     WINCONSOLE.SBI.srWindow.Top : 0);
 
-    if (write_screen(WINCONSOLE.hdl,
+    if (WriteConsoleOutputW(WINCONSOLE.hdl,
 		     WINCONSOLE.save_screen,
 		     WINCONSOLE.save_size,
 		     bufferCoord,
@@ -812,10 +812,22 @@ _nc_console_keyExist(int keycode)
 static unsigned char
 unicode_to_cp8Bit(wchar_t wc)
 {
-    if (wc <= 0xFF)
+    /* For ASCII characters, direct conversion is safe */
+    if (wc <= 0x7F)
         return (unsigned char)wc;
 
-    /* Fallback */
+    /* Use Windows API to convert Unicode to current console codepage */
+    UINT cp = GetConsoleCP();
+    char mb_char[4] = {0}; /* Max 4 bytes for multibyte character */
+    
+    int result = WideCharToMultiByte(cp, 0, &wc, 1, mb_char, sizeof(mb_char), NULL, NULL);
+    
+    /* If conversion successful and results in single byte, return it */
+    if (result == 1) {
+        return (unsigned char)mb_char[0];
+    }
+    
+    /* For multibyte characters or conversion failures, return fallback */
     return '?';
 }
 
@@ -862,9 +874,11 @@ win32_get_input_event(HANDLE hdl, NCWIN_EVENT *ev)
 	if (!has_unicode && !is_special)
 	    return false;
 #endif
-        /* Unicode immer korrekt */
         ev->unicode = k->uChar.UnicodeChar;
-        ev->cp8Bit = unicode_to_cp8Bit(ev->unicode);
+#if !USE_WIDEC_SUPPORT
+// ev->cp8Bit = unicode_to_cp8Bit(ev->unicode);
+        ev->cp8Bit = k->uChar.AsciiChar;
+#endif
         return true;
     }
 
@@ -952,39 +966,62 @@ _nc_console_twait(const SCREEN *sp,
 NCURSES_EXPORT(int)
 _nc_console_read(SCREEN *sp, HANDLE hdl, int *buf)
 {
-    NCWIN_EVENT ev;
+	NCWIN_EVENT ev;
 
-    while (true) {
-        if (!win32_get_input_event(hdl, &ev))
-            continue;
+	while (true)
+	{
+		if (!win32_get_input_event(hdl, &ev))
+			continue;
 
-	if (ev.is_key) {
+		if (ev.is_key)
+		{
 #if USE_WIDEC_SUPPORT
-	    if (ev.unicode != 0) {
-		*buf = (int)ev.unicode;
-		return 1;
-	    }
+			if (ev.unicode != 0)
+			{
+			    *buf = (int)(ev.unicode & 0xFFFF);
+			    return 1;
+			}
 #else
-	    if (ev.cp8Bit != 0) {
-		*buf = (int)ev.cp8Bit;
-		return 1;
-	    }
+			if (ev.cp8Bit != 0)
+			{
+			    *buf = (int)ev.cp8Bit;
+			    return 1;
+			}
 #endif
-	    int code = MapKey(ev.vk);
-
-	    if (code >= 0) {
-		*buf = code;
-		return 1;
-	    }
-
-	    if (ev.is_mouse) {
-		if (handle_mouse(sp,ev.mouse)) {
-		    *buf = KEY_MOUSE;
-		    return 1;
+			WORD vk = ev.vk;
+			if (vk >= VK_F1 && vk <= VK_F12)
+			{
+				if (ev.modifiers & SHIFT_PRESSED)
+				{
+					vk = (WORD)(vk + 12);
+				}
+			}
+			int key = MapKey(vk);
+			if (key < 0)
+				continue;
+			if (sp->_keypad_on)
+			{
+				*buf = key;
+			}
+			else
+			{
+				ungetch('\0');
+				*buf = AnsiKey(vk);
+			}
+			return 1;
 		}
-	    }
+		else
+		{
+			if (ev.is_mouse)
+			{
+				if (handle_mouse(sp, ev.mouse))
+				{
+					*buf = KEY_MOUSE;
+					return 1;
+				}
+			}
+		}
 	}
-    }
 }
 
 NCURSES_EXPORT(int)
@@ -1308,8 +1345,18 @@ _nc_win32_encoding_init(void)
     }
 
     if (!setlocale(LC_CTYPE, ctype)) {
-        /* Fallback */
+        /* Fallback - try alternative UTF-8 locale names for Windows */
+#if USE_WIDEC_SUPPORT
+        if (!setlocale(LC_CTYPE, ".UTF8") && 
+            !setlocale(LC_CTYPE, ".utf8") &&
+            !setlocale(LC_CTYPE, "en_US.UTF-8") &&
+            !setlocale(LC_CTYPE, "English_United States.65001")) {
+            /* Final fallback */
+            setlocale(LC_CTYPE, default_ctype);
+        }
+#else
         setlocale(LC_CTYPE, default_ctype);
+#endif
     }
 
     _setmode(_fileno(stdin),  _NC_STDIN_MODE);
