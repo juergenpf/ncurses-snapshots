@@ -201,13 +201,13 @@ NCURSES_SP_NAME(newterm) (NCURSES_SP_DCLx
     current = CURRENT_SCREEN;
     its_term = (current ? current->_term : NULL);
 
+    INIT_TERM_DRIVER();
 #if USE_NAMED_PIPES
-    _setmode(fileno(_ifp), _O_BINARY);
-    _setmode(fileno(_ofp), _O_BINARY);
+    _nc_setmode(fileno(_ifp), true);
+    _nc_setmode(fileno(_ofp), false);
 #endif
 
-    INIT_TERM_DRIVER();
-    /* this loads the capability entry, then sets LINES and COLS */
+	/* this loads the capability entry, then sets LINES and COLS */
     if (
 	   TINFO_SETUP_TERM(&new_term, name,
 			    fileno(_ofp), &errret, FALSE) != ERR) {

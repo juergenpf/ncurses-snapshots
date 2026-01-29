@@ -430,7 +430,7 @@ NCURSES_SP_NAME(_nc_setupscreen) (
 #if USE_NAMED_PIPES
     T(("setting output mode to binary"));
     fflush(output);
-    _setmode(fileno(output), _O_BINARY);
+    _nc_setmode(fileno(output), false);
 #endif
     sp->_lines = (NCURSES_SIZE_T) slines;
     sp->_lines_avail = (NCURSES_SIZE_T) slines;
@@ -441,7 +441,7 @@ NCURSES_SP_NAME(_nc_setupscreen) (
     sp->_ofp = output;
 #if USE_NAMED_PIPES
     if (output)
-	_setmode(fileno(output), _O_BINARY);
+	_nc_setmode(fileno(output), false);
 #endif
     sp->out_limit = (size_t) ((2 + slines) * (6 + scolumns));
     if ((sp->out_buffer = malloc(sp->out_limit)) == NULL)

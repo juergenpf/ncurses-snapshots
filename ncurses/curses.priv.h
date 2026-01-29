@@ -2572,6 +2572,8 @@ extern NCURSES_EXPORT_VAR(TERM_DRIVER) _nc_WIN_DRIVER;
 extern NCURSES_EXPORT_VAR(TERM_DRIVER) _nc_TINFO_DRIVER;
 #endif /* USE_TERM_DRIVER */
 
+extern NCURSES_EXPORT(void) _nc_setmode(int fd, bool isInput);
+
 #ifdef TERMIOS
 #define USE_WINCONMODE 0
 #elif defined(USE_WIN32CON_DRIVER)
@@ -2596,6 +2598,7 @@ extern NCURSES_EXPORT(int)  _nc_console_test(int fd);
 extern NCURSES_EXPORT(int)  _nc_console_testmouse(const SCREEN *sp, HANDLE fd, int delay EVENTLIST_2nd(_nc_eventlist*));
 extern NCURSES_EXPORT(int)  _nc_console_twait(const SCREEN *sp, HANDLE hdl,int mode,int msec,int *left EVENTLIST_2nd(_nc_eventlist * evl));
 extern NCURSES_EXPORT(int)  _nc_console_vt_supported(void);
+extern NCURSES_EXPORT(void) _nc_win32_encoding_init(void);
 
 #ifdef _NC_CHECK_MINTTY
 extern NCURSES_EXPORT(int)    _nc_console_checkmintty(int fd, LPHANDLE pMinTTY);
