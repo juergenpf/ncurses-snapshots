@@ -608,6 +608,12 @@ typedef union {
 #define NCURSES_PUTP2(name,value)    NCURSES_SP_NAME(_nc_putp)(NCURSES_SP_ARGx name, value)
 #define NCURSES_PUTP2_FLUSH(name,value)    NCURSES_SP_NAME(_nc_putp_flush)(NCURSES_SP_ARGx name, value)
 
+#if USE_WIDEC_SUPPORT && USE_NAMED_PIPES
+#define NCURSES_OUTC_FUNC_EX    NCURSES_SP_NAME(_nc_outch_ex)
+#else
+#define NCURSES_OUTC_FUNC_EX    NCURSES_OUTC_FUNC
+#endif
+
 #if NCURSES_NO_PADDING
 #define GetNoPadding(sp)	((sp) ? (sp)->_no_padding : _nc_prescreen._no_padding)
 #define SetNoPadding(sp)	_nc_set_no_padding(sp)
@@ -1501,7 +1507,7 @@ extern NCURSES_EXPORT_VAR(SIG_ATOMIC_T) _nc_have_sigwinch;
 #define PUTC(ch)	do { if(!isWidecExt(ch)) {				    \
 			if (Charable(ch)) {					    \
 			    TR_PUTC(CharOf(ch));				    \
-			    NCURSES_OUTC_FUNC (NCURSES_SP_ARGx (int) CharOf(ch));	    \
+			    NCURSES_OUTC_FUNC_EX (NCURSES_SP_ARGx (int) CharOf(ch));	    \
 			    COUNT_OUTCHARS(1);					    \
 			} else {						    \
 			    for (PUTC_i = 0; PUTC_i < CCHARW_MAX; ++PUTC_i) {	    \
@@ -1514,19 +1520,19 @@ extern NCURSES_EXPORT_VAR(SIG_ATOMIC_T) _nc_have_sigwinch;
 				if (PUTC_n <= 0) {				    \
 				    if (PUTC_ch && is8bits(PUTC_ch) && PUTC_i == 0) { \
 					TR_PUTC(CharOf(ch));			    \
-					NCURSES_OUTC_FUNC (NCURSES_SP_ARGx (int) CharOf(ch)); \
+					NCURSES_OUTC_FUNC_EX (NCURSES_SP_ARGx (int) CharOf(ch)); \
 				    }						    \
 				    break;					    \
 				} else if (PUTC_n > 1 || !is8bits(PUTC_ch)) {	    \
 				    int PUTC_j;					    \
 				    for (PUTC_j = 0; PUTC_j < PUTC_n; ++PUTC_j) {   \
 					TR_PUTC(PUTC_buf[PUTC_j]);		    \
-					NCURSES_OUTC_FUNC (NCURSES_SP_ARGx PUTC_buf[PUTC_j]); \
+					NCURSES_OUTC_FUNC_EX (NCURSES_SP_ARGx PUTC_buf[PUTC_j]); \
 				    }						    \
 				} else {					    \
 				    PUTC_buf[0] = (char) PUTC_ch;			    \
 				    TR_PUTC(PUTC_buf[0]);			    \
-				    NCURSES_OUTC_FUNC (NCURSES_SP_ARGx PUTC_buf[0]); \
+				    NCURSES_OUTC_FUNC_EX (NCURSES_SP_ARGx PUTC_buf[0]); \
 				}						    \
 			    }							    \
 			    COUNT_OUTCHARS(PUTC_i);				    \
@@ -2226,6 +2232,10 @@ extern NCURSES_EXPORT(void) _nc_signal_handler (int);
 extern NCURSES_EXPORT(void) _nc_synchook (WINDOW *);
 extern NCURSES_EXPORT(void) _nc_trace_tries (TRIES *);
 
+#if USE_WIDEC_SUPPORT && USE_NAMED_PIPES
+extern NCURSES_EXPORT(int) _nc_outch_ex(int);
+#endif
+
 #if NCURSES_EXT_NUMBERS
 extern NCURSES_EXPORT(const TERMTYPE2 *) _nc_fallback2 (const char *);
 #else
@@ -2710,6 +2720,9 @@ extern NCURSES_EXPORT(void)     NCURSES_SP_NAME(_nc_linedump)(SCREEN*);
 
 #if USE_WIDEC_SUPPORT
 extern NCURSES_EXPORT(wchar_t *) NCURSES_SP_NAME(_nc_wunctrl)(SCREEN*, cchar_t *);
+#if USE_NAMED_PIPES
+extern NCURSES_EXPORT(int)      NCURSES_SP_NAME(_nc_outch_ex)(SCREEN*, int);
+#endif
 #endif
 
 #endif /* NCURSES_SP_FUNCS */

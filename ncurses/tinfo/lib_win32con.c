@@ -1452,22 +1452,22 @@ static int valid_codepage(UINT cp)
 /* Check Windows Locale is valid */
 static int valid_locale(const char *loc)
 {
-    if (!loc || !*loc)
-        return 0;
+	if (!loc || !*loc)
+		return 0;
 
-    const char *res = setlocale(LC_CTYPE, loc);
-    if (!res)
-        return 0;
+	if (!setlocale(LC_CTYPE, loc))	
+		return 0;
 
-    /* Reset to previous value */
-    setlocale(LC_CTYPE, "");
-    return 1;
+	/* Reset to previous value */
+	setlocale(LC_CTYPE, "");
+	return 1;
 }
 
 /* Encoding setup for Windows */
 NCURSES_EXPORT(void)
 _nc_win32_encoding_init(void)
 {
+    /* Declare all variables at the beginning of the function for C90 compliance */
 #if USE_WIDEC_SUPPORT
     UINT default_cp = 65001;            /* UTF-8 */
     const char *default_ctype = "C.UTF-8";
@@ -1481,9 +1481,13 @@ _nc_win32_encoding_init(void)
 
     UINT cp = default_cp;
     const char *ctype = default_ctype;
+    UINT tmp;
+    UINT cur_in;
+    UINT cur_out;
+    const char *cur_loc;
 
     if (env_cp && *env_cp) {
-        UINT tmp = (UINT)atoi(env_cp);
+        tmp = (UINT)atoi(env_cp);
         if (valid_codepage(tmp) && codepage_compatible_with_ncurses(tmp))
             cp = tmp;
     }
@@ -1493,8 +1497,8 @@ _nc_win32_encoding_init(void)
             ctype = env_ctype;
     }
 
-    UINT cur_in  = GetConsoleCP();
-    UINT cur_out = GetConsoleOutputCP();
+    cur_in  = GetConsoleCP();
+    cur_out = GetConsoleOutputCP();
 
     if (!valid_codepage(cur_in) ||
 	!valid_codepage(cur_out) ||
@@ -1503,16 +1507,12 @@ _nc_win32_encoding_init(void)
         cur_in = cur_out = default_cp;
     }
 
-    if (!env_cp &&
-	valid_codepage(cur_out) &&
-	codepage_compatible_with_ncurses(cur_out))
+    if (!env_cp && valid_codepage(cur_out) && codepage_compatible_with_ncurses(cur_out))
         cp = cur_out;
 
-    const char *cur_loc = setlocale(LC_CTYPE, NULL);
-    if (!env_ctype &&
-	cur_loc &&
-	valid_locale(cur_loc) &&
-	locale_compatible_with_ncurses(cur_loc))
+    cur_loc = setlocale(LC_CTYPE, NULL);
+    if (!env_ctype && cur_loc && valid_locale(cur_loc) &&
+			locale_compatible_with_ncurses(cur_loc))
         ctype = cur_loc;
 
     if (valid_codepage(cp) && codepage_compatible_with_ncurses(cp)) {
