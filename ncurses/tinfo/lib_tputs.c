@@ -232,11 +232,24 @@ NCURSES_SP_NAME(_nc_outch)(NCURSES_SP_DCLx int ch)
 }
 
 #if USE_NAMED_PIPES && USE_WIDEC_SUPPORT
+// Helper function to adress the issue, that for pragmatic reasons we have 
+// to output UTF-8 encoded data to the Windows Console in _O_BINARY mode.
+static size_t 
+wchar_to_utf8_win(wchar_t wc, char utf8[4]) {
+    wchar_t wstr[2] = {wc, L'\0'};
+    int result;
+    
+    result = WideCharToMultiByte(CP_UTF8,0,wstr,1,utf8,4,NULL,NULL);
+    if (result > 0)
+        return (size_t)result;
+	else
+    	return 0; // signals error
+}
+
 /*
 We have to operate the Windows Console Output stream in _O_BINARY mode, so no UTF-8
 translation is performed by the OS. Therefore we have to encode UTF-8 characters
 ourselves.
-This code at least works for Latin-1 Supplement and Latin Extended-A characters (U+00A0 to U+017F).
 
 This routine is only used by the PUTC macro in the core update function of tty_updat.c
  */
@@ -244,13 +257,23 @@ NCURSES_EXPORT(int)
 NCURSES_SP_NAME(_nc_outch_ex)(NCURSES_SP_DCLx int ch)
 {
 	int rc = OK;
-	int len=1;
-	bool is_upperhalf = (ch < 0 || ch > 127);
-	
-	if (ch < 0) ch &= 0xFF;
-	if (is_upperhalf) len++;
-
+	int len;
+	int i;
+	char utf8[4];
+			
 	COUNT_OUTCHARS(1);
+
+	/*
+	In Windows wchar_t is an unsigned short, so it requires strange operations
+	to get a negative value when propagating to an int. The only plausible
+	scenario on Windows that ch could be negative is, that it was propagated
+	from a char to an int. So the follwing is safe.
+	*/
+	if (ch < 0) ch &= 0xFF;
+	
+	len = wchar_to_utf8_win((wchar_t)ch, utf8);
+	if (len == 0)
+		return ERR; // conversion error
 
 	if (HasTInfoTerminal(SP_PARM) && SP_PARM != NULL)
 	{
@@ -258,25 +281,18 @@ NCURSES_SP_NAME(_nc_outch_ex)(NCURSES_SP_DCLx int ch)
 		{
 			if (SP_PARM->out_inuse + len >= SP_PARM->out_limit)
 				NCURSES_SP_NAME(_nc_flush)(NCURSES_SP_ARG);
-			if (is_upperhalf) {
-				SP_PARM->out_buffer[SP_PARM->out_inuse++] = (char)(0xc0 | ((ch >> 6) & 0x1f));	
-				SP_PARM->out_buffer[SP_PARM->out_inuse++] = (char)(0x80 | (ch & 0x3f));
-			} else {
-				SP_PARM->out_buffer[SP_PARM->out_inuse++] = (char)ch;
+			for(i=0; i<len; i++) {
+				SP_PARM->out_buffer[SP_PARM->out_inuse++] = utf8[i];
 			}
 		}
 		else
 		{
-			char tmp[len];
-			if (is_upperhalf) {
-				tmp[0] = (char)(0xc0 | ((ch >> 6) & 0x1f));	
-				tmp[1] = (char)(0x80 | (ch & 0x3f));
-			} else {
-				tmp[0] = (char)ch;
-			}
-			if (write(fileno(NC_OUTPUT(SP_PARM)), &tmp, (size_t)len) == -1)
+			if (write(fileno(NC_OUTPUT(SP_PARM)), utf8, (size_t)len) == -1)
 				rc = ERR;
 		}
+	} else {
+		if (write(fileno(stdout), utf8, (size_t)len) == -1)
+			rc = ERR;		
 	}
 	return rc;
 }

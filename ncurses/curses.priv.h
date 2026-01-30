@@ -1508,7 +1508,7 @@ extern NCURSES_EXPORT_VAR(SIG_ATOMIC_T) _nc_have_sigwinch;
 			if (Charable(ch)) {					    \
 			    TR_PUTC(CharOf(ch));				    \
 			    NCURSES_OUTC_FUNC_EX (NCURSES_SP_ARGx (int) CharOf(ch));	    \
-			    COUNT_OUTCHARS(1);					    \
+			    /*COUNT_OUTCHARS(1);*/					    \
 			} else {						    \
 			    for (PUTC_i = 0; PUTC_i < CCHARW_MAX; ++PUTC_i) {	    \
 				PUTC_ch = (ch).chars[PUTC_i];			    \
@@ -1535,7 +1535,7 @@ extern NCURSES_EXPORT_VAR(SIG_ATOMIC_T) _nc_have_sigwinch;
 				    NCURSES_OUTC_FUNC_EX (NCURSES_SP_ARGx PUTC_buf[0]); \
 				}						    \
 			    }							    \
-			    COUNT_OUTCHARS(PUTC_i);				    \
+			    /*COUNT_OUTCHARS(PUTC_i);*/				    \
 			} } } while (0)
 
 #define BLANK		NewChar2(' ', WA_NORMAL)
