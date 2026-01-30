@@ -30,12 +30,259 @@
 -- Author: Juergen Pfeifer
 -------------------------------------------------------------------------------
 
-This is work in progress, but it is in an state where one can see it
+This is work in progress, but it is in a state where one can see it
 works at least on the Windows Console.
 
-You should install the MSYS2 package, so that you have a shell environment that
-allows you to run scripts, especially configure, etc.  You can get that
-from
+We recommend to use one of the Linux distributions that supports the MinGW
+cross-build packages. Because we develop for Windows, it's nice to be able
+to develop on Windows using WSL2 to host a Linux subsystem.
+The Author is using Ubuntu under WSL2, not because its a preference but it
+is the most common WSL2 distribution, well supported by the partners Canonical
+and Microsoft and most tips and tricks you'll find are using Ubuntu as an example.
+
+In Ubuntu just install the mingw-w64 package, it will install the whole suite of
+compilers, tools, and libraries you need to cross-build for the Windows MSVCRT 
+environment, the classical - although outdated - C runtime on Windows.
+
+You should enable Interop, so your WSL Ubuntu can call Windows programs. Do not
+install vscode in Ubuntu, but on Windows. vscode has a special extension builtin
+for WSL2 support, so with your Windows based vscode you can develop in WSL2 Linux.
+
+Even with interop, we do not recommend to run test programs from within a WSL2
+shell. The terminal characteristics are different from Windows and you should
+test directly on Windows.
+
+Fortunately, WSL2 supports to navigate from Windows into a WSL2 filesystem.
+So in CMD.EXE or Powershell, just do a "pushd \\wsl$\Ubuntu" (assuming Ubuntu
+is your WSL2 distribution name) and you are on the root of your Linux subsystem
+and can navigate to your test directory.
+
+The "Windows Terminal" is an ideal environment to run and test console programs
+on the Windows commandline - with one caveat: don't mix Unicode tests with tests
+for 8-bit codepages in the same Windows Terminal session. Your sessions should be
+either pure Unicode in all tabs, or pure 8-bit.
+
+In order to allow ncurses programs on Windows to ensure the correct locale and
+codepage, we support two environment variables
+
+	- NC_WINCP      can be set to the desired codepage
+	- NC_WIN_CTYPE  can be set to a locale that will be used for LC_CTYPE
+
+Example: 
+	NC_WINNCP="1252"
+	NC_WIN_CTYPE="German_Germany.1252"
+
+Would allow to run 8-Bit ncurses programs using Latin-1 codepage with a German 
+locale.
+
+Using cross build is much faster than the rather slow MSYS2 environment, but comes
+with one potential drawback: all major Linux distros only support the MinGW target
+which is based on good old MSVCRT runtime. This is ok, as ncurses currently only
+targets this one. But MSYS2 supports also the newer UCRT C-runtime, which is now
+used by all modern Windows systems and apps. They have two flavours for that
+runtime, one named UCRT64 for the gcc compiler, and one called CLANG64 for the
+clang compiler.
+
+So if you want to build ncurses against these targets, at the moment you have to use
+MSYS2. See below how to get it.
+
+To build a decent but still small footprint ncurses that provides
+hooks for interop, I recommend using these options:
+
+	--without-libtool
+	--disable-home-terminfo
+	--enable-database
+	--disable-termcap
+	--enable-sp-funcs
+	--enable-term-driver
+	--enable-named-pipes
+	--enable-interop
+
+This is the configuration command line which I am using at the moment,
+assuming you are in your ncurses source directory:
+
+In the following example we assume you have the ncurses sources in the
+directory ${HOME}/src/ncurses
+
+If that's not the case, do this
+
+$ cd $HOME
+$ [ -d $HOME/src ] || mkdir -p $HOME/src
+$ cd src
+$ git clone https://github.com/thomasdickey/ncurses-snapshots.git ncurses
+
+Now that you have that directory, you can do this
+
+$ NCURSES_SRC=$HOME/src/ncurses 
+$ cd $NCURSES_SRC
+$ mkdir build
+$ mkdir -p inst/mingw64
+$ pushd build >/dev/null
+$ ../configure \
+	--srcdir=.. \
+	--prefix=/mingw64 \
+	--with-default-terminfo-dir=/mingw64/share/terminfo \
+	--host=x86_64-w64-mingw32 \
+	--build=x86_64-pc-linux-gnu \
+	--without-cxx \
+	--without-ada \
+	--enable-warnings \
+	--enable-assertions \
+	--enable-ext-funcs \
+	--disable-home-terminfo \
+	--disable-echo \
+	--disable-getcap \
+	--disable-hard-tabs \
+	--disable-leaks \
+	--disable-macros \
+	--disable-overwrite \
+	--disable-termcap \
+	--enable-opaque-curses \
+	--enable-opaque-form \
+	--enable-opaque-menu \
+	--enable-opaque-panel \
+	--enable-pc-files \
+	--without-shared \
+	--without-manpages \
+	--without-libtool \
+	--enable-term-driver \
+	--enable-named-pipes \
+	--without-pkg-config \
+	--with-fallbacks=ms-terminal \
+	--disable-reentrant \
+	--without-pthread \
+	--enable-widec \
+	--enable-sp-funcs \
+	--enable-interop \
+	--with-debug \
+	--with-progs \
+	--with-tests \
+	--with-develop \
+	--with-trace \
+	--enable-database \
+	--enable-db-install
+$ make -j$(nproc)
+if [ $? -eq 0 ]; then
+    inst_path=$(readlink -f "../inst")
+    make install DESTDIR=$inst_path
+else
+     echo "Build failed" >&2
+fi
+popd >/dev/null
+
+Of course you can replace --enable-widec by --disable-widec is you want a
+tradition 8-Bit only build.
+
+If nothing failed, you have in ./build/test all the test programs you may
+examine. So, how do you get to them?
+
+I suggest this for your comfort: Put the following lines in your Powershell Profile.
+you can do that in powershell with
+
+$ notepad $PROFILE # or any other text editor you preference
+
+This is the logic
+#############################################
+$NC_INIPATH=$Env:PATH
+
+function Test-NCurses {
+    param(
+        [Switch]$Legacy,
+        [Switch]$Trace
+    )
+    [string]$User=${Env:USERNAME}.ToLowerInvariant()
+    [string]$NCSRC="\\wsl$\Ubuntu\home\${User}\src\ncurses"
+    [string]$inst="${NCSRC}\inst\mingw64"
+    [string]$Target="$NCSRC\build\test"
+
+    Push-Location -Path "$target"
+    $Env:PATH="$inst\bin;$NC_INIPATH"
+    $Env:TERM="ms-terminal"
+    $Env:TERMINFO="$inst\share\terminfo"
+    if (!$Legacy) {
+        chcp 65001
+        $Env:NC_WINCP="65001"
+        $Env:NC_WIN_CTYPE="German_Germany.UTF-8"
+    } else {
+        chcp 1252
+        $Env:NC_WINCP="1252"
+        $Env:NC_WIN_CTYPE="German_Germany.1252"
+    }
+    if ($Trace) {
+        $Env:NCURSES_TRACE=8191
+    }
+    Write-Host "NC_WIN_CTYPE: $Env:NC_WIN_CTYPE"
+    Write-Host "NC_WINCP: $Env:NC_WINCP"
+    Write-Host "TERM: $Env:TERM"
+    Write-Host "TERMINFO: $Env:TERMINFO"
+    if ($Legacy) {
+        cd $ENV:USERPROFILE
+        Start-Process cmd -ArgumentList "/K","PUSHD $Target && chcp $Env:NC_WINCP"
+    }
+}
+
+Set-Alias nct Test-NCurses
+#############################################
+
+With the alias nct you're pushed into the test directory in Unicode mode 
+(the default on Windows). You can run tests and afterwards just do a popd.
+
+If you've build your ncurses without widec support, you should test in Legacy
+mode. Just do this:
+
+$ nct -l
+
+This will spawn a separate Windows Terminal session and set it initially to
+codepage 1252, so you can test 8-bit ncurses apps.
+
+When it come to development, I suggest vscode. On WSL2 there is a speciality.
+In that case, do not install vscode in the WSL2 Linux Distro. Just make sure
+you have interop enabled and the path of vscode installed on Windows is 
+on your PATH list. Then do this:
+
+$ cd $HOME/ncurses && code .
+
+This will launch the Windows install of vscode (so no remote graphics involved)
+which has a special extension to do development in WSL2.
+
+And what's about debugging. Having debugging of Windows apps build in WSL2 in
+vscode is a complex setup, involving Wine and other tools. This is simply beyond
+the scope of a README.
+
+But there is a pleasant - IMHO good enough - alternative. Install MSYS2 (see below)
+and in MSYS2 the package mingw-w64-x86_64-gdb. But how do you access your build-
+and test environment from within MSYS2? Here is the recipe
+
+1. Make sure there is a /home/username in MSYS2, where username should be the
+   username you have in your WSL2 distro. If you haven't done special configurations, WSL2
+   distros as well as MSYS2 use your Windows username. If that directory doesn't
+   exist, simply create it.
+2. I now assume, that your MSYS2 username is the same as your WSL2 username, so we
+   can use "id -un" to get it. Do this
+   $ mkdir -p "/home/$(id -un)/src"
+3. Change directory to /home/$(id -un)/src 
+   If $HOME is set properly you may use $HOME instead of $(id -un)
+   If you already have an ncurses directory there, rename or move it
+4. Now comes the trick. Do this
+   $ ln -s "//wsl$/Ubuntu/home/$(id -un)/src/ncurses" .
+   Because MSYS2 sits on top of the Windows filesystem, it understands its remote
+   directory name conventions and can provide access to the WSL2 filesystem.
+   Replace the name Ubuntu with the name of your distribution if you use another one.
+5. Now, if gdb looks for the sourcefiles, it will find them because we have mirrored
+   the filesystem-tree in MSYS2.
+6. Now open a terminal session in the MINGW64 environment and do this:
+   $ cd /home/$(id -un)/src/ncurses/test
+   $ gdb xxx.EXE
+   Replace xxx by the name of the program you want to debug
+
+This workaround still requires MSYS2, but only for debugging. The build and coding is
+done in WSL2, which is much more responsive than MSYS2.
+
+Of course, if you don't use WSL2 but a native Linux Box, you can't use this workaround
+and have to use the Wine based approach.
+
+You can get MSYS2 from
+
 	https://www.msys2.org/
 
 or the individual packages from
@@ -85,55 +332,6 @@ is NOT a console program, e.g., MSYS2's own mintty Terminal emulator.
 
 In the current MSYS2/minGW setup, building MinGW shared libraries with
 libtool for ncurses seems to be broken, so I recommend NOT to use libtool.
-
-To build a modern but still small footprint ncurses that provides
-hooks for interop, I recommend using these options:
-
-	--without-libtool
-	--disable-home-terminfo
-	--enable-database
-	--disable-termcap
-	--enable-sp-funcs
-	--enable-term-driver
-	--enable-interop
-
-This is the configuration command line which I am using at the moment
-(assuming environment variable MINGW_ROOT holds the root directory name of
-your MinGW build):
-
-./configure \
-	--prefix=/mingw64 \
-	--without-cxx \
-	--without-ada \
-	--enable-warnings \
-	--enable-assertions \
-	--enable-named-pipes \
-	--enable-ext-funcs \
-	--disable-home-terminfo \
-	--disable-echo \
-	--disable-getcap \
-	--disable-hard-tabs \
-	--disable-leaks \
-	--disable-macros \
-	--disable-overwrite \
-	--enable-opaque-curses \
-	--enable-opaque-panel \
-	--enable-opaque-menu \
-	--enable-opaque-form \
-	--enable-database \
-	--enable-sp-funcs \
-	--enable-term-driver \
-	--enable-interop \
-	--disable-termcap \
-	--enable-database \
-	--with-progs \
-	--without-libtool \
-	--enable-pc-files \
-	--with-shared \
-	--with-normal \
-	--without-debug \
-	--with-fallbacks=ms-terminal \
-	--without-manpages
 
 Please note that it is also necessary to set this environment variable:
 
