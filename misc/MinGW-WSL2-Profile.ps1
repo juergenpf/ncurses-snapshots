@@ -1,8 +1,58 @@
+#------------------------------------------------------------------------------
+## Copyright 2020 Thomas E. Dickey                                           ##
+## Copyright 2008-2011,2012 Free Software Foundation, Inc.                   ##
+##                                                                           ##
+## Permission is hereby granted, free of charge, to any person obtaining a   ##
+## copy of this software and associated documentation files (the             ##
+## "Software"), to deal in the Software without restriction, including       ##
+## without limitation the rights to use, copy, modify, merge, publish,       ##
+## distribute, distribute with modifications, sublicense, and/or sell copies ##
+## of the Software, and to permit persons to whom the Software is furnished  ##
+## to do so, subject to the following conditions:                            ##
+##                                                                           ##
+## The above copyright notice and this permission notice shall be included   ##
+## in all copies or substantial portions of the Software.                    ##
+##                                                                           ##
+## THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS   ##
+## OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF                ##
+## MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN ##
+## NO EVENT SHALL THE ABOVE COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,       ##
+## DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR     ##
+## OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE ##
+## USE OR OTHER DEALINGS IN THE SOFTWARE.                                    ##
+##                                                                           ##
+## Except as contained in this notice, the name(s) of the above copyright    ##
+## holders shall not be used in advertising or otherwise to promote the      ##
+## sale, use or other dealings in this Software without prior written        ##
+## authorization.                                                            ##
+#------------------------------------------------------------------------------
+## $Id$
+## Author: Juergen Pfeifer
+#------------------------------------------------------------------------------
 # You may change the following two variables according to your environment
 $NC_DISTRO_NAME="Ubuntu"
 $NC_SRC_PATTERN="\home\@USER@\src\ncurses"
 
 $NC_INIPATH=$Env:PATH
+
+function Get-MinGWGDBPath {
+    $registryPath = "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\MSYS2 64bit_is1"
+    $installDir = (Get-ItemProperty -Path $registryPath -ErrorAction SilentlyContinue).InstallLocation
+
+    if (-not $installDir) {
+        if (Test-Path "${Env:SystemDrive}\msys64") { $installDir = "${Env:SystemDrive}\msys64" }
+    }
+
+    if ($installDir) {
+        $gdbPath = Join-Path (Join-Path (Join-Path $installDir "mingw64") "bin") "gdb.exe"
+        if (Test-Path $gdbPath -PathType Leaf) {
+       	    return $gdbPath
+        } else {
+        Write-Error "gdb.exe not found"
+    }
+    }
+    return $null
+}
 
 function Test-NCurses {
     param(
@@ -15,33 +65,40 @@ function Test-NCurses {
     [string]$Target="$NCSRC\build\test"
     [bool]$Legacy=$false
     [string]$ConfigLog=(Join-Path (Join-Path $NCSRC "build") "config.log")
-    
+    [string]$DefaultCP="65001"
+    [string]$DefaultLocale="German_Germany.UTF-8"
+    [string]$gdb=Get-MinGWGDBPath
+
     if (Test-Path -Path $ConfigLog -PathType Leaf) {
         $Legacy=Select-String -Path $ConfigLog -Pattern "--disable-widec" -Quiet
+    }
+    if ($Legacy) {
+        $DefaultCP="1252"
+        $DefaultLocale="German_Germany.1252"
     }
     Push-Location -Path "$target"
     $Env:PATH="$inst\bin;$NC_INIPATH"
     $Env:TERM="ms-terminal"
     $Env:TERMINFO="$inst\share\terminfo"
-    if (!$Legacy) {
-	[Console]::OutputEncoding = [System.Text.Encoding]::GetEncoding(65001)
-        $Env:NC_WINCP="65001"
-        $Env:NC_WIN_CTYPE="German_Germany.UTF-8"
-    } else {
-	[Console]::OutputEncoding = [System.Text.Encoding]::GetEncoding(1252)
-        $Env:NC_WINCP="1252"
-        $Env:NC_WIN_CTYPE="German_Germany.1252"
-    }
     if ($Trace) {
         $Env:NCURSES_TRACE=8191
     }
-    Write-Host "NC_WIN_CTYPE: $Env:NC_WIN_CTYPE"
-    Write-Host "NC_WINCP: $Env:NC_WINCP"
-    Write-Host "TERM: $Env:TERM"
-    Write-Host "TERMINFO: $Env:TERMINFO"
+   if (!$Legacy) {
+	    [Console]::OutputEncoding = [System.Text.Encoding]::GetEncoding(65001)
+        $Env:NC_WINCP="65001"
+        $Env:NC_WIN_CTYPE="German_Germany.UTF-8"
+    } else {
+        Write-Host "Separate Terminal session will be started with these settings:"
+        Write-Host "NCDBG=$gdb"
+    }
+    Write-Host "NC_WIN_CTYPE=$Env:NC_WIN_CTYPE"
+    Write-Host "NC_WINCP$Env:NC_WINCP"
+    Write-Host "TERM=$Env:TERM"
+    Write-Host "TERMINFO=$Env:TERMINFO"
     if ($Legacy) {
-        cd $ENV:USERPROFILE
-        Start-Process cmd -ArgumentList "/K","PUSHD $Target && chcp $Env:NC_WINCP"
+        Pop-Location
+        Set-Location $ENV:USERPROFILE
+        Start-Process cmd -ArgumentList "/K","PUSHD $Target && SET NCDBG=$gdb SET NC_WINCP=$DefaultCP && SET NC_WIN_CTYPE=$DefaultLocale && chcp $DefaultCP"
     }
 }
 
@@ -49,21 +106,13 @@ function Start-MinGWDebug {
     param(
         [string]$Program
     )
-    $registryPath = "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\MSYS2 64bit_is1"
-    $installDir = (Get-ItemProperty -Path $registryPath -ErrorAction SilentlyContinue).InstallLocation
-
-    if (-not $installDir) {
-        if (Test-Path "${Env:SystemDrive}\msys64") { $installDir = "${Env:SystemDrive}\msys64" }
-    }
-
-    if ($installDir) {
-        $gdbPath = Join-Path (Join-Path (Join-Path $installDir "mingw64") "bin") "gdb.exe"
-        if (Test-Path $gdbPath -PathType Leaf) {
-       	    & $gdbPath $Program
-        } else {
+    $gdbPath = Get-MinGWGDBPath
+    if ($gdbPath) {
+        & $gdbPath $Program
+    }   
+    else {
 	    Write-Error "gdb.exe not found"
 	}
-    }
 }
 
 Set-Alias nct Test-NCurses

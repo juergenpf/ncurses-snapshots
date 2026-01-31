@@ -208,10 +208,14 @@ $ notepad $PROFILE
 Insert the content of above mentioned file and modify it according to your setup
 (ncurses source location and WSL Distribution you use)
 
-With the alias nct you're pushed into the test directory of your build, if it
-exists at all. You can run tests and afterwards just do a popd. Please note,
-that if you've build a non-widec version, this will spawn a new Terminal session
-that will be setup for non-Unicode codepage and locale.
+Now launch Windows Terminal with a Powershell tab and type this
+
+	PS> nct
+
+You're pushed into the test directory of your build, if it exists at all. You 
+can run tests and afterwards just do a popd. Please note, that if you've build 
+a non-widec version, this will spawn a new Terminal session that will be setup 
+for non-Unicode codepage and locale and use the CMD.EXE command processor.
 
 When it come to development, I suggest vscode. I've described above how to set it
 up. Then just do this:
@@ -260,19 +264,25 @@ from within MSYS2? Here is the recipe:
 5. Now, if gdb looks for the sourcefiles, it will find them because you have mirrored
    the filesystem-tree in MSYS2.
 
-6. Now open a Windows Terminal session and do
+6. Now open a Windows Terminal session with a Powershell Tab and do
 
-   $ Test-NCurses
+   PS> nct
 
-   which will push you into the test directory of your build. You may use the 
-   nct alias for your convenience.
+   which will push you into the test directory of your build.
 
    Now you can do this:
 
-   $ Start-MinGWDebug xxx.exe
+      a) If you test a widec build (Unicode), you stay in your current Powershell
+         and type this
 
-   if you want to debug xxx.exe. You may use the ncdbg alias for your convenience.
-   Replace xxx with the name of the program you want to debug.
+   	PS> ncdbg xxx.exe
+
+     b) If you test a non-widec legacy build, a separate terminal was launched
+        with 8-bit settings and CMD.EXE as command processor. Type this
+
+	> %NCDBG% xxx.exe
+
+   to debug xxx.exe. Replace xxx with the name of the program you want to debug.
 
 This workaround still requires MSYS2, but only for debugging. The build and coding is
 done in WSL2, which is much more responsive than MSYS2.
