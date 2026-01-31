@@ -347,7 +347,7 @@ NCURSES_SP_NAME(newterm) (NCURSES_SP_DCLx
 	    _nc_initscr(NCURSES_SP_ARG);
 
 	    _nc_signal_handler(TRUE);
-#if USE_NAMED_PIPES || defined(USE_WINCONMODE)
+#if USE_NAMED_PIPES || defined(_NC_WINDOWS_NATIVE)
 	    _nc_setmode(fileno(_ifp), true, true);
     	    _nc_setmode(fileno(_ofp), false, true);
 #endif

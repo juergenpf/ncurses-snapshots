@@ -938,7 +938,7 @@ TINFO_SETUP_TERM(TERMINAL **tp,
 
 	T(("your terminal name is %s", myname));
 
-#if defined(USE_WIN32CON_DRIVER)
+#if USE_NAMED_PIPES || defined(_NC_WINDOWS_NATIVE)
 		_nc_win32_encoding_init();
 #endif
 
