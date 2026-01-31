@@ -907,11 +907,9 @@ TINFO_SETUP_TERM(TERMINAL **tp,
 	termp = cur_term;
 	T((T_CALLED("setupterm(%s,%d,%p)"), _nc_visbuf(tname), Filedes, (void *)errret));
 #endif
-
 	if (tname == NULL)
 	{
 		tname = getenv("TERM");
-		_nc_win32_encoding_init();
 #if USE_NAMED_PIPES
 		if (!VALID_TERM_ENV(tname, NO_TERMINAL))
 		{
@@ -939,6 +937,10 @@ TINFO_SETUP_TERM(TERMINAL **tp,
 	}
 
 	T(("your terminal name is %s", myname));
+
+#if defined(USE_WIN32CON_DRIVER)
+		_nc_win32_encoding_init();
+#endif
 
 	/*
 	 * Allow output redirection.  This is what SVr3 does.  If stdout is

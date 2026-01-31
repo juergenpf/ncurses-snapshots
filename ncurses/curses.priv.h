@@ -2582,7 +2582,7 @@ extern NCURSES_EXPORT_VAR(TERM_DRIVER) _nc_WIN_DRIVER;
 extern NCURSES_EXPORT_VAR(TERM_DRIVER) _nc_TINFO_DRIVER;
 #endif /* USE_TERM_DRIVER */
 
-extern NCURSES_EXPORT(void) _nc_setmode(int fd, bool isInput);
+extern NCURSES_EXPORT(void) _nc_setmode(int fd, bool isInput, bool isCurses);
 
 #ifdef TERMIOS
 #define USE_WINCONMODE 0

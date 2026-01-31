@@ -122,21 +122,21 @@ _nc_console_checkmintty(int fd, LPHANDLE pMinTTY)
    character modes.
 */
 NCURSES_EXPORT(void)
-_nc_setmode(int fd, bool isInput)
+_nc_setmode(int fd, bool isInput, bool isCurses)
 {
-	T((T_CALLED("lib_win32util::_nc_setmode(%d,%d)"), fd, isInput));
+	T((T_CALLED("lib_win32util::_nc_setmode(%d,%d,%d)"), fd, isInput,isCurses));
 	if (!isatty(fd))
 		return;
 #if USE_WIDEC_SUPPORT
 	if (WINCONSOLE.isTermInfoConsole)
-		_setmode(fd, isInput ? _O_TEXT : _O_BINARY);
+		_setmode(fd, isInput ? _O_TEXT : (isCurses ? _O_BINARY : _O_TEXT));
 	else
-		_setmode(fd, isInput ? _O_TEXT : _O_BINARY);
+		_setmode(fd, isInput ? _O_TEXT : (isCurses ? _O_BINARY : _O_TEXT));
 #else
 	if (WINCONSOLE.isTermInfoConsole)
-		_setmode(fd, isInput ? _O_TEXT : _O_BINARY);
+		_setmode(fd, isInput ? _O_TEXT : (isCurses ? _O_BINARY : _O_TEXT));
 	else
-		_setmode(fd, isInput ? _O_TEXT : _O_BINARY);
+		_setmode(fd, isInput ? _O_TEXT : (isCurses ? _O_BINARY : _O_TEXT));
 #endif
 }
 

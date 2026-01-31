@@ -33,6 +33,39 @@
 This is work in progress, but it is in a state where one can see it
 works at least on the Windows Console.
 
+Before we dive into the details how to build and test ncurses for Windows, let
+me set expectations. Although Windows now for a while has a console subsystem 
+that accepts ANSI control sequences, there is one fundamental difference to most
+UNIX-like operating systems e.g. Linux. In Linux, when the console is in
+UTF-8 mode, the console handles the UTF-8 encoding for you if you send a
+non-ASCII character. This is not true on Windows. If the console is in UTF-8
+mode, it expects the application to send UTF-8 encoded character sequences. 
+
+This fundamental difference in console behaviour has consequences for the 
+terminfo low level interface usage. As you know, terminfo is used to query
+the terminal capability database and to translate abstract requests into 
+concrete code to be send to the terminal, like doing cursor positioning,
+enabling/disabling character attributes like boldness etc. or sending
+sequences to clear the screen, insert or delete lines etc. - you get it.
+All this works with this Windows port on all Windows versions since
+10.0 Build 17763. The terminfo paradigm assumes, that everything else
+to be written to the console is done by standard library I/O routines.
+And this makes the use of terminfo not really portable to Windows, 
+because as said above, in Windows you have to take care of UTF-8 encoding
+yourself. There is no way to fix that easily.
+
+Nevertheless is terminfo usable on Windows, it's just that it only works like
+on UNIX as long as you don't output something that requires multibyte UTF-8
+encoding. And of course all that is if you use --enable-widec when configuring
+the build. If you use --disable-widec and build a legacy non-unicode version of
+the library, everything should be compatible.
+
+In the layer above terminfo, the ncurses, panel, menu and form library we
+have full control over the output and can handle this issue, so these
+libraries are fully portable, even for Windows Versions before 10.0.17763!
+
+But now let's talk about building and testing the libraries.
+
 I recommend using one of the Linux distributions that supports the MinGW
 cross-build packages. Because we develop for Windows, it's nice to be able
 to develop on Windows using WSL2 to host a Linux subsystem.

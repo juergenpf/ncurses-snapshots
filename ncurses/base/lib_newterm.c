@@ -202,12 +202,8 @@ NCURSES_SP_NAME(newterm) (NCURSES_SP_DCLx
     its_term = (current ? current->_term : NULL);
 
     INIT_TERM_DRIVER();
-#if USE_NAMED_PIPES
-    _nc_setmode(fileno(_ifp), true);
-    _nc_setmode(fileno(_ofp), false);
-#endif
 
-	/* this loads the capability entry, then sets LINES and COLS */
+    /* this loads the capability entry, then sets LINES and COLS */
     if (
 	   TINFO_SETUP_TERM(&new_term, name,
 			    fileno(_ofp), &errret, FALSE) != ERR) {
@@ -351,6 +347,10 @@ NCURSES_SP_NAME(newterm) (NCURSES_SP_DCLx
 	    _nc_initscr(NCURSES_SP_ARG);
 
 	    _nc_signal_handler(TRUE);
+#if USE_NAMED_PIPES || defined(USE_WINCONMODE)
+	    _nc_setmode(fileno(_ifp), true, true);
+    	    _nc_setmode(fileno(_ofp), false, true);
+#endif
 	    result = SP_PARM;
 	}
     }

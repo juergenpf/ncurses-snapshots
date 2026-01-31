@@ -1052,7 +1052,25 @@ _nc_console_twait(
 								goto end;
 							}
 							continue;
-							/* e.g., FOCUS_EVENT */
+						case WINDOW_BUFFER_SIZE_EVENT:
+							T(("twait:event WINDOW_BUFFER_SIZE_EVENT"));
+							/* Console window was resized - handle like Unix SIGWINCH */
+							{
+								int old_lines, old_cols;
+								int new_lines, new_cols;
+								
+								old_lines = sp ? screen_lines(sp) : 0;
+								old_cols = sp ? screen_columns(sp) : 0;								
+								_nc_console_get_SBI();								
+								_nc_console_size(&new_lines, &new_cols);
+								
+								if (sp && ((new_lines != old_lines) || (new_cols != old_cols))) {
+									code = TW_INPUT;
+									goto end;	
+								}
+							}
+							CONSUME();
+							continue;
 						default:
 							T(("twait:event Type %d", inp_rec.EventType));
 							CONSUME();
@@ -1202,6 +1220,27 @@ _nc_console_read(
 				{
 					*buf = KEY_MOUSE;
 					break;
+				}
+			}
+			else if (inp_rec.EventType == WINDOW_BUFFER_SIZE_EVENT)
+			{
+				T(("_nc_console_read: WINDOW_BUFFER_SIZE_EVENT"));
+				/* Console window was resized - handle like Unix SIGWINCH */
+				{
+					int old_lines, old_cols;
+					int new_lines, new_cols;
+					
+					old_lines = sp ? screen_lines(sp) : 0;
+					old_cols = sp ? screen_columns(sp) : 0;
+					_nc_console_get_SBI();
+					_nc_console_size(&new_lines, &new_cols);
+					
+					if (sp && ((new_lines != old_lines) || (new_cols != old_cols))) {
+						T(("Console resized from %dx%d to %dx%d", old_lines, old_cols, new_lines, new_cols));
+						NCURSES_SP_NAME(resizeterm)(sp, new_lines, new_cols);
+						*buf = KEY_RESIZE;
+						break;
+					}
 				}
 			}
 			continue;
@@ -1367,9 +1406,9 @@ _nc_console_checkinit(bool assumeTermInfo)
 		   So if terminfo functions are used in this setup,
 		   they actually may work.
 		 */
-		_nc_setmode(fileno(stdin), true);
-		_nc_setmode(fileno(stdout), false);
-		_nc_setmode(fileno(stderr), false);
+		/*_nc_setmode(fileno(stdin), true, false);
+		_nc_setmode(fileno(stdout), false, false);
+		_nc_setmode(fileno(stderr), false, false);*/
 		if (WINCONSOLE.hdl != INVALID_HANDLE_VALUE)
 		{
 			WINCONSOLE.buffered = buffered;
@@ -1467,12 +1506,11 @@ static int valid_locale(const char *loc)
 NCURSES_EXPORT(void)
 _nc_win32_encoding_init(void)
 {
-    /* Declare all variables at the beginning of the function for C90 compliance */
 #if USE_WIDEC_SUPPORT
-    UINT default_cp = 65001;            /* UTF-8 */
+    UINT default_cp = CP_UTF8;
     const char *default_ctype = "C.UTF-8";
 #else
-    UINT default_cp = 1252;             /* CP1252 */
+    UINT default_cp = 1252;
     const char *default_ctype = "English_United States.1252";
 #endif
 
@@ -1538,9 +1576,9 @@ _nc_win32_encoding_init(void)
 #endif
     }
 
-    _nc_setmode(_fileno(stdin),  true);
-    _nc_setmode(_fileno(stdout), false);
-    _nc_setmode(_fileno(stderr), false);
+    _nc_setmode(_fileno(stdin),  true, false);
+    _nc_setmode(_fileno(stdout), false, false);
+    _nc_setmode(_fileno(stderr), false, false);
 }
 
 #endif // _NC_WINDOWS
