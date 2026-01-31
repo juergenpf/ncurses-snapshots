@@ -33,10 +33,10 @@
 This is work in progress, but it is in a state where one can see it
 works at least on the Windows Console.
 
-We recommend to use one of the Linux distributions that supports the MinGW
+I recommend using one of the Linux distributions that supports the MinGW
 cross-build packages. Because we develop for Windows, it's nice to be able
 to develop on Windows using WSL2 to host a Linux subsystem.
-The Author is using Ubuntu under WSL2, not because its a preference but it
+The author is using Ubuntu under WSL2, not because it's a preference but it
 is the most common WSL2 distribution, well supported by the partners Canonical
 and Microsoft and most tips and tricks you'll find are using Ubuntu as an example.
 
@@ -55,12 +55,12 @@ Find the details how to configure WSL2 here:
 	https://learn.microsoft.com/en-us/windows/wsl/wsl-config
 
 Do not install vscode in Ubuntu, but on Windows. vscode has a special extension 
-builtin for WSL2 support, so with your Windows based vscode you can develop in 
+built-in for WSL2 support, so with your Windows-based vscode you can develop in 
 WSL2 Linux. You can find the details about developing for WSL2 with vscode here:
 
 	https://learn.microsoft.com/en-us/windows/wsl/tutorials/wsl-vscode
 
-Even with interop, we do not recommend to run test programs from within a WSL2
+Even with interop, I do not recommend running test programs from within a WSL2
 shell. The terminal characteristics are different from Windows and you should
 test directly on Windows. 
 
@@ -79,12 +79,12 @@ If you not yet have Windows Terminal installed, you can get it from the store:
 	https://apps.microsoft.com/detail/9n0dx20hk701
 
 In order to allow ncurses programs on Windows to ensure the correct locale and
-codepage, we support two environment variables
+codepage, ncurses supports two environment variables
 
 	- NC_WINCP      can be set to the desired codepage
 	- NC_WIN_CTYPE  can be set to a locale that will be used for LC_CTYPE
 
-Example for legacy 8-Bit: 
+Example for legacy 8-bit: 
 	NC_WINNCP="1252"
 	NC_WIN_CTYPE="German_Germany.1252"
 
@@ -92,21 +92,21 @@ Example for Unicode:
 	NC_WINNCP="65001"
 	NC_WIN_CTYPE="German_Germany.UTF-8"
 
-Of course you shoud set the country to your preference.
+Of course you should set the country to your preference.
 
-Would allow to run 8-Bit ncurses programs using Latin-1 codepage with a German 
-locale.
+This would allow running 8-bit ncurses programs using Latin-1 codepage with a 
+German  locale.
 
-Using cross build is much faster than the rather slow MSYS2 environment, but comes
+Using cross-build is much faster than the rather slow MSYS2 environment, but comes
 with one potential drawback: all major Linux distros only support the MinGW target
-which is based on good old MSVCRT runtime. This is ok, as ncurses currently only
-targets this one. But MSYS2 supports also the newer UCRT C-runtime, which is now
-used by all modern Windows systems and apps. MSYS2 has two flavours for that
+which is based on the old MSVCRT runtime. This is OK, as ncurses currently only
+targets this one. But MSYS2 also supports the newer UCRT C-runtime, which is now
+used by all modern Windows systems and apps. MSYS2 has two flavors for that
 runtime, one named UCRT64 using the gcc compiler, and one called CLANG64 using 
 the clang compiler.
 
-So if you want to build ncurses against these targets, at the moment you have to use
-MSYS2. See below how to get it.
+So if you want to build ncurses against these targets, at the moment you have to 
+use MSYS2. See below how to get it.
 
 To build a decent but still small footprint ncurses that provides
 hooks for interop, I recommend using these options:
@@ -183,22 +183,22 @@ $ ../configure \
 	--enable-db-install
 $ make -j$(nproc)
 
-If the build was successfull, you can install into the test environment
+If the build was successful, you can install into the test environment
 
 $ make install DESTDIR=$(readlink -f "../inst")
 $ popd
 
-Of course you can replace --enable-widec by --disable-widec is you want a
-tradition 8-Bit only build.
+Of course you can replace --enable-widec with --disable-widec if you want a
+traditional 8-bit only build.
 
 If nothing failed, you have in ./build/test all the test programs you may
 examine. So, how do you get to them?
 
 I suggest this for your comfort (assuming you develop on Windows with WSL2):
 
-In the ncurses source directory in folder misc you'll find the file
+In the ncurses source directory in the misc folder you'll find the file
 
-	MinGW-WSL2-Profile.ps1
+	MinGW-WSL2-NCBind.ps1
 
 Include this file into your Powershell Profile. Just open Powershell in Windows
 Terminal and type
@@ -221,26 +221,26 @@ $ cd $HOME/ncurses && code .
 This will launch the Windows install of vscode (so no remote graphics involved)
 which has a special extension to do development in WSL2.
 
-And what's about debugging. Having debugging of Windows apps build in WSL2 in
+And what about debugging? Having debugging of Windows apps built in WSL2 in
 vscode is a complex setup, involving Wine and other tools. This is simply beyond
-the scope of a README. This is also true if you don't use WSL2 but are on A
-native Intel Linux box. You can run tests and do debugging, but you've to setup
+the scope of a README. This is also true if you don't use WSL2 but are on a
+native Intel Linux box. You can run tests and do debugging, but you have to set up
 and configure Wine properly.
 
 But there is a pleasant - IMHO good enough - alternative in the WSL2 scenario. 
 Install MSYS2 (see below) and in MSYS2 do
 
-$ pacman -S package mingw-w64-x86_64-gdb. 
+$ pacman -S mingw-w64-x86_64-gdb
 
-to get the MinGW gdb debzgger. But how do you access your build- and test environment 
-from within MSYS2? Here is the recipe
+to get the MinGW gdb debugger. But how do you access your build and test environment 
+from within MSYS2? Here is the recipe:
 
 1. Make sure there is a /home/username in MSYS2, where username should be the
    username you have in your WSL2 distro. If you haven't done special configurations, WSL2
    distros as well as MSYS2 use your Windows username. If that directory doesn't
    exist, simply create it.
 
-2. I now assume, that your MSYS2 username is the same as your WSL2 username, so we
+2. I now assume, that your MSYS2 username is the same as your WSL2 username, so you
    can use "id -un" to get it. Do this
 
    $ mkdir -p "/home/$(id -un)/src"
@@ -257,22 +257,22 @@ from within MSYS2? Here is the recipe
    directory name conventions and can provide access to the WSL2 filesystem.
    Replace the name Ubuntu with the name of your distribution if you use another one.
 
-5. Now, if gdb looks for the sourcefiles, it will find them because we have mirrored
+5. Now, if gdb looks for the sourcefiles, it will find them because you have mirrored
    the filesystem-tree in MSYS2.
 
 6. Now open a Windows Terminal session and do
 
    $ Test-NCurses
 
-   Which will push you into the test directory of your build. You may use the 
-   nct alias for your conveniance.
+   which will push you into the test directory of your build. You may use the 
+   nct alias for your convenience.
 
    Now you can do this:
 
    $ Start-MinGWDebug xxx.exe
 
-   if you want to debug xxx.exe. You may use the ncdbg alias for your conveniance.
-   Replace xxx by the name of the program you want to debug
+   if you want to debug xxx.exe. You may use the ncdbg alias for your convenience.
+   Replace xxx with the name of the program you want to debug.
 
 This workaround still requires MSYS2, but only for debugging. The build and coding is
 done in WSL2, which is much more responsive than MSYS2.
@@ -284,9 +284,9 @@ You can get MSYS2 from
 
 	https://www.msys2.org/
 
-or that site you'll also find a package index if you want to install more than just the
-core shell environment and the MinGW gdb debugger required by the above described 
-workaround for debugging when doing a cross-build under a WSL2 Linux.
+On that site you'll also find a package index if you want to install more than just the
+core shell environment and the MinGW gdb debugger required by the above-described 
+workaround for debugging when doing a cross-build under WSL2 Linux.
 
 To build ncurses for native Windows with support for the new Windows 10 Virtual
 Terminal and PseudoConsole support, you should install at least version 8.0 of
@@ -297,8 +297,8 @@ not be able to properly build the libraries for current Windows 10 using these
 toolchains.  Although it is a bit slow, MSYS2 on Windows 10 64-Bit is the
 authoritative build environment for the MinGW version of ncurses.
 
-Using MinGW is a pragmatic decision, it is the easiest way to port this
-heavily UNIX based sourcebase to native Windows. The goal is of course
+Using MinGW is a pragmatic decision; it is the easiest way to port this
+heavily UNIX-based codebase to native Windows. The goal is, of course,
 to provide the includes, libraries and DLLs to be used with the more
 common traditional development environments on Windows, mainly with
 Microsoft Visual Studio.
