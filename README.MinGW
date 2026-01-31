@@ -40,17 +40,29 @@ The Author is using Ubuntu under WSL2, not because its a preference but it
 is the most common WSL2 distribution, well supported by the partners Canonical
 and Microsoft and most tips and tricks you'll find are using Ubuntu as an example.
 
-In Ubuntu just install the mingw-w64 package, it will install the whole suite of
-compilers, tools, and libraries you need to cross-build for the Windows MSVCRT 
-environment, the classical - although outdated - C runtime on Windows.
+In Ubuntu just install the mingw-w64 package:
 
-You should enable Interop, so your WSL Ubuntu can call Windows programs. Do not
-install vscode in Ubuntu, but on Windows. vscode has a special extension builtin
-for WSL2 support, so with your Windows based vscode you can develop in WSL2 Linux.
+$ sudo apt update
+$ sudo apt install mingw-w64 
+
+It will install the whole suite of compilers, tools, and libraries you need to 
+cross-build for the Windows MSVCRT environment, the classical - although 
+outdated - C runtime on Windows.
+
+You should enable Interop, so your WSL Ubuntu can call Windows programs. 
+Find the details how to configure WSL2 here:
+
+	https://learn.microsoft.com/en-us/windows/wsl/wsl-config
+
+Do not install vscode in Ubuntu, but on Windows. vscode has a special extension 
+builtin for WSL2 support, so with your Windows based vscode you can develop in 
+WSL2 Linux. You can find the details about developing for WSL2 with vscode here:
+
+	https://learn.microsoft.com/en-us/windows/wsl/tutorials/wsl-vscode
 
 Even with interop, we do not recommend to run test programs from within a WSL2
 shell. The terminal characteristics are different from Windows and you should
-test directly on Windows.
+test directly on Windows. 
 
 Fortunately, WSL2 supports to navigate from Windows into a WSL2 filesystem.
 So in CMD.EXE or Powershell, just do a "pushd \\wsl$\Ubuntu" (assuming Ubuntu
@@ -62,15 +74,25 @@ on the Windows commandline - with one caveat: don't mix Unicode tests with tests
 for 8-bit codepages in the same Windows Terminal session. Your sessions should be
 either pure Unicode in all tabs, or pure 8-bit.
 
+If you not yet have Windows Terminal installed, you can get it from the store:
+
+	https://apps.microsoft.com/detail/9n0dx20hk701
+
 In order to allow ncurses programs on Windows to ensure the correct locale and
 codepage, we support two environment variables
 
 	- NC_WINCP      can be set to the desired codepage
 	- NC_WIN_CTYPE  can be set to a locale that will be used for LC_CTYPE
 
-Example: 
+Example for legacy 8-Bit: 
 	NC_WINNCP="1252"
 	NC_WIN_CTYPE="German_Germany.1252"
+
+Example for Unicode: 
+	NC_WINNCP="65001"
+	NC_WIN_CTYPE="German_Germany.UTF-8"
+
+Of course you shoud set the country to your preference.
 
 Would allow to run 8-Bit ncurses programs using Latin-1 codepage with a German 
 locale.
@@ -79,9 +101,9 @@ Using cross build is much faster than the rather slow MSYS2 environment, but com
 with one potential drawback: all major Linux distros only support the MinGW target
 which is based on good old MSVCRT runtime. This is ok, as ncurses currently only
 targets this one. But MSYS2 supports also the newer UCRT C-runtime, which is now
-used by all modern Windows systems and apps. They have two flavours for that
-runtime, one named UCRT64 for the gcc compiler, and one called CLANG64 for the
-clang compiler.
+used by all modern Windows systems and apps. MSYS2 has two flavours for that
+runtime, one named UCRT64 using the gcc compiler, and one called CLANG64 using 
+the clang compiler.
 
 So if you want to build ncurses against these targets, at the moment you have to use
 MSYS2. See below how to get it.
@@ -98,11 +120,9 @@ hooks for interop, I recommend using these options:
 	--enable-named-pipes
 	--enable-interop
 
-This is the configuration command line which I am using at the moment,
-assuming you are in your ncurses source directory:
-
-In the following example we assume you have the ncurses sources in the
-directory ${HOME}/src/ncurses
+The following example demonstrates the configuration command line which I am using 
+at the moment, assuming you are in your ncurses source directory. I assume you have 
+the ncurses sources in the directory ${HOME}/src/ncurses
 
 If that's not the case, do this
 
@@ -117,7 +137,7 @@ $ NCURSES_SRC=$HOME/src/ncurses
 $ cd $NCURSES_SRC
 $ mkdir build
 $ mkdir -p inst/mingw64
-$ pushd build >/dev/null
+$ pushd build
 $ ../configure \
 	--srcdir=.. \
 	--prefix=/mingw64 \
@@ -162,13 +182,11 @@ $ ../configure \
 	--enable-database \
 	--enable-db-install
 $ make -j$(nproc)
-if [ $? -eq 0 ]; then
-    inst_path=$(readlink -f "../inst")
-    make install DESTDIR=$inst_path
-else
-     echo "Build failed" >&2
-fi
-popd >/dev/null
+
+If the build was successfull, you can install into the test environment
+
+$ make install DESTDIR=$(readlink -f "../inst")
+$ popd
 
 Of course you can replace --enable-widec by --disable-widec is you want a
 tradition 8-Bit only build.
@@ -176,69 +194,27 @@ tradition 8-Bit only build.
 If nothing failed, you have in ./build/test all the test programs you may
 examine. So, how do you get to them?
 
-I suggest this for your comfort: Put the following lines in your Powershell Profile.
-you can do that in powershell with
+I suggest this for your comfort (assuming you develop on Windows with WSL2):
 
-$ notepad $PROFILE # or any other text editor you preference
+In the ncurses source directory in folder misc you'll find the file
 
-This is the logic
-#############################################
-$NC_INIPATH=$Env:PATH
+	MinGW-WSL2-Profile.ps1
 
-function Test-NCurses {
-    param(
-        [Switch]$Legacy,
-        [Switch]$Trace
-    )
-    [string]$User=${Env:USERNAME}.ToLowerInvariant()
-    [string]$NCSRC="\\wsl$\Ubuntu\home\${User}\src\ncurses"
-    [string]$inst="${NCSRC}\inst\mingw64"
-    [string]$Target="$NCSRC\build\test"
+Include this file into your Powershell Profile. Just open Powershell in Windows
+Terminal and type
 
-    Push-Location -Path "$target"
-    $Env:PATH="$inst\bin;$NC_INIPATH"
-    $Env:TERM="ms-terminal"
-    $Env:TERMINFO="$inst\share\terminfo"
-    if (!$Legacy) {
-        chcp 65001
-        $Env:NC_WINCP="65001"
-        $Env:NC_WIN_CTYPE="German_Germany.UTF-8"
-    } else {
-        chcp 1252
-        $Env:NC_WINCP="1252"
-        $Env:NC_WIN_CTYPE="German_Germany.1252"
-    }
-    if ($Trace) {
-        $Env:NCURSES_TRACE=8191
-    }
-    Write-Host "NC_WIN_CTYPE: $Env:NC_WIN_CTYPE"
-    Write-Host "NC_WINCP: $Env:NC_WINCP"
-    Write-Host "TERM: $Env:TERM"
-    Write-Host "TERMINFO: $Env:TERMINFO"
-    if ($Legacy) {
-        cd $ENV:USERPROFILE
-        Start-Process cmd -ArgumentList "/K","PUSHD $Target && chcp $Env:NC_WINCP"
-    }
-}
+$ notepad $PROFILE
 
-Set-Alias nct Test-NCurses
-#############################################
+Insert the content of above mentioned file and modify it according to your setup
+(ncurses source location and WSL Distribution you use)
 
-With the alias nct you're pushed into the test directory in Unicode mode 
-(the default on Windows). You can run tests and afterwards just do a popd.
+With the alias nct you're pushed into the test directory of your build, if it
+exists at all. You can run tests and afterwards just do a popd. Please note,
+that if you've build a non-widec version, this will spawn a new Terminal session
+that will be setup for non-Unicode codepage and locale.
 
-If you've build your ncurses without widec support, you should test in Legacy
-mode. Just do this:
-
-$ nct -l
-
-This will spawn a separate Windows Terminal session and set it initially to
-codepage 1252, so you can test 8-bit ncurses apps.
-
-When it come to development, I suggest vscode. On WSL2 there is a speciality.
-In that case, do not install vscode in the WSL2 Linux Distro. Just make sure
-you have interop enabled and the path of vscode installed on Windows is 
-on your PATH list. Then do this:
+When it come to development, I suggest vscode. I've described above how to set it
+up. Then just do this:
 
 $ cd $HOME/ncurses && code .
 
@@ -247,32 +223,55 @@ which has a special extension to do development in WSL2.
 
 And what's about debugging. Having debugging of Windows apps build in WSL2 in
 vscode is a complex setup, involving Wine and other tools. This is simply beyond
-the scope of a README.
+the scope of a README. This is also true if you don't use WSL2 but are on A
+native Intel Linux box. You can run tests and do debugging, but you've to setup
+and configure Wine properly.
 
-But there is a pleasant - IMHO good enough - alternative. Install MSYS2 (see below)
-and in MSYS2 the package mingw-w64-x86_64-gdb. But how do you access your build-
-and test environment from within MSYS2? Here is the recipe
+But there is a pleasant - IMHO good enough - alternative in the WSL2 scenario. 
+Install MSYS2 (see below) and in MSYS2 do
+
+$ pacman -S package mingw-w64-x86_64-gdb. 
+
+to get the MinGW gdb debzgger. But how do you access your build- and test environment 
+from within MSYS2? Here is the recipe
 
 1. Make sure there is a /home/username in MSYS2, where username should be the
    username you have in your WSL2 distro. If you haven't done special configurations, WSL2
    distros as well as MSYS2 use your Windows username. If that directory doesn't
    exist, simply create it.
+
 2. I now assume, that your MSYS2 username is the same as your WSL2 username, so we
    can use "id -un" to get it. Do this
+
    $ mkdir -p "/home/$(id -un)/src"
+
 3. Change directory to /home/$(id -un)/src 
    If $HOME is set properly you may use $HOME instead of $(id -un)
    If you already have an ncurses directory there, rename or move it
+
 4. Now comes the trick. Do this
+
    $ ln -s "//wsl$/Ubuntu/home/$(id -un)/src/ncurses" .
+
    Because MSYS2 sits on top of the Windows filesystem, it understands its remote
    directory name conventions and can provide access to the WSL2 filesystem.
    Replace the name Ubuntu with the name of your distribution if you use another one.
+
 5. Now, if gdb looks for the sourcefiles, it will find them because we have mirrored
    the filesystem-tree in MSYS2.
-6. Now open a terminal session in the MINGW64 environment and do this:
-   $ cd /home/$(id -un)/src/ncurses/test
-   $ gdb xxx.EXE
+
+6. Now open a Windows Terminal session and do
+
+   $ Test-NCurses
+
+   Which will push you into the test directory of your build. You may use the 
+   nct alias for your conveniance.
+
+   Now you can do this:
+
+   $ Start-MinGWDebug xxx.exe
+
+   if you want to debug xxx.exe. You may use the ncdbg alias for your conveniance.
    Replace xxx by the name of the program you want to debug
 
 This workaround still requires MSYS2, but only for debugging. The build and coding is
@@ -285,12 +284,9 @@ You can get MSYS2 from
 
 	https://www.msys2.org/
 
-or the individual packages from
-
-	https://sourceforge.net/projects/msys2/files/
-
-You may also use a hosted MinGW cross-compile toolchain, e.g., on Ubuntu or
-ArchLinux to build the libraries and tools.
+or that site you'll also find a package index if you want to install more than just the
+core shell environment and the MinGW gdb debugger required by the above described 
+workaround for debugging when doing a cross-build under a WSL2 Linux.
 
 To build ncurses for native Windows with support for the new Windows 10 Virtual
 Terminal and PseudoConsole support, you should install at least version 8.0 of
