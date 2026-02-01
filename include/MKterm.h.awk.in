@@ -164,7 +164,7 @@ BEGIN {
 	print  "/* configured with --enable-exp-win32? */"
 	print  "#elif defined(_WIN32) || defined(_WIN64)"
 	print  "#define GET_TTY(fd, buf) _nc_console_getmode(_nc_console_fd2handle(fd),buf)"
-	print  "#define SET_TTY(fd, buf) _nc_console_setmode(_nc_console_fd2handle(fd),buf)"
+	print  "#define SET_TTY(fd, buf) _nc_console_setmode(fd,buf)"
 	print  "#elif @HAVE_SGTTY_H@	/* HAVE_SGTTY_H */"
 	print  "#define GET_TTY(fd, buf) gtty(fd, buf)"
 	print  "#define SET_TTY(fd, buf) stty(fd, buf)"

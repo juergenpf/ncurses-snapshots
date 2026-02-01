@@ -38,7 +38,7 @@
 
 #include <ncurses_cfg.h>
 
-#if defined(_WIN32) || defined(_WIN64) || defined(USE_WIN32CON_DRIVER)
+#if defined(_WIN32) || defined(_WIN64) || defined(USE_WIN32_CONPTY)
 
 #if @USE_NAMED_PIPES@	/* USE_NAMED_PIPES */
 

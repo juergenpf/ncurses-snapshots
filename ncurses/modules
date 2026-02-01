@@ -245,21 +245,23 @@ widechars	lib             $(wide)		$(HEADER_DEPS)
 # MinGW, using Console API
 @ port_win32con
 gettimeofday	lib		$(win32con)	$(HEADER_DEPS)
-lib_win32con	lib		$(tinfo)	$(HEADER_DEPS)
+#lib_win32con	lib		$(tinfo)	$(HEADER_DEPS)
+lib_win32conpty	lib		$(tinfo)	$(HEADER_DEPS)
 lib_win32util	lib		$(tinfo)	$(HEADER_DEPS)
 wcwidth		lib             $(win32con)	$(HEADER_DEPS)
 widechars	lib             $(wide)		$(HEADER_DEPS)
-win32_driver	lib             $(win32con)	$(HEADER_DEPS)
+#win32_driver	lib             $(win32con)	$(HEADER_DEPS)
 
 # MinGW-W64, using Console API and named pipes
 @ port_win32
 gettimeofday	lib		$(win32con)	$(HEADER_DEPS)
-lib_win32con	lib		$(tinfo)	$(HEADER_DEPS)
+#lib_win32con	lib		$(tinfo)	$(HEADER_DEPS)
+lib_win32conpty	lib		$(tinfo)	$(HEADER_DEPS)
 lib_win32util	lib		$(tinfo)	$(HEADER_DEPS)
 wcwidth		lib             $(win32con)	$(HEADER_DEPS)
-win32_driver	lib             $(win32con)	$(HEADER_DEPS)
+#win32_driver	lib             $(win32con)	$(HEADER_DEPS)
 
 @ port_tinfo
-tinfo_driver	lib		$(tinfo)	$(HEADER_DEPS)	$(INCDIR)/tic.h
+#tinfo_driver	lib		$(tinfo)	$(HEADER_DEPS)	$(INCDIR)/tic.h
 
 # vile:makemode

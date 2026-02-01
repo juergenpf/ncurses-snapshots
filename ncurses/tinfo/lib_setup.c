@@ -289,7 +289,7 @@ use_tioctl(bool f)
 }
 #endif
 
-#if !(USE_NAMED_PIPES)
+#if 1 || !(USE_NAMED_PIPES) // JPF Check
 static void
 _nc_default_screensize(TERMINAL *termp, int *linep, int *colp)
 {
@@ -434,7 +434,7 @@ _nc_check_screensize(SCREEN *sp, TERMINAL *termp, int *linep, int *colp)
 	int fd = termp->Filedes;
 	TTY saved;
 	const char *name = NULL;
-
+#if !USE_NAMED_PIPES // JPF Check
 	if (IsRealTty(fd, name) && VALID_STRING(cursor_address) && is_expected(user7, "6n") && (is_expected(user6, "%i%d;%dR") || is_expected(user6, "%i%p1%d;%p2%dR")) && GET_TTY(fd, &saved) == OK)
 	{
 		int current_y = -1, current_x = -1;
@@ -473,7 +473,7 @@ _nc_check_screensize(SCREEN *sp, TERMINAL *termp, int *linep, int *colp)
 		T(("NOT trying CPR with fd %d (%s): %s",
 		   fd, NonNull(name), NC_ISATTY(fd) ? "tty" : "not a tty"));
 	}
-
+#endif /* !USE_NAMED_PIPES */
 	_nc_default_screensize(termp, linep, colp);
 }
 #else												 /* !USE_CHECK_SIZE */
@@ -636,7 +636,6 @@ _nc_update_screensize(SCREEN *sp)
 {
 	int new_lines;
 	int new_cols;
-
 	TERMINAL *termp = cur_term;
 	int old_lines = lines;
 	int old_cols = columns;
@@ -855,7 +854,6 @@ TINFO_SETUP_TERM(TERMINAL **tp,
 
 	termp = cur_term;
 	T((T_CALLED("setupterm(%s,%d,%p)"), _nc_visbuf(tname), Filedes, (void *)errret));
-	
 	if (tname == NULL)
 	{
 		tname = getenv("TERM");
@@ -1026,29 +1024,6 @@ TINFO_SETUP_TERM(TERMINAL **tp,
 	if (errret)
 		*errret = TGETENT_YES;
 
-	if (generic_type)
-	{
-		/*
-		 * BSD 4.3's termcap contains mis-typed "gn" for wy99.  Do a sanity
-		 * check before giving up.
-		 */
-		if ((VALID_STRING(cursor_address) || (VALID_STRING(cursor_down) && VALID_STRING(cursor_home))) && VALID_STRING(clear_screen))
-		{
-			ret_error1(TGETENT_YES, "terminal is not really generic.\n",
-					   myname, free(myname));
-		}
-		else
-		{
-			del_curterm(termp);
-			ret_error1(TGETENT_NO, "I need something more specific.\n",
-					   myname, free(myname));
-		}
-	}
-	else if (hard_copy)
-	{
-		ret_error1(TGETENT_YES, "I can't handle hardcopy terminals.\n",
-				   myname, free(myname));
-	}
 	free(myname);
 	returnCode(code);
 }
