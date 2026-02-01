@@ -452,18 +452,6 @@ enable_xterm_mouse(SCREEN *sp, bool enable)
     sp->_mouse_active = enable;
 }
 
-#if USE_TERM_DRIVER
-static void
-enable_win32_mouse(SCREEN *sp, bool enable)
-{
-#if USE_NAMED_PIPES
-    enable_xterm_mouse(sp, enable);
-#else
-    sp->_mouse_active = enable;
-#endif
-}
-#endif
-
 #if USE_GPM_SUPPORT
 static bool
 allow_gpm_mouse(SCREEN *sp GCC_UNUSED)
@@ -753,9 +741,6 @@ initialize_mousetype(SCREEN *sp)
     }
 #endif /* USE_SYSMOUSE */
 
-#if USE_TERM_DRIVER
-    CallDriver(sp, td_initmouse);
-#endif
 #if !defined(_NC_WINDOWS_NATIVE) || USE_NAMED_PIPES
     /* we know how to recognize mouse events under "xterm" */
     if (NonEmpty(key_mouse)) {
@@ -905,27 +890,6 @@ _nc_mouse_event(SCREEN *sp)
 	break;
 #endif /* USE_SYSMOUSE */
 
-#if USE_TERM_DRIVER
-    case M_TERM_DRIVER:
-	while (sp->_drv_mouse_head < sp->_drv_mouse_tail) {
-	    *eventp = sp->_drv_mouse_fifo[sp->_drv_mouse_head];
-
-	    /*
-	     * Point the fifo-head to the next possible location.  If there
-	     * are none, reset the indices.
-	     */
-	    sp->_drv_mouse_head += 1;
-	    if (sp->_drv_mouse_head == sp->_drv_mouse_tail) {
-		sp->_drv_mouse_tail = 0;
-		sp->_drv_mouse_head = 0;
-	    }
-
-	    /* bump the next-free pointer into the circular list */
-	    sp->_mouse_writep = eventp = NEXT(eventp);
-	    result = TRUE;
-	}
-	break;
-#endif
 
     case M_NONE:
 	break;
@@ -1443,11 +1407,6 @@ mouse_activate(SCREEN *sp, bool on)
 	    sp->_mouse_active = TRUE;
 	    break;
 #endif
-#if USE_TERM_DRIVER
-	case M_TERM_DRIVER:
-	    enable_win32_mouse(sp, TRUE);
-	    break;
-#endif
 	case M_NONE:
 	    returnVoid;
 	default:
@@ -1478,11 +1437,6 @@ mouse_activate(SCREEN *sp, bool on)
 	case M_SYSMOUSE:
 	    signal(SIGUSR2, SIG_IGN);
 	    sp->_mouse_active = FALSE;
-	    break;
-#endif
-#if USE_TERM_DRIVER
-	case M_TERM_DRIVER:
-	    enable_win32_mouse(sp, FALSE);
 	    break;
 #endif
 	case M_NONE:
@@ -1784,11 +1738,6 @@ _nc_mouse_wrap(SCREEN *sp)
 	mouse_activate(sp, FALSE);
 	break;
 #endif
-#if USE_TERM_DRIVER
-    case M_TERM_DRIVER:
-	mouse_activate(sp, FALSE);
-	break;
-#endif
     case M_NONE:
 	break;
     }
@@ -1817,12 +1766,6 @@ _nc_mouse_resume(SCREEN *sp)
 
 #if USE_SYSMOUSE
     case M_SYSMOUSE:
-	mouse_activate(sp, TRUE);
-	break;
-#endif
-
-#if USE_TERM_DRIVER
-    case M_TERM_DRIVER:
 	mouse_activate(sp, TRUE);
 	break;
 #endif

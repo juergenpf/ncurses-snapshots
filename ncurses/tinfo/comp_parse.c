@@ -666,10 +666,6 @@ _nc_resolve_uses2(bool fullresolve, bool literal)
 		TerminalType(&fake_tm) = qp->tterm;
 		_nc_set_screen(&fake_sp);
 		set_curterm(&fake_tm);
-#if USE_TERM_DRIVER
-		((TERMINAL_CONTROL_BLOCK *) (CurTerm))->drv = &_nc_TINFO_DRIVER;
-#endif
-
 		_nc_check_termtype2(&qp->tterm, literal);
 
 		/*

@@ -142,19 +142,6 @@ check_mouse_activity(SCREEN *sp, int delay EVENTLIST_2nd(_nc_eventlist * evl))
 {
     int rc;
 
-#if USE_TERM_DRIVER
-    TERMINAL_CONTROL_BLOCK *TCB = TCBOf(sp);
-    rc = TCBOf(sp)->drv->td_testmouse(TCBOf(sp), delay EVENTLIST_2nd(evl));
-# if USE_NAMED_PIPES || defined(_NC_WINDOWS_NATIVE)
-    /* if we emulate terminfo on console, we have to use the console routine */
-    if (IsTermInfoOnConsole(sp)) {
-	rc = _nc_console_testmouse(sp,
-				   _nc_console_handle(sp->_ifd),
-				   delay EVENTLIST_2nd(evl));
-    } else
-# endif
-	rc = TCB->drv->td_testmouse(TCB, delay EVENTLIST_2nd(evl));
-#else /* !USE_TERM_DRIVER */
 # if USE_SYSMOUSE
     if ((sp->_mouse_type == M_SYSMOUSE)
 	&& (sp->_sysmouse_head < sp->_sysmouse_tail)) {
@@ -183,7 +170,6 @@ check_mouse_activity(SCREEN *sp, int delay EVENTLIST_2nd(_nc_eventlist * evl))
 	}
 # endif
     }
-#endif /* USE_TERM_DRIVER */
     return rc;
 }
 
@@ -272,14 +258,6 @@ fifo_push(SCREEN *sp EVENTLIST_2nd(_nc_eventlist * evl))
 	n = 1;
     } else
 #endif
-#if USE_TERM_DRIVER
-	if ((sp->_mouse_type == M_TERM_DRIVER)
-	    && (sp->_drv_mouse_head < sp->_drv_mouse_tail)) {
-	sp->_mouse_event(sp);
-	ch = KEY_MOUSE;
-	n = 1;
-    } else
-#endif
 #if USE_KLIBC_KBD
     if (NC_ISATTY(sp->_ifd) && IsCbreak(sp)) {
 	ch = _read_kbd(0, 1, !IsRaw(sp));
@@ -288,20 +266,6 @@ fifo_push(SCREEN *sp EVENTLIST_2nd(_nc_eventlist * evl))
     } else
 #endif
     {				/* Can block... */
-#if USE_TERM_DRIVER
-	int buf;
-# if USE_NAMED_PIPES || defined(_NC_WINDOWS_NATIVE)
-	if (NC_ISATTY(sp->_ifd) && IsTermInfoOnConsole(sp) && IsCbreak(sp)) {
-	    _nc_set_read_thread(TRUE);
-	    n = _nc_console_read(sp,
-				 _nc_console_handle(sp->_ifd),
-				 &buf);
-	    _nc_set_read_thread(FALSE);
-	} else
-# endif	/* USE_NAMED_PIPES */
-	    n = CallDriver_1(sp, td_read, &buf);
-	ch = buf;
-#else /* !USE_TERM_DRIVER */
 #if USE_NAMED_PIPES
 	int buf;
 #endif
@@ -318,7 +282,6 @@ fifo_push(SCREEN *sp EVENTLIST_2nd(_nc_eventlist * evl))
 #endif
 	_nc_set_read_thread(FALSE);
 	ch = c2;
-#endif /* USE_TERM_DRIVER */
     }
 
     if ((n == -1) || (n == 0)) {

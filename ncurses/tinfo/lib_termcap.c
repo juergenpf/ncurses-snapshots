@@ -94,20 +94,11 @@ NCURSES_SP_NAME(tgetent) (NCURSES_SP_DCLx char *bufp, const char *name)
     int rc = ERR;
     int n;
     bool found_cache = FALSE;
-#if USE_TERM_DRIVER
-    TERMINAL *termp = NULL;
-#endif
 
     START_TRACE();
     T((T_CALLED("tgetent()")));
 
     TINFO_SETUP_TERM(&termp, name, STDOUT_FILENO, &rc, TRUE);
-
-#if USE_TERM_DRIVER
-    if (termp == NULL ||
-	!((TERMINAL_CONTROL_BLOCK *) termp)->drv->isTerminfo)
-	returnCode(rc);
-#endif
 
     /*
      * In general we cannot tell if the fixed sgr0 is still used by the

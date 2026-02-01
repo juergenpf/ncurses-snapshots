@@ -1116,27 +1116,6 @@ _nc_mvcur(int yold, int xold,
 }
 #endif
 
-#if USE_TERM_DRIVER
-/*
- * The terminal driver does not support the external "mvcur()".
- */
-NCURSES_EXPORT(int)
-TINFO_MVCUR(NCURSES_SP_DCLx int yold, int xold, int ynew, int xnew)
-{
-    int rc;
-    rc = _nc_real_mvcur(NCURSES_SP_ARGx
-			yold, xold,
-			ynew, xnew,
-			NCURSES_SP_NAME(_nc_outch),
-			TRUE);
-    if ((SP_PARM != NULL) && (SP_PARM->_endwin == ewInitial))
-	NCURSES_SP_NAME(_nc_flush) (NCURSES_SP_ARG);
-    NCURSES_SP_NAME(_nc_flush) (NCURSES_SP_ARG);
-    return rc;
-}
-
-#else /* !USE_TERM_DRIVER */
-
 /*
  * These entrypoints support users of the library.
  */
@@ -1158,7 +1137,6 @@ mvcur(int yold, int xold, int ynew, int xnew)
     return NCURSES_SP_NAME(mvcur) (CURRENT_SCREEN, yold, xold, ynew, xnew);
 }
 #endif
-#endif /* USE_TERM_DRIVER */
 
 #if defined(TRACE) || defined(NCURSES_TEST)
 NCURSES_EXPORT_VAR(int) _nc_optimize_enable = OPTIMIZE_ALL;

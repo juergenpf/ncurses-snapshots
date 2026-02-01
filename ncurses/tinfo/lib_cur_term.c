@@ -94,21 +94,10 @@ NCURSES_SP_NAME(set_curterm) (NCURSES_SP_DCLx TERMINAL *termp)
     cur_term = termp;
 #endif
     if (termp != NULL) {
-#if USE_TERM_DRIVER
-	TERMINAL_CONTROL_BLOCK *TCB = (TERMINAL_CONTROL_BLOCK *) termp;
-	ospeed = (NCURSES_OSPEED) _nc_ospeed(termp->_baudrate);
-	if (TCB->drv &&
-	    TCB->drv->isTerminfo &&
-	    TerminalType(termp).Strings) {
-	    PC = (char) (VALID_STRING(pad_char) ? pad_char[0] : 0);
-	}
-	TCB->csp = SP_PARM;
-#else
 	ospeed = (NCURSES_OSPEED) _nc_ospeed(termp->_baudrate);
 	if (TerminalType(termp).Strings) {
 	    PC = (char) (VALID_STRING(pad_char) ? pad_char[0] : 0);
 	}
-#endif
 #if !USE_REENTRANT
 	save_ttytype(termp);
 #endif
@@ -135,9 +124,6 @@ NCURSES_SP_NAME(del_curterm) (NCURSES_SP_DCLx TERMINAL *termp)
     T((T_CALLED("del_curterm(%p, %p)"), (void *) SP_PARM, (void *) termp));
 
     if (termp != NULL) {
-#if USE_TERM_DRIVER
-	TERMINAL_CONTROL_BLOCK *TCB = (TERMINAL_CONTROL_BLOCK *) termp;
-#endif
 	TERMINAL *cur = (
 #if USE_REENTRANT
 			    NCURSES_SP_NAME(_nc_get_cur_term) (NCURSES_SP_ARG)
@@ -162,10 +148,6 @@ NCURSES_SP_NAME(del_curterm) (NCURSES_SP_DCLx TERMINAL *termp)
 	if (_nc_globals.home_terminfo != NULL) {
 	    FreeAndNull(_nc_globals.home_terminfo);
 	}
-#endif
-#if USE_TERM_DRIVER
-	if (TCB->drv)
-	    TCB->drv->td_release(TCB);
 #endif
 #if NO_LEAKS
 	/* discard memory used in tgetent's cache for this terminal */
