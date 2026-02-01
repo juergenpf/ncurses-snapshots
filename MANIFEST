@@ -949,7 +949,7 @@
 ./ncurses/tinfo/lib_tparm.c
 ./ncurses/tinfo/lib_tputs.c
 ./ncurses/tinfo/lib_ttyflags.c
-./ncurses/tinfo/lib_win32con.c
+./ncurses/tinfo/lib_win32conpty.c
 ./ncurses/tinfo/lib_win32util.c
 ./ncurses/tinfo/make_hash.c
 ./ncurses/tinfo/make_keys.c
@@ -959,7 +959,6 @@
 ./ncurses/tinfo/read_entry.c
 ./ncurses/tinfo/read_termcap.c
 ./ncurses/tinfo/strings.c
-./ncurses/tinfo/tinfo_driver.c
 ./ncurses/tinfo/trim_sgr0.c
 ./ncurses/tinfo/use_screen.c
 ./ncurses/tinfo/write_entry.c
@@ -1007,7 +1006,6 @@
 ./ncurses/widechar/widechars.c
 ./ncurses/win32con/gettimeofday.c
 ./ncurses/win32con/wcwidth.c
-./ncurses/win32con/win32_driver.c
 ./package/debian-mingw/changelog
 ./package/debian-mingw/compat
 ./package/debian-mingw/control
