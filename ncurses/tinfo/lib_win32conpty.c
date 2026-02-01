@@ -156,16 +156,18 @@ AnsiKey(WORD vKey)
 	return code;
 }
 
+#define NOT_IMPLEMENTED { fprintf(stderr, "NOT IMPLEMENTED: %s:%d\n", __FILE__, __LINE__); abort(); }
+
 static bool
 save_original_screen(void)
 {
-	abort();
+	NOT_IMPLEMENTED
 	return false;
 }
 static bool
 restore_original_screen(void)
 {
-	abort();
+	NOT_IMPLEMENTED
 	return false;
 }
 
@@ -540,57 +542,57 @@ _nc_console_size(int *Lines, int *Cols)
 
 NCURSES_EXPORT(WORD) _nc_console_MapColor(bool fore, int color) 
 {
-	abort();
+	NOT_IMPLEMENTED
 	return (WORD)0;
 }
 NCURSES_EXPORT(int)  _nc_console_flush(void* handle) 
 {
-	abort();
+	NOT_IMPLEMENTED
 	return ERR;
 }
 NCURSES_EXPORT(bool) _nc_console_get_SBI(void) 
 {
-	abort();
+	NOT_IMPLEMENTED
 	return false;
 }
 NCURSES_EXPORT(bool) _nc_console_keyExist(int keycode) 
 {
-	abort();
+	NOT_IMPLEMENTED
 	return false;
 }
 NCURSES_EXPORT(int)  _nc_console_keyok(int keycode, int flag) {
-	abort();
+	NOT_IMPLEMENTED
 	return ERR;
 }
 NCURSES_EXPORT(int)  _nc_console_read(SCREEN *sp, HANDLE fd, int *buf) 
 {
-	abort();
+	NOT_IMPLEMENTED
 	return ERR;
 }
 NCURSES_EXPORT(bool) _nc_console_restore(void) 
 {
-	abort();
+	NOT_IMPLEMENTED
 	return false;
 }
 NCURSES_EXPORT(void) _nc_console_selectActiveHandle(void) 
 {
-	abort();
+	NOT_IMPLEMENTED
 }
 NCURSES_EXPORT(void) _nc_console_set_scrollback(bool normal, CONSOLE_SCREEN_BUFFER_INFO * info) {
-	abort();
+	NOT_IMPLEMENTED
 }
 NCURSES_EXPORT(int)  _nc_console_test(int fd) {
-	abort();
+	NOT_IMPLEMENTED
 	return ERR;
 }
 NCURSES_EXPORT(int)  _nc_console_testmouse(const SCREEN *sp, HANDLE fd, int delay EVENTLIST_2nd(_nc_eventlist*)) 
 {
-	abort();
+	NOT_IMPLEMENTED
 	return ERR;
 }
 NCURSES_EXPORT(int)  _nc_console_twait(const SCREEN *sp, HANDLE hdl,int mode,int msec,int *left EVENTLIST_2nd(_nc_eventlist * evl)) 
 {
-	abort();
+	NOT_IMPLEMENTED
 	return ERR;
 }
 
