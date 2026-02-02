@@ -189,7 +189,7 @@ static struct speed const speeds[] =
 #endif
 #endif
 };
-#endif /* !USE_NAMED_PIPES */
+#endif /* !defined(USE_WIN32_CONPTY) */
 
 NCURSES_EXPORT(int)
 _nc_baudrate(int OSpeed)
@@ -237,7 +237,7 @@ _nc_baudrate(int OSpeed)
 #endif
     }
     return (result);
-#endif /* !USE_NAMED_PIPES */
+#endif /* !defined(USE_WIN32_CONPTY) */
 }
 
 NCURSES_EXPORT(int)
@@ -305,7 +305,7 @@ NCURSES_SP_NAME(baudrate) (NCURSES_SP_DCL0)
     } else {
 	result = ERR;
     }
-#endif /* !USE_NAMED_PIPES */
+#endif /* !defined(USE_WIN32_CONPTY) */
     returnCode(result);
 }
 

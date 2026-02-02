@@ -84,7 +84,7 @@ _nc_initscr(NCURSES_SP_DCL0)
 	buf.c_oflag &= (unsigned) ~(ONLCR);
 #elif HAVE_SGTTY_H
 	buf.sg_flags &= ~(ECHO | CRMOD);
-#elif USE_NAMED_PIPES
+#elif defined(USE_WIN32_CONPTY)
 	buf.dwFlagIn = CONMODE_IN_DEFAULT;
 	buf.dwFlagOut = CONMODE_OUT_DEFAULT | VT_FLAG_OUT;
 	if (WINCONSOLE.isTermInfoConsole) {
@@ -323,7 +323,7 @@ NCURSES_SP_NAME(newterm) (NCURSES_SP_DCLx
 	    _nc_initscr(NCURSES_SP_ARG);
 
 	    _nc_signal_handler(TRUE);
-#if USE_NAMED_PIPES || defined(_NC_WINDOWS_NATIVE)
+#if defined(USE_WIN32_CONPTY) || defined(_NC_WINDOWS_NATIVE)
 	    _nc_setmode(fileno(_ifp), true, true);
     	    _nc_setmode(fileno(_ofp), false, true);
 #endif

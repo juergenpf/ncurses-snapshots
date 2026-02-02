@@ -379,7 +379,7 @@ handle_sysmouse(int sig GCC_UNUSED)
 }
 #endif /* USE_SYSMOUSE */
 
-#if !defined(_NC_WINDOWS_NATIVE) || USE_NAMED_PIPES
+#if !defined(_NC_WINDOWS_NATIVE) || defined(USE_WIN32_CONPTY)
 #define xterm_kmous "\033[M"
 
 static void
@@ -741,7 +741,7 @@ initialize_mousetype(SCREEN *sp)
     }
 #endif /* USE_SYSMOUSE */
 
-#if !defined(_NC_WINDOWS_NATIVE) || USE_NAMED_PIPES
+#if !defined(_NC_WINDOWS_NATIVE) || defined(USE_WIN32_CONPTY)
     /* we know how to recognize mouse events under "xterm" */
     if (NonEmpty(key_mouse)) {
 	init_xterm_mouse(sp);

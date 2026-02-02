@@ -592,7 +592,7 @@ typedef union {
 #define NCURSES_PUTP2(name,value)    NCURSES_SP_NAME(_nc_putp)(NCURSES_SP_ARGx name, value)
 #define NCURSES_PUTP2_FLUSH(name,value)    NCURSES_SP_NAME(_nc_putp_flush)(NCURSES_SP_ARGx name, value)
 
-#if USE_WIDEC_SUPPORT && USE_NAMED_PIPES
+#if USE_WIDEC_SUPPORT && defined(USE_WIN32_CONPTY)
 #define NCURSES_OUTC_FUNC_EX    NCURSES_SP_NAME(_nc_outch_ex)
 #else
 #define NCURSES_OUTC_FUNC_EX    NCURSES_OUTC_FUNC
@@ -2208,7 +2208,7 @@ extern NCURSES_EXPORT(void) _nc_signal_handler (int);
 extern NCURSES_EXPORT(void) _nc_synchook (WINDOW *);
 extern NCURSES_EXPORT(void) _nc_trace_tries (TRIES *);
 
-#if USE_WIDEC_SUPPORT && USE_NAMED_PIPES
+#if USE_WIDEC_SUPPORT && defined(USE_WIN32_CONPTY)
 extern NCURSES_EXPORT(int) _nc_outch_ex(int);
 #endif
 
@@ -2563,7 +2563,7 @@ extern NCURSES_EXPORT(void)     NCURSES_SP_NAME(_nc_linedump)(SCREEN*);
 
 #if USE_WIDEC_SUPPORT
 extern NCURSES_EXPORT(wchar_t *) NCURSES_SP_NAME(_nc_wunctrl)(SCREEN*, cchar_t *);
-#if USE_NAMED_PIPES
+#if defined(USE_WIN32_CONPTY)
 extern NCURSES_EXPORT(int)      NCURSES_SP_NAME(_nc_outch_ex)(SCREEN*, int);
 #endif
 #endif

@@ -411,7 +411,7 @@ NCURSES_SP_NAME(_nc_setupscreen) (
 
 	T(("filter screensize %dx%d", slines, scolumns));
     }
-#if USE_NAMED_PIPES
+#if defined(USE_WIN32_CONPTY)
     T(("setting output mode to binary"));
     fflush(output);
     _nc_setmode(fileno(output), false, true);
@@ -423,7 +423,7 @@ NCURSES_SP_NAME(_nc_setupscreen) (
     fflush(output);
     sp->_ofd = output ? fileno(output) : -1;
     sp->_ofp = output;
-#if USE_NAMED_PIPES
+#if defined(USE_WIN32_CONPTY)
     if (output)
 	_nc_setmode(fileno(output), false, true);
 #endif

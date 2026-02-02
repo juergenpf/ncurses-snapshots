@@ -231,7 +231,7 @@ NCURSES_SP_NAME(_nc_outch)(NCURSES_SP_DCLx int ch)
 	return rc;
 }
 
-#if USE_NAMED_PIPES && USE_WIDEC_SUPPORT
+#if defined(USE_WIN32_CONPTY) && USE_WIDEC_SUPPORT
 // Helper function to adress the issue, that for pragmatic reasons we have 
 // to output UTF-8 encoded data to the Windows Console in _O_BINARY mode.
 static size_t 
@@ -305,7 +305,7 @@ _nc_outch(int ch)
 	return NCURSES_SP_NAME(_nc_outch)(CURRENT_SCREEN, ch);
 }
 
-#if USE_NAMED_PIPES & USE_WIDEC_SUPPORT
+#if defined(USE_WIN32_CONPTY) && USE_WIDEC_SUPPORT
 NCURSES_EXPORT(int)
 _nc_outch_ex(int ch)
 {

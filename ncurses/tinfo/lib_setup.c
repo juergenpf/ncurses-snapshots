@@ -289,7 +289,7 @@ use_tioctl(bool f)
 }
 #endif
 
-#if 1 || !(USE_NAMED_PIPES) // JPF Check
+#if 1 || !defined(USE_WIN32_CONPTY) // JPF Check
 static void
 _nc_default_screensize(TERMINAL *termp, int *linep, int *colp)
 {
@@ -434,7 +434,7 @@ _nc_check_screensize(SCREEN *sp, TERMINAL *termp, int *linep, int *colp)
 	int fd = termp->Filedes;
 	TTY saved;
 	const char *name = NULL;
-#if !USE_NAMED_PIPES // JPF Check
+#if !defined(USE_WIN32_CONPTY) // JPF Check
 	if (IsRealTty(fd, name) && VALID_STRING(cursor_address) && is_expected(user7, "6n") && (is_expected(user6, "%i%d;%dR") || is_expected(user6, "%i%p1%d;%p2%dR")) && GET_TTY(fd, &saved) == OK)
 	{
 		int current_y = -1, current_x = -1;
@@ -473,13 +473,13 @@ _nc_check_screensize(SCREEN *sp, TERMINAL *termp, int *linep, int *colp)
 		T(("NOT trying CPR with fd %d (%s): %s",
 		   fd, NonNull(name), NC_ISATTY(fd) ? "tty" : "not a tty"));
 	}
-#endif /* !USE_NAMED_PIPES */
+#endif /* !defined(USE_WIN32_CONPTY) */
 	_nc_default_screensize(termp, linep, colp);
 }
 #else												 /* !USE_CHECK_SIZE */
 #define _nc_check_screensize(sp, termp, linep, colp) /* nothing */
 #endif
-#endif /* !(USE_NAMED_PIPES) */
+#endif /* !defined(USE_WIN32_CONPTY) */
 
 NCURSES_EXPORT(void)
 _nc_get_screensize(SCREEN *sp, int *linep, int *colp)
@@ -491,7 +491,7 @@ _nc_get_screensize(SCREEN *sp, int *linep, int *colp)
 	bool useTioctl = _nc_prescreen.use_tioctl;
 
 	T((T_CALLED("_nc_get_screensize (%p)"), (void *)sp));
-#if USE_NAMED_PIPES
+#if defined(USE_WIN32_CONPTY)
 	/* If we are here, then Windows console is used in terminfo mode.
 	   We need to figure out the size using the console API
 	 */
@@ -857,7 +857,7 @@ TINFO_SETUP_TERM(TERMINAL **tp,
 	if (tname == NULL)
 	{
 		tname = getenv("TERM");
-#if USE_NAMED_PIPES
+#if defined(USE_WIN32_CONPTY)
 		if (!VALID_TERM_ENV(tname, NO_TERMINAL))
 		{
 			T(("Failure with TERM=%s", NonNull(tname)));
@@ -882,7 +882,7 @@ TINFO_SETUP_TERM(TERMINAL **tp,
 
 	T(("your terminal name is %s", myname));
 
-#if USE_NAMED_PIPES || defined(_NC_WINDOWS_NATIVE)
+#if defined(USE_WIN32_CONPTY) || defined(_NC_WINDOWS_NATIVE)
 		_nc_win32_encoding_init();
 #endif
 

@@ -80,7 +80,7 @@ NCURSES_EXPORT_VAR(ConsoleInfo)
 _nc_CONSOLE;
 
 static bool console_initialized = FALSE;
-#define EnsureInit() (void)(console_initialized ? TRUE : _nc_console_checkinit(USE_NAMED_PIPES))
+#define EnsureInit() (void)(console_initialized ? TRUE : _nc_console_checkinit(1))
 
 static int
 rkeycompare(const void *el1, const void *el2)

@@ -149,7 +149,7 @@ check_mouse_activity(SCREEN *sp, int delay EVENTLIST_2nd(_nc_eventlist * evl))
     } else
 # endif
     {
-# if USE_NAMED_PIPES
+# if defined(USE_WIN32_CONPTY)
 	rc = _nc_console_testmouse(sp,
 				   _nc_console_handle(sp->_ifd),
 				   delay
@@ -266,13 +266,13 @@ fifo_push(SCREEN *sp EVENTLIST_2nd(_nc_eventlist * evl))
     } else
 #endif
     {				/* Can block... */
-#if USE_NAMED_PIPES
+#if defined(USE_WIN32_CONPTY)
 	int buf;
 #endif
 	unsigned char c2 = 0;
 
 	_nc_set_read_thread(TRUE);
-#if USE_NAMED_PIPES
+#if defined(USE_WIN32_CONPTY)
 	n = _nc_console_read(sp,
 			     _nc_console_handle(sp->_ifd),
 			     &buf);
