@@ -128,15 +128,9 @@ _nc_setmode(int fd, bool isInput, bool isCurses)
 	if (!isatty(fd))
 		return;
 #if USE_WIDEC_SUPPORT
-	if (WINCONSOLE.isTermInfoConsole)
-		_setmode(fd, isInput ? _O_TEXT : (isCurses ? _O_BINARY : _O_TEXT));
-	else
-		_setmode(fd, isInput ? _O_TEXT : (isCurses ? _O_BINARY : _O_TEXT));
+	setmode(fd, isInput ? _O_TEXT : (isCurses ? _O_BINARY : _O_TEXT));
 #else
-	if (WINCONSOLE.isTermInfoConsole)
-		_setmode(fd, isInput ? _O_TEXT : (isCurses ? _O_BINARY : _O_TEXT));
-	else
-		_setmode(fd, isInput ? _O_TEXT : (isCurses ? _O_BINARY : _O_TEXT));
+	setmode(fd, isInput ? _O_TEXT : (isCurses ? _O_BINARY : _O_TEXT));
 #endif
 }
 

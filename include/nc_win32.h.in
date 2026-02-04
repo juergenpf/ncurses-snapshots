@@ -160,19 +160,14 @@ typedef struct
 #define CON_NUMPAIRS 64
 typedef struct {
     BOOL initialized;
-    BOOL buffered;
     BOOL window_only;
     BOOL progMode;
     BOOL isMinTTY;
-    BOOL isTermInfoConsole;
     HANDLE out;
     HANDLE inp;
     HANDLE hdl;
     HANDLE lastOut;
     int numButtons;
-    LPDWORD ansi_map;
-    LPDWORD map;
-    LPDWORD rmap;
     WORD pairs[CON_NUMPAIRS];
     COORD origin;
     CHAR_INFO *save_screen;
