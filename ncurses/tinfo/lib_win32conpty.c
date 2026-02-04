@@ -922,7 +922,7 @@ _nc_console_restore(void)
 	returnBool(res);
 }
 
-NCURSES_EXPORT(void)
+/*NCURSES_EXPORT(void)
 _nc_console_selectActiveHandle(void)
 {
 	if (WINCONSOLE.lastOut != WINCONSOLE.hdl)
@@ -930,7 +930,7 @@ _nc_console_selectActiveHandle(void)
 		WINCONSOLE.lastOut = WINCONSOLE.hdl;
 		// JPF SetConsoleActiveScreenBuffer(WINCONSOLE.lastOut);
 	}
-}
+}*/
 
 NCURSES_EXPORT(int)
 _nc_console_test(int fd)
@@ -1148,7 +1148,7 @@ _nc_console_twait(
 						default:
 							T(("twait:event Type %d", inp_rec.EventType));
 							CONSUME();
-							_nc_console_selectActiveHandle();
+							// JPF remove? _nc_console_selectActiveHandle();
 							continue;
 						}
 					}

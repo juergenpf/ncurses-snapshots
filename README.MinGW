@@ -231,7 +231,7 @@ I suggest this for your comfort (assuming you develop on Windows with WSL2):
 
 In the ncurses source directory in the misc folder you'll find the file
 
-	MinGW-WSL2-NCBind.ps1
+	MinGW-WSL2-Profile.ps1
 
 Include this file into your Powershell Profile. Just open Powershell in Windows
 Terminal and type

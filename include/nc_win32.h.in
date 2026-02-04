@@ -166,7 +166,7 @@ typedef struct {
     HANDLE out;
     HANDLE inp;
     HANDLE hdl;
-    HANDLE lastOut;
+    // JPF remove HANDLE lastOut;
     int numButtons;
     WORD pairs[CON_NUMPAIRS];
     COORD origin;
