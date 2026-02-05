@@ -121,8 +121,8 @@
 #define VT_FLAG_IN  ENABLE_VIRTUAL_TERMINAL_INPUT
 
   /* Default flags for input/output modes */
-#define CONMODE_IN_DEFAULT (ENABLE_LINE_INPUT | ENABLE_PROCESSED_INPUT | ENABLE_WINDOW_INPUT | ENABLE_MOUSE_INPUT)
-#define CONMODE_OUT_DEFAULT (ENABLE_PROCESSED_OUTPUT | DISABLE_NEWLINE_AUTO_RETURN | ENABLE_LVB_GRID_WORLDWIDE)
+#define CONMODE_IN_DEFAULT (ENABLE_LINE_INPUT | ENABLE_PROCESSED_INPUT | ENABLE_ECHO_INPUT | ENABLE_WINDOW_INPUT | ENABLE_MOUSE_INPUT)
+#define CONMODE_OUT_DEFAULT (ENABLE_VIRTUAL_TERMINAL_PROCESSING | ENABLE_PROCESSED_OUTPUT)
 
   /* Flags to reset from RAW/CBREAK */
 #define CONMODE_NORAW    (ENABLE_PROCESSED_INPUT|ENABLE_LINE_INPUT)
@@ -151,10 +151,24 @@ extern NCURSES_EXPORT(int) _nc_gettimeofday(struct timeval *, void *);
 extern NCURSES_EXPORT(int) _nc_wcwidth(uint32_t);
 #endif
 
-typedef struct
-{
+typedef struct {
     DWORD dwFlagIn;
     DWORD dwFlagOut;
+    // Add UNIX stty-equivalent flags
+    struct {
+        unsigned char raw:1;      // raw vs cooked mode
+        unsigned char cbreak:1;   // single char vs line mode  
+        unsigned char echo:1;     // echo input characters
+        unsigned char nl:1;       // newline processing
+        unsigned char isig:1;     // signal character processing
+        unsigned char icanon:1;   // canonical input processing
+    } unix_flags;
+    // Special characters equivalent to termios c_cc[]
+    unsigned char intr_char;  // interrupt char (Ctrl+C)
+    unsigned char quit_char;  // quit char (Ctrl+\)
+    unsigned char erase_char; // backspace char
+    unsigned char kill_char;  // kill line char
+    unsigned char eof_char;   // EOF char (Ctrl+D)
 } ConsoleMode;
 
 #define CON_NUMPAIRS 64
@@ -176,7 +190,8 @@ typedef struct {
     CONSOLE_SCREEN_BUFFER_INFO SBI;
     CONSOLE_SCREEN_BUFFER_INFO save_SBI;
     CONSOLE_CURSOR_INFO save_CI;
-    ConsoleMode originalMode;
+    ConsoleMode mode;
+    SCREEN* sp;
 } ConsoleInfo;
 
 extern NCURSES_EXPORT_VAR(ConsoleInfo) _nc_CONSOLE;

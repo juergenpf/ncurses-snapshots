@@ -882,10 +882,6 @@ TINFO_SETUP_TERM(TERMINAL **tp,
 
 	T(("your terminal name is %s", myname));
 
-#if defined(USE_WIN32_CONPTY) || defined(_NC_WINDOWS_NATIVE)
-		_nc_win32_encoding_init();
-#endif
-
 	/*
 	 * Allow output redirection.  This is what SVr3 does.  If stdout is
 	 * directed to a file, screen updates go to standard error.
@@ -1015,6 +1011,9 @@ TINFO_SETUP_TERM(TERMINAL **tp,
 	}
 
 	sp = SP;
+#if defined(USE_WIN32_CONPTY) || defined(_NC_WINDOWS_NATIVE)
+		_nc_console_checkinit();
+#endif
 
 	/*
 	 * We should always check the screensize, just in case.

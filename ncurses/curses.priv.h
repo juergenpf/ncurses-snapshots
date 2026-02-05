@@ -2455,14 +2455,9 @@ extern NCURSES_EXPORT(WORD) _nc_console_MapColor(bool fore, int color);
 extern NCURSES_EXPORT(int)  _nc_console_flush(void* handle);
 extern NCURSES_EXPORT(bool) _nc_console_get_SBI(void);
 extern NCURSES_EXPORT(bool) _nc_stdout_is_conpty(void);
-extern NCURSES_EXPORT(int)  _nc_console_read(SCREEN *sp, HANDLE fd, int *buf);
-extern NCURSES_EXPORT(bool) _nc_console_restore(void);
-// JPF remove extern NCURSES_EXPORT(void) _nc_console_selectActiveHandle(void);
-extern NCURSES_EXPORT(void) _nc_console_set_scrollback(bool normal, CONSOLE_SCREEN_BUFFER_INFO * info);
 extern NCURSES_EXPORT(int)  _nc_console_test(int fd);
 extern NCURSES_EXPORT(int)  _nc_console_testmouse(const SCREEN *sp, HANDLE fd, int delay EVENTLIST_2nd(_nc_eventlist*));
 extern NCURSES_EXPORT(int)  _nc_console_twait(const SCREEN *sp, HANDLE hdl,int mode,int msec,int *left EVENTLIST_2nd(_nc_eventlist * evl));
-extern NCURSES_EXPORT(void) _nc_win32_encoding_init(void);
 
 #ifdef _NC_CHECK_MINTTY
 extern NCURSES_EXPORT(int)    _nc_console_checkmintty(int fd, LPHANDLE pMinTTY);

@@ -46,14 +46,263 @@
 NCURSES_EXPORT_VAR(ConsoleInfo)
 _nc_CONSOLE;
 
-static bool console_initialized = FALSE;
-#define EnsureInit() (void)(console_initialized ? TRUE : _nc_console_checkinit())
-
 #define NOT_IMPLEMENTED                                                          \
 	{                                                                        \
 		fprintf(stderr, "NOT IMPLEMENTED: %s:%d\n", __FILE__, __LINE__); \
 		abort();                                                         \
 	}
+
+static int
+locale_is_utf8(const char *loc)
+{
+	if (!loc)
+		return 0;
+	return strstr(loc, "UTF-8") ||
+	       strstr(loc, "utf8") ||
+	       strstr(loc, "utf-8");
+}
+
+static int
+locale_compatible_with_ncurses(const char *loc)
+{
+#if USE_WIDEC_SUPPORT
+	return locale_is_utf8(loc);
+#else
+	return !locale_is_utf8(loc);
+#endif
+}
+
+static int
+codepage_compatible_with_ncurses(UINT cp)
+{
+#if USE_WIDEC_SUPPORT
+	return cp == 65001; /* only UTF-8 */
+#else
+	return cp != 65001; /* all but UTF-8 */
+#endif
+}
+
+/* Check Codepage exists */
+static int valid_codepage(UINT cp)
+{
+	CPINFOEX info;
+	return GetCPInfoEx(cp, 0, &info) != 0;
+}
+
+/* Check Windows Locale is valid */
+static int valid_locale(const char *loc)
+{
+	if (!loc || !*loc)
+		return 0;
+
+	if (!setlocale(LC_CTYPE, loc))
+		return 0;
+
+	/* Reset to previous value */
+	setlocale(LC_CTYPE, "");
+	return 1;
+}
+
+/* Encoding setup for Windows */
+static void
+encoding_init(void)
+{
+#if USE_WIDEC_SUPPORT
+	UINT default_cp = CP_UTF8;
+	const char *default_ctype = "C.UTF-8";
+#else
+	UINT default_cp = 1252;
+	const char *default_ctype = "English_United States.1252";
+#endif
+
+	const char *env_cp = getenv("NC_WINCP");
+	const char *env_ctype = getenv("NC_WIN_CTYPE");
+
+	UINT cp = default_cp;
+	const char *ctype = default_ctype;
+	UINT tmp;
+	UINT cur_in;
+	UINT cur_out;
+	const char *cur_loc;
+
+	if (env_cp && *env_cp)
+	{
+		tmp = (UINT)atoi(env_cp);
+		if (valid_codepage(tmp) && codepage_compatible_with_ncurses(tmp))
+			cp = tmp;
+	}
+
+	if (env_ctype && *env_ctype)
+	{
+		if (valid_locale(env_ctype) && locale_compatible_with_ncurses(env_ctype))
+			ctype = env_ctype;
+	}
+
+	cur_in = GetConsoleCP();
+	cur_out = GetConsoleOutputCP();
+
+	if (!valid_codepage(cur_in) ||
+	    !valid_codepage(cur_out) ||
+	    !codepage_compatible_with_ncurses(cur_in) ||
+	    !codepage_compatible_with_ncurses(cur_out))
+	{
+		cur_in = cur_out = default_cp;
+	}
+
+	if (!env_cp && valid_codepage(cur_out) && codepage_compatible_with_ncurses(cur_out))
+		cp = cur_out;
+
+	cur_loc = setlocale(LC_CTYPE, NULL);
+	if (!env_ctype && cur_loc && valid_locale(cur_loc) &&
+	    locale_compatible_with_ncurses(cur_loc))
+		ctype = cur_loc;
+
+	if (valid_codepage(cp) && codepage_compatible_with_ncurses(cp))
+	{
+		SetConsoleCP(cp);
+		SetConsoleOutputCP(cp);
+	}
+	else
+	{
+		SetConsoleCP(default_cp);
+		SetConsoleOutputCP(default_cp);
+	}
+
+	if (!setlocale(LC_CTYPE, ctype))
+	{
+		/* Fallback - try alternative UTF-8 locale names for Windows */
+#if USE_WIDEC_SUPPORT
+		if (!setlocale(LC_CTYPE, ".UTF8") &&
+		    !setlocale(LC_CTYPE, ".utf8") &&
+		    !setlocale(LC_CTYPE, "en_US.UTF-8") &&
+		    !setlocale(LC_CTYPE, "English_United States.65001"))
+		{
+			/* Final fallback */
+			setlocale(LC_CTYPE, default_ctype);
+		}
+#else
+		setlocale(LC_CTYPE, default_ctype);
+#endif
+	}
+
+	_nc_setmode(_fileno(stdin), true, false);
+	_nc_setmode(_fileno(stdout), false, false);
+	_nc_setmode(_fileno(stderr), false, false);
+}
+
+// Convert UNIX stty flags to Windows console flags
+static DWORD unix_to_win32_input_flags(const ConsoleMode *mode) {
+    DWORD flags = ENABLE_MOUSE_INPUT | VT_FLAG_IN;
+    
+    if (mode->unix_flags.icanon) {
+        flags |= ENABLE_LINE_INPUT;
+    }
+    if (mode->unix_flags.echo) {
+        flags |= ENABLE_ECHO_INPUT;
+    }
+    if (mode->unix_flags.isig) {
+        flags |= ENABLE_PROCESSED_INPUT;
+    }
+    // Raw mode disables most processing
+    if (mode->unix_flags.raw) {
+        flags = ENABLE_MOUSE_INPUT | VT_FLAG_IN;
+    }
+    
+    return flags;
+}
+
+static void win32_to_unix_input_flags(DWORD dwFlags, ConsoleMode *mode) {
+    mode->unix_flags.raw = !(dwFlags & ENABLE_LINE_INPUT);
+    mode->unix_flags.cbreak = !(dwFlags & ENABLE_PROCESSED_INPUT);
+    mode->unix_flags.echo = (dwFlags & ENABLE_ECHO_INPUT) != 0;
+    mode->unix_flags.nl = (dwFlags & ENABLE_PROCESSED_INPUT) != 0;
+    mode->unix_flags.isig = (dwFlags & ENABLE_PROCESSED_INPUT) != 0;
+    mode->unix_flags.icanon = !(dwFlags & ENABLE_LINE_INPUT);
+}
+
+static DWORD unix_to_win32_output_flags(const ConsoleMode *mode) {
+    DWORD flags = ENABLE_VIRTUAL_TERMINAL_PROCESSING;
+    
+    if (!mode->unix_flags.raw && mode->unix_flags.nl) {
+        flags |= ENABLE_PROCESSED_OUTPUT;
+    }
+    
+    return flags;
+}
+
+static void win32_to_unix_output_flags(DWORD dwFlags, ConsoleMode *mode) {
+    mode->unix_flags.raw = !(dwFlags & ENABLE_PROCESSED_OUTPUT);
+    mode->unix_flags.nl = (dwFlags & ENABLE_PROCESSED_OUTPUT) != 0;
+}
+
+static bool console_initialized = FALSE;
+
+NCURSES_EXPORT(bool)
+_nc_console_checkinit()
+{
+	bool res = FALSE;
+
+	T((T_CALLED("lib_win32conpty::_nc_console_checkinit()")));
+
+	/* initialize once, or not at all */
+	if (!console_initialized)
+	{
+		int i;
+		DWORD num_buttons;
+		WORD a;
+		BOOL b;
+
+		START_TRACE();
+
+		encoding_init();
+
+		if (GetNumberOfConsoleMouseButtons(&num_buttons))
+		{
+			WINCONSOLE.numButtons = (int)num_buttons;
+		}
+		else
+		{
+			WINCONSOLE.numButtons = 1;
+		}
+
+		a = _nc_console_MapColor(true, COLOR_WHITE) |
+		    _nc_console_MapColor(false, COLOR_BLACK);
+		for (i = 0; i < CON_NUMPAIRS; i++)
+			WINCONSOLE.pairs[i] = a;
+
+		WINCONSOLE.inp = GetStdHandle(STD_INPUT_HANDLE);
+		WINCONSOLE.out = GetStdHandle(STD_OUTPUT_HANDLE);
+		WINCONSOLE.hdl = WINCONSOLE.out;
+
+		WINCONSOLE.mode.dwFlagIn = CONMODE_IN_DEFAULT | VT_FLAG_IN;
+		SetConsoleMode(WINCONSOLE.inp, WINCONSOLE.mode.dwFlagIn);
+
+		WINCONSOLE.mode.dwFlagOut = CONMODE_OUT_DEFAULT | VT_FLAG_OUT;
+		SetConsoleMode(WINCONSOLE.out, WINCONSOLE.mode.dwFlagOut);
+		
+		win32_to_unix_input_flags(WINCONSOLE.mode.dwFlagIn, &WINCONSOLE.mode);
+		win32_to_unix_output_flags(WINCONSOLE.mode.dwFlagOut, &WINCONSOLE.mode);
+		
+		if (WINCONSOLE.hdl != INVALID_HANDLE_VALUE)
+		{
+			_nc_console_get_SBI();
+			WINCONSOLE.save_SBI = WINCONSOLE.SBI;
+			GetConsoleCursorInfo(WINCONSOLE.hdl, &WINCONSOLE.save_CI);
+			T(("... initial cursor is %svisible, %d%%",
+			   (WINCONSOLE.save_CI.bVisible ? "" : "not-"),
+			   (int)WINCONSOLE.save_CI.dwSize));
+		}
+
+		WINCONSOLE.initialized = TRUE;
+		console_initialized = TRUE;
+	}
+	res = (WINCONSOLE.hdl != INVALID_HANDLE_VALUE);
+	BOOL check = _nc_stdout_is_conpty();
+	T(("... console initialized=%d, isConpty=%d",
+	   console_initialized,
+	   check));
+	returnBool(res);
+}
 
 static ULONGLONG
 tdiff(FILETIME fstart, FILETIME fend)
@@ -169,199 +418,6 @@ handle_mouse(SCREEN *sp, MOUSE_EVENT_RECORD mer)
 	return result;
 }
 
-static bool
-read_screen_data(void)
-{
-	bool result = FALSE;
-	COORD bufferCoord;
-	size_t want;
-
-	WINCONSOLE.save_size.X = (SHORT)(WINCONSOLE.save_region.Right - WINCONSOLE.save_region.Left + 1);
-	WINCONSOLE.save_size.Y = (SHORT)(WINCONSOLE.save_region.Bottom - WINCONSOLE.save_region.Top + 1);
-
-	want = (size_t)(WINCONSOLE.save_size.X * WINCONSOLE.save_size.Y);
-
-	if ((WINCONSOLE.save_screen = malloc(want * sizeof(CHAR_INFO))) != NULL)
-	{
-		bufferCoord.X = (SHORT)(WINCONSOLE.window_only
-					    ? WINCONSOLE.SBI.srWindow.Left
-					    : 0);
-		bufferCoord.Y = (SHORT)(WINCONSOLE.window_only
-					    ? WINCONSOLE.SBI.srWindow.Top
-					    : 0);
-
-		T(("... reading console %s %dx%d into %d,%d - %d,%d at %d,%d",
-		   WINCONSOLE.window_only ? "window" : "buffer",
-		   WINCONSOLE.save_size.Y, WINCONSOLE.save_size.X,
-		   WINCONSOLE.save_region.Top,
-		   WINCONSOLE.save_region.Left,
-		   WINCONSOLE.save_region.Bottom,
-		   WINCONSOLE.save_region.Right,
-		   bufferCoord.Y,
-		   bufferCoord.X));
-
-		if (read_screen(WINCONSOLE.hdl,
-				WINCONSOLE.save_screen,
-				WINCONSOLE.save_size,
-				bufferCoord,
-				&WINCONSOLE.save_region))
-		{
-			result = TRUE;
-		}
-		else
-		{
-			T((" error %#lx", (unsigned long)GetLastError()));
-			FreeAndNull(WINCONSOLE.save_screen);
-		}
-	}
-
-	return result;
-}
-
-static bool
-save_original_screen(void)
-{
-	bool result = FALSE;
-
-	WINCONSOLE.save_region.Top = 0;
-	WINCONSOLE.save_region.Left = 0;
-	WINCONSOLE.save_region.Bottom = (SHORT)(WINCONSOLE.SBI.dwSize.Y - 1);
-	WINCONSOLE.save_region.Right = (SHORT)(WINCONSOLE.SBI.dwSize.X - 1);
-
-	if (read_screen_data())
-	{
-		result = TRUE;
-	}
-	else
-	{
-
-		WINCONSOLE.save_region.Top = WINCONSOLE.SBI.srWindow.Top;
-		WINCONSOLE.save_region.Left = WINCONSOLE.SBI.srWindow.Left;
-		WINCONSOLE.save_region.Bottom = WINCONSOLE.SBI.srWindow.Bottom;
-		WINCONSOLE.save_region.Right = WINCONSOLE.SBI.srWindow.Right;
-
-		WINCONSOLE.window_only = TRUE;
-
-		if (read_screen_data())
-		{
-			result = TRUE;
-		}
-	}
-	T(("... save original screen contents %s", result ? "ok" : "err"));
-	return result;
-}
-
-static bool
-restore_original_screen(void)
-{
-	COORD bufferCoord;
-	bool result = FALSE;
-	SMALL_RECT save_region = WINCONSOLE.save_region;
-
-	T(("... restoring %s",
-	   WINCONSOLE.window_only ? "window" : "entire buffer"));
-
-	bufferCoord.X = (SHORT)(WINCONSOLE.window_only ? WINCONSOLE.SBI.srWindow.Left : 0);
-	bufferCoord.Y = (SHORT)(WINCONSOLE.window_only ? WINCONSOLE.SBI.srWindow.Top : 0);
-
-	if (write_screen(WINCONSOLE.hdl,
-			 WINCONSOLE.save_screen,
-			 WINCONSOLE.save_size,
-			 bufferCoord,
-			 &save_region))
-	{
-		result = TRUE;
-		SetConsoleCursorPosition(WINCONSOLE.hdl, WINCONSOLE.save_SBI.dwCursorPosition);
-		T(("... restore original screen contents ok %dx%d (%d,%d - %d,%d)",
-		   WINCONSOLE.save_size.Y,
-		   WINCONSOLE.save_size.X,
-		   save_region.Top,
-		   save_region.Left,
-		   save_region.Bottom,
-		   save_region.Right));
-	}
-	else
-	{
-		T(("... restore original screen contents err"));
-	}
-	return result;
-}
-
-NCURSES_EXPORT(bool)
-_nc_console_checkinit()
-{
-	bool res = FALSE;
-
-	T((T_CALLED("lib_win32conpty::_nc_console_checkinit()")));
-
-	/* initialize once, or not at all */
-	if (!console_initialized)
-	{
-		int i;
-		DWORD num_buttons;
-		WORD a;
-		BOOL b;
-
-		START_TRACE();
-
-		if (GetNumberOfConsoleMouseButtons(&num_buttons))
-		{
-			WINCONSOLE.numButtons = (int)num_buttons;
-		}
-		else
-		{
-			WINCONSOLE.numButtons = 1;
-		}
-
-		a = _nc_console_MapColor(true, COLOR_WHITE) |
-		    _nc_console_MapColor(false, COLOR_BLACK);
-		for (i = 0; i < CON_NUMPAIRS; i++)
-			WINCONSOLE.pairs[i] = a;
-
-#define SaveConsoleMode(handle, value) \
-	GetConsoleMode(WINCONSOLE.handle, &WINCONSOLE.originalMode.value)
-
-		WINCONSOLE.inp = GetStdHandle(STD_INPUT_HANDLE);
-		WINCONSOLE.out = GetStdHandle(STD_OUTPUT_HANDLE);
-		WINCONSOLE.hdl = WINCONSOLE.out;
-
-		SaveConsoleMode(inp, dwFlagIn);
-		SaveConsoleMode(out, dwFlagOut);
-
-		/* We set binary I/O even when using the console
-		   driver to cover the situation, that the
-		   TERM variable is set to #win32con, but actually
-		   Windows supports virtual terminal processing.
-		   So if terminfo functions are used in this setup,
-		   they actually may work.
-		 */
-		/*_nc_setmode(fileno(stdin), true, false);
-		_nc_setmode(fileno(stdout), false, false);
-		_nc_setmode(fileno(stderr), false, false);*/
-		if (WINCONSOLE.hdl != INVALID_HANDLE_VALUE)
-		{
-			_nc_console_get_SBI();
-			WINCONSOLE.save_SBI = WINCONSOLE.SBI;
-			save_original_screen();
-			_nc_console_set_scrollback(FALSE, &WINCONSOLE.SBI);
-
-			GetConsoleCursorInfo(WINCONSOLE.hdl, &WINCONSOLE.save_CI);
-			T(("... initial cursor is %svisible, %d%%",
-			   (WINCONSOLE.save_CI.bVisible ? "" : "not-"),
-			   (int)WINCONSOLE.save_CI.dwSize));
-		}
-
-		WINCONSOLE.initialized = TRUE;
-		console_initialized = TRUE;
-	}
-	res = (WINCONSOLE.hdl != INVALID_HANDLE_VALUE);
-	BOOL check = _nc_stdout_is_conpty();
-	T(("... console initialized=%d, isConpty=%d",
-	   console_initialized,
-	   check));
-	returnBool(res);
-}
-
 #define REQUIRED_MAX_V (DWORD)10
 #define REQUIRED_MIN_V (DWORD)0
 #define REQUIRED_BUILD (DWORD)17763
@@ -419,7 +475,16 @@ _nc_console_isatty(int fd)
 		result = 1;
 	returnCode(result);
 }
-int xxx = 0;
+
+/* Convert a file descriptor into a HANDLE
+   That's not necessarily a console HANDLE
+*/
+NCURSES_EXPORT(HANDLE)
+_nc_console_handle(int fd)
+{
+	intptr_t value = _get_osfhandle(fd);
+	return (HANDLE)value;
+}
 
 NCURSES_EXPORT(HANDLE)
 _nc_console_fd2handle(int fd)
@@ -452,16 +517,17 @@ _nc_console_fd2handle(int fd)
 
 #define OutHandle() ((WINCONSOLE.progMode) ? WINCONSOLE.hdl : WINCONSOLE.out)
 
+
 NCURSES_EXPORT(int)
 _nc_console_setmode(int fd, const TTY *arg)
 {
-	HANDLE hdl = _nc_console_fd2handle(fd);
-	DWORD dwFlag = 0;
 	int code = ERR;
-	HANDLE alt;
 
 	if (arg)
 	{
+		HANDLE hdl = _nc_console_fd2handle(fd);
+		DWORD dwFlag = 0;
+		HANDLE alt;
 #ifdef TRACE
 		TTY TRCTTY;
 #define TRCTTYOUT(flag) TRCTTY.dwFlagOut = flag
@@ -498,6 +564,41 @@ _nc_console_setmode(int fd, const TTY *arg)
 		assert(_nc_stdout_is_conpty());
 	}
 	return (code);
+}
+
+// Implement UNIX stty-like mode functions
+NCURSES_EXPORT(int) _nc_console_raw(void) {
+    ConsoleMode mode;
+    if (_nc_console_getmode(WINCONSOLE.inp, &mode) == OK) {
+        mode.unix_flags.raw = 1;
+        mode.unix_flags.cbreak = 0;
+        mode.unix_flags.echo = 0;
+        mode.unix_flags.nl = 0;
+        mode.unix_flags.isig = 0;
+        mode.unix_flags.icanon = 0;
+        return _nc_console_setmode(_nc_console_handle(STDIN_FILENO), &mode);
+    }
+    return ERR;
+}
+
+NCURSES_EXPORT(int) _nc_console_cbreak(void) {
+    ConsoleMode mode;
+    if (_nc_console_getmode(WINCONSOLE.inp, &mode) == OK) {
+        mode.unix_flags.raw = 0;
+        mode.unix_flags.cbreak = 1;
+        mode.unix_flags.icanon = 0;  // Disable line buffering
+        return _nc_console_setmode(_nc_console_handle(STDIN_FILENO), &mode);
+    }
+    return ERR;
+}
+
+NCURSES_EXPORT(int) _nc_console_noecho(void) {
+    ConsoleMode mode;
+    if (_nc_console_getmode(WINCONSOLE.inp, &mode) == OK) {
+        mode.unix_flags.echo = 0;
+        return _nc_console_setmode(_nc_console_handle(STDIN_FILENO), &mode);
+    }
+    return ERR;
 }
 
 NCURSES_EXPORT(int)
@@ -541,15 +642,65 @@ _nc_console_getmode(HANDLE hdl, TTY *arg)
 	return (code);
 }
 
-/* Convert a file descriptor into a HANDLE
-   That's not necessarily a console HANDLE
-*/
-NCURSES_EXPORT(HANDLE)
-_nc_console_handle(int fd)
-{
-	intptr_t value = _get_osfhandle(fd);
-	return (HANDLE)value;
+// Handle UNIX-like signal characters in ConPTY mode
+static void handle_signal_chars(wint_t ch) {
+    if (_nc_stdout_is_conpty()) {
+        ConsoleMode mode;
+        if (_nc_console_getmode(WINCONSOLE.inp, &mode) != OK) {
+            return;
+        }
+        
+        switch(ch) {
+            case 3:  // Ctrl+C (SIGINT)
+                if (mode.unix_flags.isig) {
+                    // Raise SIGINT equivalent
+                    GenerateConsoleCtrlEvent(CTRL_C_EVENT, 0);
+                }
+                break;
+            case 28: // Ctrl+\ (SIGQUIT)  
+                if (mode.unix_flags.isig) {
+                    // Handle quit signal
+                }
+                break;
+        }
+    }
 }
+
+NCURSES_EXPORT(int) _nc_console_process_input(wint_t *ch) {
+    ConsoleMode mode;
+    _nc_console_getmode(WINCONSOLE.inp, &mode);
+    
+    // Handle special characters
+    if (*ch == mode.erase_char && !mode.unix_flags.raw) {
+        // Process backspace - return actual control character
+        return 8;  // Backspace (Ctrl+H)
+    }
+    if (*ch == mode.kill_char && !mode.unix_flags.raw) {
+        // Process kill line - return actual control character  
+        return 21; // Kill line (Ctrl+U)
+    }
+    if (*ch == mode.eof_char && !mode.unix_flags.raw) {
+        // Process EOF
+        return EOF;
+    }
+    
+    handle_signal_chars(*ch);
+    return *ch;
+}
+
+NCURSES_EXPORT(void) _nc_console_show_settings(void) {
+    ConsoleMode mode;
+    if (_nc_console_getmode(WINCONSOLE.inp, &mode) == OK) {
+        printf("ConPTY mode: %s\n", _nc_stdout_is_conpty() ? "yes" : "no");
+        printf("raw: %s, cbreak: %s, echo: %s\n",
+               mode.unix_flags.raw ? "on" : "off",
+               mode.unix_flags.cbreak ? "on" : "off", 
+               mode.unix_flags.echo ? "on" : "off");
+        printf("Input flags: 0x%lx, Output flags: 0x%lx\n",
+               mode.dwFlagIn, mode.dwFlagOut);
+    }
+}
+
 
 /* Validate that a HANDLE is actually a
    console HANDLE
@@ -561,8 +712,6 @@ IsConsoleHandle(HANDLE hdl)
 	BOOL result = FALSE;
 
 	T((T_CALLED("lib_win32con::IsConsoleHandle(HANDLE=%p"), hdl));
-
-	EnsureInit();
 
 	if (!GetConsoleMode(hdl, &dwFlag))
 	{
@@ -579,7 +728,6 @@ IsConsoleHandle(HANDLE hdl)
 NCURSES_EXPORT(void)
 _nc_console_size(int *Lines, int *Cols)
 {
-	EnsureInit();
 	if (Lines != NULL && Cols != NULL)
 	{
 		*Lines = (int)(WINCONSOLE.SBI.srWindow.Bottom + 1 -
@@ -692,88 +840,6 @@ _nc_console_flush(void *hdl)
 #define MIN_WIDE 80
 #define MIN_HIGH 24
 
-/*
- * In "normal" mode, reset the buffer- and window-sizes back to their original values.
- */
-NCURSES_EXPORT(void)
-_nc_console_set_scrollback(bool normal, CONSOLE_SCREEN_BUFFER_INFO *info)
-{
-	SMALL_RECT rect;
-	COORD coord;
-	bool changed = FALSE;
-
-	T((T_CALLED("lib_win32con::_nc_console_set_scrollback(%s)"),
-	   (normal
-			? "normal"
-			: "application")));
-
-	T(("... SBI.srWindow %d,%d .. %d,%d",
-	   info->srWindow.Top,
-	   info->srWindow.Left,
-	   info->srWindow.Bottom,
-	   info->srWindow.Right));
-	T(("... SBI.dwSize %dx%d",
-	   info->dwSize.Y,
-	   info->dwSize.X));
-
-	if (normal)
-	{
-		rect = info->srWindow;
-		coord = info->dwSize;
-		if (memcmp(info, &WINCONSOLE.SBI, sizeof(*info)) != 0)
-		{
-			changed = TRUE;
-			WINCONSOLE.SBI = *info;
-		}
-	}
-	else
-	{
-		int high = info->srWindow.Bottom - info->srWindow.Top + 1;
-		int wide = info->srWindow.Right - info->srWindow.Left + 1;
-
-		if (high < MIN_HIGH)
-		{
-			T(("... height %d < %d", high, MIN_HIGH));
-			high = MIN_HIGH;
-			changed = TRUE;
-		}
-		if (wide < MIN_WIDE)
-		{
-			T(("... width %d < %d", wide, MIN_WIDE));
-			wide = MIN_WIDE;
-			changed = TRUE;
-		}
-
-		rect.Left =
-			rect.Top = 0;
-		rect.Right = (SHORT)(wide - 1);
-		rect.Bottom = (SHORT)(high - 1);
-
-		coord.X = (SHORT)wide;
-		coord.Y = (SHORT)high;
-
-		if (info->dwSize.Y != high ||
-			info->dwSize.X != wide ||
-			info->srWindow.Top != 0 ||
-			info->srWindow.Left != 0)
-		{
-			changed = TRUE;
-		}
-	}
-
-	if (changed)
-	{
-		T(("... coord %d,%d", coord.Y, coord.X));
-		T(("... rect %d,%d - %d,%d",
-		   rect.Top, rect.Left,
-		   rect.Bottom, rect.Right));
-		SetConsoleScreenBufferSize(WINCONSOLE.hdl, coord); /* dwSize */
-		SetConsoleWindowInfo(WINCONSOLE.hdl, TRUE, &rect); /* srWindow */
-		_nc_console_get_SBI();
-	}
-	returnVoid;
-}
-
 NCURSES_EXPORT(bool)
 _nc_console_get_SBI(void)
 {
@@ -882,44 +948,14 @@ _nc_console_read(SCREEN *sp, HANDLE hdl, int *buf)
 				T(("_nc_console_read: WINDOW_BUFFER_SIZE_EVENT"));
 				/* Console window was resized - handle like Unix SIGWINCH */
 				{
-					int old_lines, old_cols;
-					int new_lines, new_cols;
-
-					old_lines = sp ? screen_lines(sp) : 0;
-					old_cols = sp ? screen_columns(sp) : 0;
-					_nc_console_get_SBI();
-					_nc_console_size(&new_lines, &new_cols);
-
-					if (sp && ((new_lines != old_lines) || (new_cols != old_cols)))
-					{
-						T(("Console resized from %dx%d to %dx%d", old_lines, old_cols, new_lines, new_cols));
-						NCURSES_SP_NAME(resizeterm)(sp, new_lines, new_cols);
-						*buf = KEY_RESIZE;
-						break;
-					}
+					// FIXME needs to be implemented as an event in wgetch-events
 				}
+				break;
 			}
 			continue;
 		}
 	}
 	returnCode(rc);
-}
-
-NCURSES_EXPORT(bool)
-_nc_console_restore(void)
-{
-	bool res = FALSE;
-
-	T((T_CALLED("lib_win32con::_nc_console_restore")));
-	if (WINCONSOLE.hdl != INVALID_HANDLE_VALUE)
-	{
-		res = TRUE;
-		_nc_console_set_scrollback(TRUE, &WINCONSOLE.save_SBI);
-		if (!restore_original_screen())
-		res = FALSE;
-		SetConsoleCursorInfo(WINCONSOLE.hdl, &WINCONSOLE.save_CI);
-	}
-	returnBool(res);
 }
 
 /*NCURSES_EXPORT(void)
@@ -1130,18 +1166,7 @@ _nc_console_twait(
 							T(("twait:event WINDOW_BUFFER_SIZE_EVENT"));
 							/* Console window was resized - handle like Unix SIGWINCH */
 							{
-								int old_lines, old_cols;
-								int new_lines, new_cols;
-								
-								old_lines = sp ? screen_lines(sp) : 0;
-								old_cols = sp ? screen_columns(sp) : 0;								
-								_nc_console_get_SBI();								
-								_nc_console_size(&new_lines, &new_cols);
-								
-								if (sp && ((new_lines != old_lines) || (new_cols != old_cols))) {
-									code = TW_INPUT;
-									goto end;	
-								}
+								// FIXME needs to be implemented as an event in wgetch-events
 							}
 							CONSUME();
 							continue;
@@ -1181,146 +1206,5 @@ end:
 	return code;
 }
 
-static int
-locale_is_utf8(const char *loc)
-{
-	if (!loc)
-		return 0;
-	return strstr(loc, "UTF-8") ||
-	       strstr(loc, "utf8") ||
-	       strstr(loc, "utf-8");
-}
-
-static int
-locale_compatible_with_ncurses(const char *loc)
-{
-#if USE_WIDEC_SUPPORT
-	return locale_is_utf8(loc);
-#else
-	return !locale_is_utf8(loc);
-#endif
-}
-
-static int
-codepage_compatible_with_ncurses(UINT cp)
-{
-#if USE_WIDEC_SUPPORT
-	return cp == 65001; /* only UTF-8 */
-#else
-	return cp != 65001; /* all but UTF-8 */
-#endif
-}
-
-/* Check Codepage exists */
-static int valid_codepage(UINT cp)
-{
-	CPINFOEX info;
-	return GetCPInfoEx(cp, 0, &info) != 0;
-}
-
-/* Check Windows Locale is valid */
-static int valid_locale(const char *loc)
-{
-	if (!loc || !*loc)
-		return 0;
-
-	if (!setlocale(LC_CTYPE, loc))
-		return 0;
-
-	/* Reset to previous value */
-	setlocale(LC_CTYPE, "");
-	return 1;
-}
-
-/* Encoding setup for Windows */
-NCURSES_EXPORT(void)
-_nc_win32_encoding_init(void)
-{
-#if USE_WIDEC_SUPPORT
-	UINT default_cp = CP_UTF8;
-	const char *default_ctype = "C.UTF-8";
-#else
-	UINT default_cp = 1252;
-	const char *default_ctype = "English_United States.1252";
-#endif
-
-	const char *env_cp = getenv("NC_WINCP");
-	const char *env_ctype = getenv("NC_WIN_CTYPE");
-
-	UINT cp = default_cp;
-	const char *ctype = default_ctype;
-	UINT tmp;
-	UINT cur_in;
-	UINT cur_out;
-	const char *cur_loc;
-
-	T(("lib_win32conpty:_nc_win32_encoding_init()"));
-
-	EnsureInit();
-
-	if (env_cp && *env_cp)
-	{
-		tmp = (UINT)atoi(env_cp);
-		if (valid_codepage(tmp) && codepage_compatible_with_ncurses(tmp))
-			cp = tmp;
-	}
-
-	if (env_ctype && *env_ctype)
-	{
-		if (valid_locale(env_ctype) && locale_compatible_with_ncurses(env_ctype))
-			ctype = env_ctype;
-	}
-
-	cur_in = GetConsoleCP();
-	cur_out = GetConsoleOutputCP();
-
-	if (!valid_codepage(cur_in) ||
-	    !valid_codepage(cur_out) ||
-	    !codepage_compatible_with_ncurses(cur_in) ||
-	    !codepage_compatible_with_ncurses(cur_out))
-	{
-		cur_in = cur_out = default_cp;
-	}
-
-	if (!env_cp && valid_codepage(cur_out) && codepage_compatible_with_ncurses(cur_out))
-		cp = cur_out;
-
-	cur_loc = setlocale(LC_CTYPE, NULL);
-	if (!env_ctype && cur_loc && valid_locale(cur_loc) &&
-	    locale_compatible_with_ncurses(cur_loc))
-		ctype = cur_loc;
-
-	if (valid_codepage(cp) && codepage_compatible_with_ncurses(cp))
-	{
-		SetConsoleCP(cp);
-		SetConsoleOutputCP(cp);
-	}
-	else
-	{
-		SetConsoleCP(default_cp);
-		SetConsoleOutputCP(default_cp);
-	}
-
-	if (!setlocale(LC_CTYPE, ctype))
-	{
-		/* Fallback - try alternative UTF-8 locale names for Windows */
-#if USE_WIDEC_SUPPORT
-		if (!setlocale(LC_CTYPE, ".UTF8") &&
-		    !setlocale(LC_CTYPE, ".utf8") &&
-		    !setlocale(LC_CTYPE, "en_US.UTF-8") &&
-		    !setlocale(LC_CTYPE, "English_United States.65001"))
-		{
-			/* Final fallback */
-			setlocale(LC_CTYPE, default_ctype);
-		}
-#else
-		setlocale(LC_CTYPE, default_ctype);
-#endif
-	}
-
-	_nc_setmode(_fileno(stdin), true, false);
-	_nc_setmode(_fileno(stdout), false, false);
-	_nc_setmode(_fileno(stderr), false, false);
-}
 
 #endif /* defined(USE_WIN32_CONPTY)) */

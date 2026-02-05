@@ -128,7 +128,7 @@ _nc_setmode(int fd, bool isInput, bool isCurses)
 	if (!isatty(fd))
 		return;
 #if USE_WIDEC_SUPPORT
-	setmode(fd, isInput ? _O_TEXT : (isCurses ? _O_BINARY : _O_TEXT));
+	setmode(fd, isInput ? _O_BINARY : (isCurses ? _O_BINARY : _O_BINARY));
 #else
 	setmode(fd, isInput ? _O_TEXT : (isCurses ? _O_BINARY : _O_TEXT));
 #endif

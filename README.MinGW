@@ -148,10 +148,14 @@ hooks for interop, I recommend using these options:
 	--disable-home-terminfo
 	--enable-database
 	--disable-termcap
-	--enable-sp-funcs
+	--disable-sp-funcs
 	--enable-term-driver
 	--enable-named-pipes
 	--enable-interop
+
+Please note --disable-sp-funcs is used, because we use Windows ConPTY and a Windows
+program can only have a single console and has no other terminal like devices. So
+there is no use for support of multiple terminals in one process.
 
 The following example demonstrates the configuration command line which I am using 
 at the moment, assuming you are in your ncurses source directory. I assume you have 
@@ -205,7 +209,7 @@ $ ../configure \
 	--disable-reentrant \
 	--without-pthread \
 	--enable-widec \
-	--enable-sp-funcs \
+	--disable-sp-funcs \
 	--enable-interop \
 	--with-debug \
 	--with-progs \

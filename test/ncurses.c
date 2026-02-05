@@ -7811,10 +7811,19 @@ main_menu(bool top)
 	command = 0;
 	for (;;) {
 #if USE_WIDEC_SUPPORT
+#if defined(_WIN32) || defined(USE_WIN32_CONPTY)
+            /* Use fgetc for Windows - wide char input is problematic */
+            int ch_int = fgetc(stdin);
+            wint_t ch = (ch_int == EOF) ? WEOF : (wint_t)ch_int;
+            if (ch == WEOF) {
+#else
             wint_t ch = 0;
+            errno = 0;  /* Clear any stale error */
             if ( (ch = fgetwc(stdin)) == WEOF) {
+#endif
 #else
             char ch = '\0';
+            errno = 0;  /* Clear any stale error */
             if (read(fileno(stdin), &ch, (size_t) 1) <= 0) {
 #endif
 		int save_err = errno;
