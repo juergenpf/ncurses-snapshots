@@ -191,48 +191,50 @@ encoding_init(void)
 }
 
 // Convert UNIX stty flags to Windows console flags
-static DWORD unix_to_win32_input_flags(const ConsoleMode *mode) {
+NCURSES_EXPORT(DWORD) 
+_nc_unix_to_win32_input_flags(const TTY *mode) {
     DWORD flags = ENABLE_MOUSE_INPUT | VT_FLAG_IN;
     
-    if (mode->unix_flags.icanon) {
+    if (mode->unixTTYflags.icanon) {
         flags |= ENABLE_LINE_INPUT;
     }
-    if (mode->unix_flags.echo) {
+    if (mode->unixTTYflags.echo) {
         flags |= ENABLE_ECHO_INPUT;
     }
-    if (mode->unix_flags.isig) {
+    if (mode->unixTTYflags.isig) {
         flags |= ENABLE_PROCESSED_INPUT;
     }
     // Raw mode disables most processing
-    if (mode->unix_flags.raw) {
+    if (mode->unixTTYflags.raw) {
         flags = ENABLE_MOUSE_INPUT | VT_FLAG_IN;
     }
     
     return flags;
 }
 
-static void win32_to_unix_input_flags(DWORD dwFlags, ConsoleMode *mode) {
-    mode->unix_flags.raw = !(dwFlags & ENABLE_LINE_INPUT);
-    mode->unix_flags.cbreak = !(dwFlags & ENABLE_PROCESSED_INPUT);
-    mode->unix_flags.echo = (dwFlags & ENABLE_ECHO_INPUT) != 0;
-    mode->unix_flags.nl = (dwFlags & ENABLE_PROCESSED_INPUT) != 0;
-    mode->unix_flags.isig = (dwFlags & ENABLE_PROCESSED_INPUT) != 0;
-    mode->unix_flags.icanon = !(dwFlags & ENABLE_LINE_INPUT);
+static void win32_to_unix_input_flags(DWORD dwFlags, TTY *mode) {
+    mode->unixTTYflags.raw = !(dwFlags & ENABLE_LINE_INPUT);
+    mode->unixTTYflags.cbreak = !(dwFlags & ENABLE_PROCESSED_INPUT);
+    mode->unixTTYflags.echo = (dwFlags & ENABLE_ECHO_INPUT) != 0;
+    mode->unixTTYflags.nl = (dwFlags & ENABLE_PROCESSED_INPUT) != 0;
+    mode->unixTTYflags.isig = (dwFlags & ENABLE_PROCESSED_INPUT) != 0;
+    mode->unixTTYflags.icanon = !(dwFlags & ENABLE_LINE_INPUT);
 }
 
-static DWORD unix_to_win32_output_flags(const ConsoleMode *mode) {
-    DWORD flags = ENABLE_VIRTUAL_TERMINAL_PROCESSING;
+NCURSES_EXPORT(DWORD) 
+_nc_unix_to_win32_output_flags(const TTY *mode) {
+    DWORD flags = ENABLE_VIRTUAL_TERMINAL_PROCESSING | VT_FLAG_OUT;
     
-    if (!mode->unix_flags.raw && mode->unix_flags.nl) {
+    if (!mode->unixTTYflags.raw && mode->unixTTYflags.nl) {
         flags |= ENABLE_PROCESSED_OUTPUT;
     }
     
     return flags;
 }
 
-static void win32_to_unix_output_flags(DWORD dwFlags, ConsoleMode *mode) {
-    mode->unix_flags.raw = !(dwFlags & ENABLE_PROCESSED_OUTPUT);
-    mode->unix_flags.nl = (dwFlags & ENABLE_PROCESSED_OUTPUT) != 0;
+static void win32_to_unix_output_flags(DWORD dwFlags, TTY *mode) {
+    mode->unixTTYflags.raw = !(dwFlags & ENABLE_PROCESSED_OUTPUT);
+    mode->unixTTYflags.nl = (dwFlags & ENABLE_PROCESSED_OUTPUT) != 0;
 }
 
 static bool console_initialized = FALSE;
@@ -517,6 +519,93 @@ _nc_console_fd2handle(int fd)
 
 #define OutHandle() ((WINCONSOLE.progMode) ? WINCONSOLE.hdl : WINCONSOLE.out)
 
+/*
+ * Translate Unix-style flags in ConsoleMode to Windows Console flags
+ */
+NCURSES_EXPORT(int)
+_nc_win32_stty(int fd, ConsoleMode *mode)
+{
+    DWORD dwFlagIn = 0;
+    DWORD dwFlagOut = 0;
+    
+    /* Start with default console modes */
+    dwFlagIn = CONMODE_IN_DEFAULT;  
+    dwFlagOut = CONMODE_OUT_DEFAULT;
+    
+    /* Translate Unix-style flags to Windows Console flags */
+    
+    /* Raw mode: disable all input processing */
+    if (mode->unix_flags.unixTTYflags.raw) {
+        dwFlagIn &= ~(ENABLE_PROCESSED_INPUT | ENABLE_LINE_INPUT | 
+                      ENABLE_ECHO_INPUT | ENABLE_WINDOW_INPUT);
+        /* Keep mouse and virtual terminal input */
+        dwFlagIn |= (ENABLE_MOUSE_INPUT | ENABLE_VIRTUAL_TERMINAL_INPUT);
+    }
+    
+    /* Cbreak mode: single character input, no line buffering */
+    if (mode->unix_flags.unixTTYflags.cbreak && !mode->unix_flags.unixTTYflags.raw) {
+        dwFlagIn &= ~ENABLE_LINE_INPUT;  /* Disable line input */
+        dwFlagIn |= ENABLE_PROCESSED_INPUT;  /* Keep processed input for Ctrl+C etc. */
+    }
+    
+    /* Canonical mode: line-oriented input */
+    if (mode->unix_flags.unixTTYflags.icanon) {
+        dwFlagIn |= ENABLE_LINE_INPUT;
+    } else {
+        dwFlagIn &= ~ENABLE_LINE_INPUT;
+    }
+    
+    /* Echo mode: echo typed characters */
+    if (mode->unix_flags.unixTTYflags.echo) {
+        dwFlagIn |= ENABLE_ECHO_INPUT;
+    } else {
+        dwFlagIn &= ~ENABLE_ECHO_INPUT;
+    }
+    
+    /* Signal processing: handle Ctrl+C, Ctrl+Break */
+    if (mode->unix_flags.unixTTYflags.isig) {
+        dwFlagIn |= ENABLE_PROCESSED_INPUT;
+    } else if (!mode->unix_flags.unixTTYflags.raw) {
+        /* In raw mode, we already disabled processed input above */
+        dwFlagIn &= ~ENABLE_PROCESSED_INPUT;
+    }
+    
+    /* Newline processing */
+    if (mode->unix_flags.unixTTYflags.nl) {
+        dwFlagOut |= ENABLE_PROCESSED_OUTPUT;
+    } else {
+        dwFlagOut &= ~ENABLE_PROCESSED_OUTPUT;
+    }
+    
+    /* Store computed flags back into mode structure */
+    mode->dwFlagIn = dwFlagIn;
+    mode->dwFlagOut = dwFlagOut;
+    
+    /* Apply the console mode using existing ncurses Windows console functions */
+    return _nc_console_setmode(fd, mode);
+}
+
+/*
+ * Enhanced console mode setting that uses Unix-style flag translation
+ */  
+NCURSES_EXPORT(int) 
+_nc_console_setmode_unix(int fd, ConsoleMode *mode)
+{
+    /* Translate Unix flags to Windows console flags */
+    int result = _nc_win32_stty(fd, mode);
+    
+    /* Optional: Log the translation for debugging */
+    T(("_nc_console_setmode_unix: unix_flags=[%s%s%s%s%s%s] -> dwFlagIn=0x%08lx, dwFlagOut=0x%08lx",
+       mode->unix_flags.unixTTYflags.raw ? "RAW " : "",
+       mode->unix_flags.unixTTYflags.cbreak ? "CBREAK " : "", 
+       mode->unix_flags.unixTTYflags.icanon ? "ICANON " : "",
+       mode->unix_flags.unixTTYflags.echo ? "ECHO " : "",
+       mode->unix_flags.unixTTYflags.isig ? "ISIG " : "",
+       mode->unix_flags.unixTTYflags.nl ? "NL " : "",
+       mode->dwFlagIn, mode->dwFlagOut));
+       
+    return result;
+}
 
 NCURSES_EXPORT(int)
 _nc_console_setmode(int fd, const TTY *arg)
@@ -528,37 +617,25 @@ _nc_console_setmode(int fd, const TTY *arg)
 		HANDLE hdl = _nc_console_fd2handle(fd);
 		DWORD dwFlag = 0;
 		HANDLE alt;
-#ifdef TRACE
-		TTY TRCTTY;
-#define TRCTTYOUT(flag) TRCTTY.dwFlagOut = flag
-#define TRCTTYIN(flag) TRCTTY.dwFlagIn = flag
-#else
-#define TRCTTYOUT(flag)
-#define TRCTTYIN(flag)
-#endif
+
 		T(("lib_win32con:_nc_console_setmode %s", _nc_trace_ttymode(arg)));
 		if (hdl == WINCONSOLE.inp)
 		{
-			dwFlag = arg->dwFlagIn | ENABLE_MOUSE_INPUT | VT_FLAG_IN;
-			TRCTTYIN(dwFlag);
+			dwFlag = _nc_unix_to_win32_input_flags	(arg);
 			SetConsoleMode(hdl, dwFlag);
 
 			alt = OutHandle();
-			dwFlag = arg->dwFlagOut;
-			TRCTTYOUT(dwFlag);
+			dwFlag = _nc_unix_to_win32_output_flags(arg);
 			SetConsoleMode(alt, dwFlag);
 		}
 		else
 		{
-			dwFlag = arg->dwFlagOut;
-			TRCTTYOUT(dwFlag);
+			dwFlag = _nc_unix_to_win32_output_flags(arg);
 			SetConsoleMode(hdl, dwFlag);
 
 			alt = WINCONSOLE.inp;
-			dwFlag = arg->dwFlagIn | ENABLE_MOUSE_INPUT;
-			TRCTTYIN(dwFlag);
+			dwFlag = _nc_unix_to_win32_input_flags(arg);
 			SetConsoleMode(alt, dwFlag);
-			T(("effective mode set %s", _nc_trace_ttymode(&TRCTTY)));
 		}
 		code = OK;
 		assert(_nc_stdout_is_conpty());
@@ -568,34 +645,34 @@ _nc_console_setmode(int fd, const TTY *arg)
 
 // Implement UNIX stty-like mode functions
 NCURSES_EXPORT(int) _nc_console_raw(void) {
-    ConsoleMode mode;
+    TTY mode;
     if (_nc_console_getmode(WINCONSOLE.inp, &mode) == OK) {
-        mode.unix_flags.raw = 1;
-        mode.unix_flags.cbreak = 0;
-        mode.unix_flags.echo = 0;
-        mode.unix_flags.nl = 0;
-        mode.unix_flags.isig = 0;
-        mode.unix_flags.icanon = 0;
+        mode.unixTTYflags.raw = 1;
+        mode.unixTTYflags.cbreak = 0;
+        mode.unixTTYflags.echo = 0;
+        mode.unixTTYflags.nl = 0;
+        mode.unixTTYflags.isig = 0;
+        mode.unixTTYflags.icanon = 0;
         return _nc_console_setmode(_nc_console_handle(STDIN_FILENO), &mode);
     }
     return ERR;
 }
 
 NCURSES_EXPORT(int) _nc_console_cbreak(void) {
-    ConsoleMode mode;
+    TTY mode;
     if (_nc_console_getmode(WINCONSOLE.inp, &mode) == OK) {
-        mode.unix_flags.raw = 0;
-        mode.unix_flags.cbreak = 1;
-        mode.unix_flags.icanon = 0;  // Disable line buffering
+        mode.unixTTYflags.raw = 0;
+        mode.unixTTYflags.cbreak = 1;
+        mode.unixTTYflags.icanon = 0;  // Disable line buffering
         return _nc_console_setmode(_nc_console_handle(STDIN_FILENO), &mode);
     }
     return ERR;
 }
 
 NCURSES_EXPORT(int) _nc_console_noecho(void) {
-    ConsoleMode mode;
+    TTY mode;
     if (_nc_console_getmode(WINCONSOLE.inp, &mode) == OK) {
-        mode.unix_flags.echo = 0;
+        mode.unixTTYflags.echo = 0;
         return _nc_console_setmode(_nc_console_handle(STDIN_FILENO), &mode);
     }
     return ERR;
@@ -615,11 +692,11 @@ _nc_console_getmode(HANDLE hdl, TTY *arg)
 		{
 			if (GetConsoleMode(hdl, &dwFlag))
 			{
-				arg->dwFlagIn = dwFlag;
+				win32_to_unix_input_flags(dwFlag, arg);
 				alt = OutHandle();
 				if (GetConsoleMode(alt, &dwFlag))
 				{
-					arg->dwFlagOut = dwFlag;
+					win32_to_unix_output_flags(dwFlag, arg);
 					code = OK;
 				}
 			}
@@ -628,11 +705,11 @@ _nc_console_getmode(HANDLE hdl, TTY *arg)
 		{
 			if (GetConsoleMode(hdl, &dwFlag))
 			{
-				arg->dwFlagOut = dwFlag;
+				win32_to_unix_output_flags(dwFlag, arg);
 				alt = WINCONSOLE.inp;
 				if (GetConsoleMode(alt, &dwFlag))
 				{
-					arg->dwFlagIn = dwFlag;
+					win32_to_unix_input_flags(dwFlag, arg);
 					code = OK;
 				}
 			}
@@ -652,13 +729,13 @@ static void handle_signal_chars(wint_t ch) {
         
         switch(ch) {
             case 3:  // Ctrl+C (SIGINT)
-                if (mode.unix_flags.isig) {
+                if (mode.unix_flags.unixTTYflags.isig) {
                     // Raise SIGINT equivalent
                     GenerateConsoleCtrlEvent(CTRL_C_EVENT, 0);
                 }
                 break;
             case 28: // Ctrl+\ (SIGQUIT)  
-                if (mode.unix_flags.isig) {
+                if (mode.unix_flags.unixTTYflags.isig) {
                     // Handle quit signal
                 }
                 break;
@@ -671,15 +748,15 @@ NCURSES_EXPORT(int) _nc_console_process_input(wint_t *ch) {
     _nc_console_getmode(WINCONSOLE.inp, &mode);
     
     // Handle special characters
-    if (*ch == mode.erase_char && !mode.unix_flags.raw) {
+    if (*ch == mode.unix_flags.erase_char && !mode.unix_flags.unixTTYflags.raw) {
         // Process backspace - return actual control character
         return 8;  // Backspace (Ctrl+H)
     }
-    if (*ch == mode.kill_char && !mode.unix_flags.raw) {
+    if (*ch == mode.unix_flags.kill_char && !mode.unix_flags.unixTTYflags.raw) {
         // Process kill line - return actual control character  
         return 21; // Kill line (Ctrl+U)
     }
-    if (*ch == mode.eof_char && !mode.unix_flags.raw) {
+    if (*ch == mode.unix_flags.eof_char && !mode.unix_flags.unixTTYflags.raw) {
         // Process EOF
         return EOF;
     }
@@ -693,9 +770,9 @@ NCURSES_EXPORT(void) _nc_console_show_settings(void) {
     if (_nc_console_getmode(WINCONSOLE.inp, &mode) == OK) {
         printf("ConPTY mode: %s\n", _nc_stdout_is_conpty() ? "yes" : "no");
         printf("raw: %s, cbreak: %s, echo: %s\n",
-               mode.unix_flags.raw ? "on" : "off",
-               mode.unix_flags.cbreak ? "on" : "off", 
-               mode.unix_flags.echo ? "on" : "off");
+               mode.unix_flags.unixTTYflags.raw ? "on" : "off",
+               mode.unix_flags.unixTTYflags.cbreak ? "on" : "off", 
+               mode.unix_flags.unixTTYflags.echo ? "on" : "off");
         printf("Input flags: 0x%lx, Output flags: 0x%lx\n",
                mode.dwFlagIn, mode.dwFlagOut);
     }

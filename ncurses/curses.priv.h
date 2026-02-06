@@ -2446,8 +2446,8 @@ extern NCURSES_EXPORT(void) _nc_setmode(int fd, bool isInput, bool isCurses);
 extern NCURSES_EXPORT(int)  _nc_console_vt_supported(void);
 extern NCURSES_EXPORT(int)  _nc_console_isatty(int fd);
 extern NCURSES_EXPORT(void*) _nc_console_fd2handle(int fd);
-extern NCURSES_EXPORT(int)  _nc_console_setmode(int fd, const ConsoleMode* arg);
-extern NCURSES_EXPORT(int)  _nc_console_getmode(void* handle, ConsoleMode* arg);
+extern NCURSES_EXPORT(int)  _nc_console_setmode(int fd, const TTY* arg);
+extern NCURSES_EXPORT(int)  _nc_console_getmode(void* handle, TTY*  arg);
 extern NCURSES_EXPORT(HANDLE) _nc_console_handle(int fd);
 extern NCURSES_EXPORT(void) _nc_console_size(int *Lines, int *Cols);
 extern NCURSES_EXPORT(bool)  _nc_console_checkinit(void);
@@ -2458,6 +2458,8 @@ extern NCURSES_EXPORT(bool) _nc_stdout_is_conpty(void);
 extern NCURSES_EXPORT(int)  _nc_console_test(int fd);
 extern NCURSES_EXPORT(int)  _nc_console_testmouse(const SCREEN *sp, HANDLE fd, int delay EVENTLIST_2nd(_nc_eventlist*));
 extern NCURSES_EXPORT(int)  _nc_console_twait(const SCREEN *sp, HANDLE hdl,int mode,int msec,int *left EVENTLIST_2nd(_nc_eventlist * evl));
+extern NCURSES_EXPORT(DWORD) _nc_unix_to_win32_output_flags(const TTY *mode);
+extern NCURSES_EXPORT(DWORD) _nc_unix_to_win32_input_flags(const TTY *mode);
 
 #ifdef _NC_CHECK_MINTTY
 extern NCURSES_EXPORT(int)    _nc_console_checkmintty(int fd, LPHANDLE pMinTTY);

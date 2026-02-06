@@ -241,8 +241,10 @@ _nc_trace_ttymode(const TTY * tty)
 			8 + sizeof(dwFlagsOut) +
 			8 + sizeof(dwFlagsIn));
     if (buf != NULL) {
-	lookup_bits(buf, dwFlagsIn, "dwIn", tty->dwFlagIn);
-	lookup_bits(buf, dwFlagsOut, "dwOut", tty->dwFlagOut);
+	DWORD dwFlagIn = _nc_unix_to_win32_input_flags(tty);
+	DWORD dwFlagOut = _nc_unix_to_win32_output_flags(tty);
+	lookup_bits(buf, dwFlagsIn, "dwIn", dwFlagIn);
+	lookup_bits(buf, dwFlagsOut, "dwOut", dwFlagOut);
     }
 #else
     /* reference: ttcompat(4M) on SunOS 4.1 */

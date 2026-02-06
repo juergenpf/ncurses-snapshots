@@ -637,7 +637,6 @@ NCURSES_SP_NAME(_nc_setupscreen) (
     assert(NULL!= output);
     // ConPTY can have exactly one console with output on stdout
     assert(fileno(output)==STDOUT_FILENO);
-    WINCONSOLE.sp = sp;
     _nc_setmode(fileno(output), false, true);
 #endif
 

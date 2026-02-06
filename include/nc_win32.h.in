@@ -152,9 +152,6 @@ extern NCURSES_EXPORT(int) _nc_wcwidth(uint32_t);
 #endif
 
 typedef struct {
-    DWORD dwFlagIn;
-    DWORD dwFlagOut;
-    // Add UNIX stty-equivalent flags
     struct {
         unsigned char raw:1;      // raw vs cooked mode
         unsigned char cbreak:1;   // single char vs line mode  
@@ -162,13 +159,19 @@ typedef struct {
         unsigned char nl:1;       // newline processing
         unsigned char isig:1;     // signal character processing
         unsigned char icanon:1;   // canonical input processing
-    } unix_flags;
+    } unixTTYflags;
     // Special characters equivalent to termios c_cc[]
     unsigned char intr_char;  // interrupt char (Ctrl+C)
     unsigned char quit_char;  // quit char (Ctrl+\)
     unsigned char erase_char; // backspace char
     unsigned char kill_char;  // kill line char
     unsigned char eof_char;   // EOF char (Ctrl+D)
+} Win32TTYFlags;
+
+typedef struct {
+    DWORD dwFlagIn;
+    DWORD dwFlagOut;
+    Win32TTYFlags unix_flags;
 } ConsoleMode;
 
 #define CON_NUMPAIRS 64
@@ -191,7 +194,6 @@ typedef struct {
     CONSOLE_SCREEN_BUFFER_INFO save_SBI;
     CONSOLE_CURSOR_INFO save_CI;
     ConsoleMode mode;
-    SCREEN* sp;
 } ConsoleInfo;
 
 extern NCURSES_EXPORT_VAR(ConsoleInfo) _nc_CONSOLE;

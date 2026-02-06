@@ -97,7 +97,11 @@ NCURSES_SP_NAME(raw) (NCURSES_SP_DCL0)
 	buf.c_cc[VMIN] = 1;
 	buf.c_cc[VTIME] = 0;
 #elif defined(USE_WIN32_CONPTY)
-	buf.dwFlagIn &= (unsigned long) ~CONMODE_NORAW;
+	/* Set Unix-style flags, let emulation layer translate */
+	buf.unixTTYflags.raw = 1;
+	buf.unixTTYflags.cbreak = 1;
+	buf.unixTTYflags.icanon = 0;
+	buf.unixTTYflags.isig = 0;
 #else
 	buf.sg_flags |= RAW;
 #endif
@@ -153,8 +157,10 @@ NCURSES_SP_NAME(cbreak) (NCURSES_SP_DCL0)
 	buf.c_cc[VMIN] = 1;
 	buf.c_cc[VTIME] = 0;
 #elif defined(USE_WIN32_CONPTY)
-	buf.dwFlagIn |= CONMODE_NORAW;
-	buf.dwFlagIn &= (unsigned long) ~CONMODE_NOCBREAK;
+	/* Set Unix-style flags, let emulation layer translate */
+	buf.unixTTYflags.cbreak = 1;
+	buf.unixTTYflags.icanon = 0;
+	buf.unixTTYflags.raw = 0;
 #else
 	buf.sg_flags |= CBREAK;
 #endif
@@ -231,7 +237,11 @@ NCURSES_SP_NAME(noraw) (NCURSES_SP_DCL0)
 	    (termp->Ottyb.c_lflag & IEXTEN);
 	buf.c_iflag |= COOKED_INPUT;
 #elif defined(USE_WIN32_CONPTY)
-	buf.dwFlagIn |= CONMODE_NORAW;
+	/* Set Unix-style flags, let emulation layer translate */
+	buf.unixTTYflags.raw = 0;
+	buf.unixTTYflags.cbreak = 0;
+	buf.unixTTYflags.icanon = 1;
+	buf.unixTTYflags.isig = 1;
 #else
 	buf.sg_flags &= ~(RAW | CBREAK);
 #endif
@@ -285,7 +295,10 @@ NCURSES_SP_NAME(nocbreak) (NCURSES_SP_DCL0)
 	buf.c_lflag |= ICANON;
 	buf.c_iflag |= ICRNL;
 #elif defined(USE_WIN32_CONPTY)
-	buf.dwFlagIn |= (CONMODE_NOCBREAK | CONMODE_NORAW);
+	buf.unixTTYflags.cbreak = 0;
+	buf.unixTTYflags.icanon = 1;
+	buf.unixTTYflags.raw = 0;
+	buf.unixTTYflags.nl = 1;
 #else
 	buf.sg_flags &= ~CBREAK;
 #endif
