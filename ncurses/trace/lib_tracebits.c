@@ -241,8 +241,10 @@ _nc_trace_ttymode(const TTY * tty)
 			8 + sizeof(dwFlagsOut) +
 			8 + sizeof(dwFlagsIn));
     if (buf != NULL) {
-	DWORD dwFlagIn = _nc_unix_to_win32_input_flags(tty);
-	DWORD dwFlagOut = _nc_unix_to_win32_output_flags(tty);
+	DWORD dwFlagIn = 0;
+	DWORD dwFlagOut = 0;
+	dwFlagIn = _nc_unix_to_win32_input_flags(dwFlagIn, tty);
+	dwFlagOut = _nc_unix_to_win32_output_flags(dwFlagOut, tty);
 	lookup_bits(buf, dwFlagsIn, "dwIn", dwFlagIn);
 	lookup_bits(buf, dwFlagsOut, "dwOut", dwFlagOut);
     }

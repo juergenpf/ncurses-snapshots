@@ -2458,8 +2458,8 @@ extern NCURSES_EXPORT(bool) _nc_stdout_is_conpty(void);
 extern NCURSES_EXPORT(int)  _nc_console_test(int fd);
 extern NCURSES_EXPORT(int)  _nc_console_testmouse(const SCREEN *sp, HANDLE fd, int delay EVENTLIST_2nd(_nc_eventlist*));
 extern NCURSES_EXPORT(int)  _nc_console_twait(const SCREEN *sp, HANDLE hdl,int mode,int msec,int *left EVENTLIST_2nd(_nc_eventlist * evl));
-extern NCURSES_EXPORT(DWORD) _nc_unix_to_win32_output_flags(const TTY *mode);
-extern NCURSES_EXPORT(DWORD) _nc_unix_to_win32_input_flags(const TTY *mode);
+extern NCURSES_EXPORT(DWORD) _nc_unix_to_win32_output_flags(DWORD dwFlags, const TTY *ttyflags);
+extern NCURSES_EXPORT(DWORD) _nc_unix_to_win32_input_flags(DWORD dwFlags, const TTY *ttyflags);
 
 #ifdef _NC_CHECK_MINTTY
 extern NCURSES_EXPORT(int)    _nc_console_checkmintty(int fd, LPHANDLE pMinTTY);

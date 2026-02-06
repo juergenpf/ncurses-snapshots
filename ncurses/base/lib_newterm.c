@@ -85,12 +85,9 @@ _nc_initscr(NCURSES_SP_DCL0)
 #elif HAVE_SGTTY_H
 	buf.sg_flags &= ~(ECHO | CRMOD);
 #elif defined(USE_WIN32_CONPTY)
-	buf.unixTTYflags.echo = 0;
-	buf.unixTTYflags.nl = 0;
-	buf.unixTTYflags.icanon = 0;
-	buf.unixTTYflags.raw = 0;
-	buf.unixTTYflags.cbreak = 0;
-	buf.unixTTYflags.isig = 1;
+	buf.c_lflag &= (unsigned) ~(ECHO | ONLCR);
+	buf.c_lflag &= (unsigned) ~(ICANON | RAW | CBREAK);
+	buf.c_lflag |= ISIG;
 #else
 	memset(&buf, 0, sizeof(buf));
 #endif

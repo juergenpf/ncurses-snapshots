@@ -29998,7 +29998,7 @@ echo "${ECHO_T}$cf_cv_ld_searchpath" >&6
 
 LD_SEARCHPATH=`echo "$cf_cv_ld_searchpath"|sed -e 's/ /|/g'`
 
-ac_config_files="$ac_config_files include/MKterm.h.awk include/curses.head:include/curses.h.in include/ncurses_dll.h include/nc_win32.h include/termcap.h include/unctrl.h man/MKterminfo.tmp:man/MKterminfo.sh man/man_db.renames $SUB_MAKEFILES Makefile"
+ac_config_files="$ac_config_files include/MKterm.h.awk include/curses.head:include/curses.h.in include/ncurses_dll.h include/termcap.h include/unctrl.h man/MKterminfo.tmp:man/MKterminfo.sh man/man_db.renames $SUB_MAKEFILES Makefile"
 
 ac_config_commands="$ac_config_commands default"
 
@@ -30407,7 +30407,6 @@ do
   "include/MKterm.h.awk" ) CONFIG_FILES="$CONFIG_FILES include/MKterm.h.awk" ;;
   "include/curses.head" ) CONFIG_FILES="$CONFIG_FILES include/curses.head:include/curses.h.in" ;;
   "include/ncurses_dll.h" ) CONFIG_FILES="$CONFIG_FILES include/ncurses_dll.h" ;;
-  "include/nc_win32.h" ) CONFIG_FILES="$CONFIG_FILES include/nc_win32.h" ;;
   "include/termcap.h" ) CONFIG_FILES="$CONFIG_FILES include/termcap.h" ;;
   "include/unctrl.h" ) CONFIG_FILES="$CONFIG_FILES include/unctrl.h" ;;
   "man/MKterminfo.tmp" ) CONFIG_FILES="$CONFIG_FILES man/MKterminfo.tmp:man/MKterminfo.sh" ;;
@@ -30416,7 +30415,7 @@ do
   "Makefile" ) CONFIG_FILES="$CONFIG_FILES Makefile" ;;
   "default" ) CONFIG_COMMANDS="$CONFIG_COMMANDS default" ;;
   "include/ncurses_cfg.h" ) CONFIG_HEADERS="$CONFIG_HEADERS include/ncurses_cfg.h:include/ncurses_cfg.hin" ;;
-  *) { { echo "$as_me:30419: error: invalid argument: $ac_config_target" >&5
+  *) { { echo "$as_me:30418: error: invalid argument: $ac_config_target" >&5
 echo "$as_me: error: invalid argument: $ac_config_target" >&2;}
    { (exit 1); exit 1; }; };;
   esac
@@ -30950,7 +30949,7 @@ done; }
   esac
 
   if test x"$ac_file" != x-; then
-    { echo "$as_me:30953: creating $ac_file" >&5
+    { echo "$as_me:30952: creating $ac_file" >&5
 echo "$as_me: creating $ac_file" >&6;}
     rm -f "$ac_file"
   fi
@@ -30968,7 +30967,7 @@ echo "$as_me: creating $ac_file" >&6;}
       -) echo "$tmp"/stdin ;;
       [\\/$]*)
          # Absolute (can't be DOS-style, as IFS=:)
-         test -f "$f" || { { echo "$as_me:30971: error: cannot find input file: $f" >&5
+         test -f "$f" || { { echo "$as_me:30970: error: cannot find input file: $f" >&5
 echo "$as_me: error: cannot find input file: $f" >&2;}
    { (exit 1); exit 1; }; }
          echo "$f";;
@@ -30981,7 +30980,7 @@ echo "$as_me: error: cannot find input file: $f" >&2;}
            echo "$srcdir/$f"
          else
            # /dev/null tree
-           { { echo "$as_me:30984: error: cannot find input file: $f" >&5
+           { { echo "$as_me:30983: error: cannot find input file: $f" >&5
 echo "$as_me: error: cannot find input file: $f" >&2;}
    { (exit 1); exit 1; }; }
          fi;;
@@ -30997,7 +30996,7 @@ cat >>"$CONFIG_STATUS" <<\EOF
       if test -n "$ac_seen"; then
         ac_used=`grep '@datarootdir@' "$ac_item"`
         if test -z "$ac_used"; then
-          { echo "$as_me:31000: WARNING: datarootdir was used implicitly but not set:
+          { echo "$as_me:30999: WARNING: datarootdir was used implicitly but not set:
 $ac_seen" >&5
 echo "$as_me: WARNING: datarootdir was used implicitly but not set:
 $ac_seen" >&2;}
@@ -31006,7 +31005,7 @@ $ac_seen" >&2;}
       fi
       ac_seen=`grep '${datarootdir}' "$ac_item"`
       if test -n "$ac_seen"; then
-        { echo "$as_me:31009: WARNING: datarootdir was used explicitly but not set:
+        { echo "$as_me:31008: WARNING: datarootdir was used explicitly but not set:
 $ac_seen" >&5
 echo "$as_me: WARNING: datarootdir was used explicitly but not set:
 $ac_seen" >&2;}
@@ -31051,7 +31050,7 @@ cat >>"$CONFIG_STATUS" <<\EOF
             ac_init=`$EGREP '[ 	]*'$ac_name'[ 	]*=' "$ac_file"`
             if test -z "$ac_init"; then
               ac_seen=`echo "$ac_seen" |sed -e 's,^,'"$ac_file"':,'`
-              { echo "$as_me:31054: WARNING: Variable $ac_name is used but was not set:
+              { echo "$as_me:31053: WARNING: Variable $ac_name is used but was not set:
 $ac_seen" >&5
 echo "$as_me: WARNING: Variable $ac_name is used but was not set:
 $ac_seen" >&2;}
@@ -31062,7 +31061,7 @@ $ac_seen" >&2;}
     $EGREP -n '@[A-Z_][A-Z_0-9]+@' "$ac_file" >>"$tmp"/out
     if test -s "$tmp"/out; then
       ac_seen=`sed -e 's,^,'"$ac_file"':,' < "$tmp"/out`
-      { echo "$as_me:31065: WARNING: Some variables may not be substituted:
+      { echo "$as_me:31064: WARNING: Some variables may not be substituted:
 $ac_seen" >&5
 echo "$as_me: WARNING: Some variables may not be substituted:
 $ac_seen" >&2;}
@@ -31111,7 +31110,7 @@ for ac_file in : $CONFIG_HEADERS; do test "x$ac_file" = x: && continue
   * )   ac_file_in=$ac_file.in ;;
   esac
 
-  test x"$ac_file" != x- && { echo "$as_me:31114: creating $ac_file" >&5
+  test x"$ac_file" != x- && { echo "$as_me:31113: creating $ac_file" >&5
 echo "$as_me: creating $ac_file" >&6;}
 
   # First look for the input files in the build tree, otherwise in the
@@ -31122,7 +31121,7 @@ echo "$as_me: creating $ac_file" >&6;}
       -) echo "$tmp"/stdin ;;
       [\\/$]*)
          # Absolute (can't be DOS-style, as IFS=:)
-         test -f "$f" || { { echo "$as_me:31125: error: cannot find input file: $f" >&5
+         test -f "$f" || { { echo "$as_me:31124: error: cannot find input file: $f" >&5
 echo "$as_me: error: cannot find input file: $f" >&2;}
    { (exit 1); exit 1; }; }
          echo $f;;
@@ -31135,7 +31134,7 @@ echo "$as_me: error: cannot find input file: $f" >&2;}
            echo "$srcdir/$f"
          else
            # /dev/null tree
-           { { echo "$as_me:31138: error: cannot find input file: $f" >&5
+           { { echo "$as_me:31137: error: cannot find input file: $f" >&5
 echo "$as_me: error: cannot find input file: $f" >&2;}
    { (exit 1); exit 1; }; }
          fi;;
@@ -31193,7 +31192,7 @@ cat >>"$CONFIG_STATUS" <<\EOF
   rm -f "$tmp"/in
   if test x"$ac_file" != x-; then
     if cmp -s "$ac_file" "$tmp/config.h" 2>/dev/null; then
-      { echo "$as_me:31196: $ac_file is unchanged" >&5
+      { echo "$as_me:31195: $ac_file is unchanged" >&5
 echo "$as_me: $ac_file is unchanged" >&6;}
     else
       ac_dir=`$as_expr X"$ac_file" : 'X\(.*[^/]\)//*[^/][^/]*/*$' \| \
@@ -31580,7 +31579,7 @@ cf_ITEM=`echo "$cf_item" | sed y%abcdefghijklmnopqrstuvwxyz./-%ABCDEFGHIJKLMNOPQ
 				(cygdll|msysdll|mingw|msvcdll)
 					test "x$with_shared_cxx" = xno && test -n "$verbose" && echo "	overriding CXX_MODEL to SHARED" 1>&6
 
-echo "${as_me:-configure}:31583: testing overriding CXX_MODEL to SHARED ..." 1>&5
+echo "${as_me:-configure}:31582: testing overriding CXX_MODEL to SHARED ..." 1>&5
 
 					with_shared_cxx=yes
 					;;

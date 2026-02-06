@@ -2530,7 +2530,6 @@ AC_CONFIG_FILES([\
 	include/MKterm.h.awk \
 	include/curses.head:include/curses.h.in \
 	include/ncurses_dll.h \
-	include/nc_win32.h \
 	include/termcap.h \
 	include/unctrl.h \
 	man/MKterminfo.tmp:man/MKterminfo.sh \

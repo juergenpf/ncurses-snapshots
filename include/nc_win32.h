@@ -40,8 +40,6 @@
 
 #if defined(_WIN32) || defined(_WIN64) || defined(USE_WIN32_CONPTY)
 
-#if @USE_NAMED_PIPES@	/* USE_NAMED_PIPES */
-
 #ifndef _NC_WINDOWS_NATIVE
 #define _NC_WINDOWS_NATIVE
 #endif
@@ -68,23 +66,6 @@
 #endif
 
 #include <windows.h>
-
-#else /* !USE_NAMED_PIPES */
-
-#ifdef WINVER
-#  if WINVER < 0x0501
-#    error WINVER must at least be 0x0501
-#  endif
-#else
-#  define WINVER 0x0501
-#endif
-
-#include <windows.h>
-
-#undef sleep
-#define sleep(n) Sleep((n) * 1000)
-
-#endif /* USE_NAMED_PIPES */
 
 #if HAVE_SYS_TIME_H
 #include <sys/time.h>		/* for struct timeval */
@@ -116,17 +97,9 @@
    * Various Console mode definitions
    */
 
-  /* Flags to enable virtual Terminal processing */
-#define VT_FLAG_OUT ENABLE_VIRTUAL_TERMINAL_PROCESSING
-#define VT_FLAG_IN  ENABLE_VIRTUAL_TERMINAL_INPUT
-
   /* Default flags for input/output modes */
-#define CONMODE_IN_DEFAULT (ENABLE_LINE_INPUT | ENABLE_PROCESSED_INPUT | ENABLE_ECHO_INPUT | ENABLE_WINDOW_INPUT | ENABLE_MOUSE_INPUT)
+#define CONMODE_IN_DEFAULT (ENABLE_VIRTUAL_TERMINAL_INPUT | ENABLE_LINE_INPUT | ENABLE_PROCESSED_INPUT | ENABLE_ECHO_INPUT | ENABLE_WINDOW_INPUT | ENABLE_MOUSE_INPUT)
 #define CONMODE_OUT_DEFAULT (ENABLE_VIRTUAL_TERMINAL_PROCESSING | ENABLE_PROCESSED_OUTPUT)
-
-  /* Flags to reset from RAW/CBREAK */
-#define CONMODE_NORAW    (ENABLE_PROCESSED_INPUT|ENABLE_LINE_INPUT)
-#define CONMODE_NOCBREAK (ENABLE_LINE_INPUT)
 
 #include <ncurses_dll.h>
 
@@ -151,28 +124,25 @@ extern NCURSES_EXPORT(int) _nc_gettimeofday(struct timeval *, void *);
 extern NCURSES_EXPORT(int) _nc_wcwidth(uint32_t);
 #endif
 
-typedef struct {
-    struct {
-        unsigned char raw:1;      // raw vs cooked mode
-        unsigned char cbreak:1;   // single char vs line mode  
-        unsigned char echo:1;     // echo input characters
-        unsigned char nl:1;       // newline processing
-        unsigned char isig:1;     // signal character processing
-        unsigned char icanon:1;   // canonical input processing
-    } unixTTYflags;
+/* Terminal input mode flags (c_lflag equivalents) */
+#define ISIG    0x01    /* Enable signal character processing */
+#define ICANON  0x02    /* Canonical input processing */  
+#define ECHO    0x04    /* Echo input characters */
+#define ONLCR   0x08    /* Map NL to CR-NL on output (newline processing) */
+
+/* Terminal control mode flags (custom for Windows) */
+#define CBREAK  0x10    /* Single character vs line mode */
+#define RAW     0x20    /* Raw vs cooked mode */
+
+struct win32_termio {
+    unsigned int c_lflag;     /* Local mode flags (like termios) */
     // Special characters equivalent to termios c_cc[]
     unsigned char intr_char;  // interrupt char (Ctrl+C)
     unsigned char quit_char;  // quit char (Ctrl+\)
     unsigned char erase_char; // backspace char
     unsigned char kill_char;  // kill line char
     unsigned char eof_char;   // EOF char (Ctrl+D)
-} Win32TTYFlags;
-
-typedef struct {
-    DWORD dwFlagIn;
-    DWORD dwFlagOut;
-    Win32TTYFlags unix_flags;
-} ConsoleMode;
+};
 
 #define CON_NUMPAIRS 64
 typedef struct {
@@ -193,7 +163,7 @@ typedef struct {
     CONSOLE_SCREEN_BUFFER_INFO SBI;
     CONSOLE_SCREEN_BUFFER_INFO save_SBI;
     CONSOLE_CURSOR_INFO save_CI;
-    ConsoleMode mode;
+    struct win32_termio ttyflags;
 } ConsoleInfo;
 
 extern NCURSES_EXPORT_VAR(ConsoleInfo) _nc_CONSOLE;
