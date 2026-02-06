@@ -593,7 +593,8 @@ typedef union {
 #define NCURSES_PUTP2_FLUSH(name,value)    NCURSES_SP_NAME(_nc_putp_flush)(NCURSES_SP_ARGx name, value)
 
 #if USE_WIDEC_SUPPORT && defined(USE_WIN32_CONPTY)
-#define NCURSES_OUTC_FUNC_EX    NCURSES_SP_NAME(_nc_outch_ex)
+// JPF not required #define NCURSES_OUTC_FUNC_EX    NCURSES_SP_NAME(_nc_outch_ex)
+#define NCURSES_OUTC_FUNC_EX    NCURSES_SP_NAME(_nc_outch)
 #else
 #define NCURSES_OUTC_FUNC_EX    NCURSES_OUTC_FUNC
 #endif
@@ -2447,7 +2448,7 @@ extern NCURSES_EXPORT(int)  _nc_console_vt_supported(void);
 extern NCURSES_EXPORT(int)  _nc_console_isatty(int fd);
 extern NCURSES_EXPORT(void*) _nc_console_fd2handle(int fd);
 extern NCURSES_EXPORT(int)  _nc_win32_tcsetattr(int fd, const TTY* arg);
-extern NCURSES_EXPORT(int)  _nc_win32_tcgetattr(void* handle, TTY*  arg);
+extern NCURSES_EXPORT(int)  _nc_win32_tcgetattr(int fd, TTY*  arg);
 extern NCURSES_EXPORT(HANDLE) _nc_console_handle(int fd);
 extern NCURSES_EXPORT(void) _nc_console_size(int *Lines, int *Cols);
 extern NCURSES_EXPORT(bool)  _nc_console_checkinit(void);

@@ -148,10 +148,6 @@ struct win32_termio {
 typedef struct {
     BOOL initialized;
     struct win32_termio ttyflags;
-    BOOL progMode;
-    HANDLE out;
-    HANDLE inp;
-    HANDLE hdl;
     int numButtons;
     WORD pairs[CON_NUMPAIRS];
     COORD origin;
@@ -162,6 +158,7 @@ typedef struct {
 
 extern NCURSES_EXPORT_VAR(ConsoleInfo) _nc_CONSOLE;
 #define WINCONSOLE _nc_CONSOLE
+extern NCURSES_EXPORT(void) _nc_console_debug(const char* headline);
 
 #ifdef __cplusplus
 }

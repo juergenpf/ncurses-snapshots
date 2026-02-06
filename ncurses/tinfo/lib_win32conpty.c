@@ -36,6 +36,7 @@
 #include <curses.priv.h>
 #include <nc_win32.h>
 #include <locale.h>
+#include <stdio.h>
 
 #define CONTROL_PRESSED (LEFT_CTRL_PRESSED | RIGHT_CTRL_PRESSED)
 
@@ -198,6 +199,7 @@ _nc_unix_to_win32_input_flags(DWORD dwFlags, const TTY* ttyflags) {
     // Raw mode disables most processing
     if (ttyflags->c_lflag & RAW) {
         flags = ENABLE_MOUSE_INPUT | ENABLE_VIRTUAL_TERMINAL_INPUT;
+        flags &= ~ENABLE_LINE_INPUT; 
     } else {
 	if (ttyflags->c_lflag & CBREAK) {
 	    flags &= ~ENABLE_LINE_INPUT;
@@ -217,12 +219,28 @@ _nc_unix_to_win32_input_flags(DWORD dwFlags, const TTY* ttyflags) {
 
 static void win32_to_unix_input_flags(DWORD dwFlags, TTY *ttyflags) {
     ttyflags->c_lflag = 0;
-    if (!(dwFlags & ENABLE_LINE_INPUT)) ttyflags->c_lflag |= RAW;
-    if (!(dwFlags & ENABLE_PROCESSED_INPUT)) ttyflags->c_lflag |= CBREAK;
-    if (dwFlags & ENABLE_ECHO_INPUT) ttyflags->c_lflag |= ECHO;
-    if (dwFlags & ENABLE_PROCESSED_INPUT) ttyflags->c_lflag |= ONLCR;
-    if (dwFlags & ENABLE_PROCESSED_INPUT) ttyflags->c_lflag |= ISIG;
-    if (!(dwFlags & ENABLE_LINE_INPUT)) ttyflags->c_lflag |= ICANON;
+    
+    // Line input mode maps to canonical mode
+    if (dwFlags & ENABLE_LINE_INPUT) {
+        ttyflags->c_lflag |= ICANON;
+    } else {
+        // No line input = either raw or cbreak mode
+        if (!(dwFlags & ENABLE_PROCESSED_INPUT)) {
+            ttyflags->c_lflag |= RAW;
+        } else {
+            ttyflags->c_lflag |= CBREAK;
+        }
+    }
+    
+    // Echo processing
+    if (dwFlags & ENABLE_ECHO_INPUT) {
+        ttyflags->c_lflag |= ECHO;
+    }
+    
+    // Signal processing
+    if (dwFlags & ENABLE_PROCESSED_INPUT) {
+        ttyflags->c_lflag |= ISIG;
+    }
 }
 
 NCURSES_EXPORT(DWORD) 
@@ -237,11 +255,18 @@ _nc_unix_to_win32_output_flags(DWORD dwFlags, const TTY* ttyflags) {
 }
 
 static void win32_to_unix_output_flags(DWORD dwFlags, TTY *ttyflags) {
-    if (!(dwFlags & ENABLE_PROCESSED_OUTPUT)) ttyflags->c_lflag |= RAW;
-    else ttyflags->c_lflag &= ~RAW;
-    if (dwFlags & ENABLE_PROCESSED_OUTPUT) ttyflags->c_lflag |= ONLCR;
-    else ttyflags->c_lflag &= ~ONLCR;
+    // Output processing affects newline translation
+    if (dwFlags & ENABLE_PROCESSED_OUTPUT) {
+        ttyflags->c_lflag |= ONLCR;
+    } else {
+        ttyflags->c_lflag &= ~ONLCR;
+        // No output processing could indicate raw mode
+        ttyflags->c_lflag |= RAW;
+    }
 }
+
+#define CON_STDIN_HANDLE _nc_console_handle(_fileno(stdin))
+#define CON_STDOUT_HANDLE _nc_console_handle(_fileno(stdout))
 
 static bool console_initialized = FALSE;
 
@@ -280,21 +305,14 @@ _nc_console_checkinit()
 		for (i = 0; i < CON_NUMPAIRS; i++)
 			WINCONSOLE.pairs[i] = a;
 
-		WINCONSOLE.inp = GetStdHandle(STD_INPUT_HANDLE);
-		WINCONSOLE.out = GetStdHandle(STD_OUTPUT_HANDLE);
-		WINCONSOLE.hdl = WINCONSOLE.out;
-
-		SetConsoleMode(WINCONSOLE.inp, dwFlagIn);
-		SetConsoleMode(WINCONSOLE.out, dwFlagOut);
-		
-		win32_to_unix_input_flags(dwFlagIn, &WINCONSOLE.ttyflags);
-		win32_to_unix_output_flags(dwFlagOut, &WINCONSOLE.ttyflags);
-		
-		if (WINCONSOLE.hdl != INVALID_HANDLE_VALUE)
+		SetConsoleMode(CON_STDIN_HANDLE, dwFlagIn);
+		SetConsoleMode(CON_STDOUT_HANDLE, dwFlagOut);
+				
+		if (CON_STDOUT_HANDLE != INVALID_HANDLE_VALUE)
 		{
 			_nc_console_get_SBI();
 			WINCONSOLE.save_SBI = WINCONSOLE.SBI;
-			GetConsoleCursorInfo(WINCONSOLE.hdl, &WINCONSOLE.save_CI);
+			GetConsoleCursorInfo(CON_STDOUT_HANDLE, &WINCONSOLE.save_CI);
 			T(("... initial cursor is %svisible, %d%%",
 			   (WINCONSOLE.save_CI.bVisible ? "" : "not-"),
 			   (int)WINCONSOLE.save_CI.dwSize));
@@ -303,7 +321,7 @@ _nc_console_checkinit()
 		WINCONSOLE.initialized = TRUE;
 		console_initialized = TRUE;
 	}
-	res = (WINCONSOLE.hdl != INVALID_HANDLE_VALUE);
+	res = (CON_STDOUT_HANDLE != INVALID_HANDLE_VALUE);
 	BOOL check = _nc_stdout_is_conpty();
 	T(("... console initialized=%d, isConpty=%d",
 	   console_initialized,
@@ -384,31 +402,21 @@ _nc_console_fd2handle(int fd)
 {
 	HANDLE hdl = _nc_console_handle(fd);
 
-	if (hdl == WINCONSOLE.inp)
+	if (fd == _fileno(stdin))
 	{
-		T(("lib_win32con:validateHandle %d -> WINCONSOLE.inp", fd));
+		T(("lib_win32con:validateHandle %d -> stdin handle", fd));
 	}
-	else if (hdl == WINCONSOLE.hdl)
+	else if (fd == _fileno(stdout))
 	{
-		T(("lib_win32con:validateHandle %d -> WINCONSOLE.hdl", fd));
-	}
-	else if (hdl == WINCONSOLE.out)
-	{
-		T(("lib_win32con:validateHandle %d -> WINCONSOLE.out", fd));
-	}
-	else if (hdl == GetStdHandle(STD_INPUT_HANDLE))
-	{
-		T(("lib_win32con:validateHandle %d -> STD_INPUT_HANDLE", fd));
+		T(("lib_win32con:validateHandle %d -> stdout handle", fd));
 	}
 	else
 	{
-		T(("lib_win32con:validateHandle %d maps to unknown HANDLE", fd));
-		hdl = INVALID_HANDLE_VALUE;
+		T(("lib_win32con:validateHandle %d maps to unknown fd", fd));
 	}
 	return hdl;
 }
 
-#define OutHandle() ((WINCONSOLE.progMode) ? WINCONSOLE.hdl : WINCONSOLE.out)
 
 NCURSES_EXPORT(int)
 _nc_win32_tcsetattr(int fd, const TTY *arg)
@@ -416,23 +424,27 @@ _nc_win32_tcsetattr(int fd, const TTY *arg)
 	int code = ERR;
 	if (arg)
 	{
-		HANDLE hdl = _nc_console_fd2handle(fd);
-		DWORD dwFlag = 0;
-		HANDLE alt;
-		bool isInput = (hdl == WINCONSOLE.inp);
+		HANDLE stdin_hdl = _nc_console_fd2handle(_fileno(stdin));
+		HANDLE stdout_hdl = _nc_console_fd2handle(_fileno(stdout));
+		DWORD input_flags = CONMODE_IN_DEFAULT;
+		DWORD output_flags = CONMODE_OUT_DEFAULT;
 
 		T(("lib_win32conpty:_nc_win32_tcsetattr %s", _nc_trace_ttymode(arg)));
-		if (GetConsoleMode(hdl, &dwFlag)) {
-			if (isInput) {
-				alt = OutHandle();
-			} else {
-				alt = WINCONSOLE.inp;
-			}
-			dwFlag = isInput ? 
-				_nc_unix_to_win32_input_flags(dwFlag, arg) : 
-				_nc_unix_to_win32_output_flags(dwFlag, arg);
-			if (SetConsoleMode(hdl, dwFlag)) 
-				code=OK;
+		
+		// Convert flags for both input and output (terminal is one device)
+		input_flags = _nc_unix_to_win32_input_flags(input_flags, arg);
+		output_flags = _nc_unix_to_win32_output_flags(output_flags, arg);
+		
+		// Set both input and output modes (like UNIX terminal device)
+		bool input_ok = (stdin_hdl == INVALID_HANDLE_VALUE) || SetConsoleMode(stdin_hdl, input_flags);
+		bool output_ok = (stdout_hdl == INVALID_HANDLE_VALUE) || SetConsoleMode(stdout_hdl, output_flags);
+		
+		if (input_ok && output_ok) {
+			WINCONSOLE.ttyflags = *arg;
+			code = OK;
+		} else {
+			T(("SetConsoleMode failed - input:%s output:%s", 
+			   input_ok ? "OK" : "FAIL", output_ok ? "OK" : "FAIL"));
 		}
 		assert(_nc_stdout_is_conpty());
 	}
@@ -440,40 +452,48 @@ _nc_win32_tcsetattr(int fd, const TTY *arg)
 }
 
 NCURSES_EXPORT(int)
-_nc_win32_tcgetattr(HANDLE hdl, TTY *arg)
+_nc_win32_tcgetattr(int fd, TTY *arg)
 {
 	int code = ERR;
 	
 	if (arg)
 	{
-		DWORD dwFlag = 0;
-		HANDLE alt;
-
-		if (hdl == WINCONSOLE.inp)
+		HANDLE stdin_hdl = _nc_console_fd2handle(_fileno(stdin));
+		HANDLE stdout_hdl = _nc_console_fd2handle(_fileno(stdout));
+		DWORD input_mode = 0, output_mode = 0;
+		bool got_input = false, got_output = false;
+		
+		// Read both input and output modes (terminal is one device)
+		if (stdin_hdl != INVALID_HANDLE_VALUE && GetConsoleMode(stdin_hdl, &input_mode)) {
+			got_input = true;
+		}
+		if (stdout_hdl != INVALID_HANDLE_VALUE && GetConsoleMode(stdout_hdl, &output_mode)) {
+			got_output = true;
+		}
+		
+		if (got_input || got_output)
 		{
-			if (GetConsoleMode(hdl, &dwFlag))
-			{
-				win32_to_unix_input_flags(dwFlag, arg);
-				alt = OutHandle();
-				if (GetConsoleMode(alt, &dwFlag))
-				{
-					win32_to_unix_output_flags(dwFlag, arg);
-					code = OK;
-				}
+			// Clear the structure first
+			memset(arg, 0, sizeof(*arg));
+			
+			// Combine input and output state into unified terminal view
+			if (got_input) {
+				win32_to_unix_input_flags(input_mode, arg);
 			}
+			if (got_output) {
+				TTY output_tty;
+				memset(&output_tty, 0, sizeof(output_tty));
+				win32_to_unix_output_flags(output_mode, &output_tty);
+				// Merge output flags (mainly ONLCR) into result
+				arg->c_lflag |= (output_tty.c_lflag & ONLCR);
+			}
+			code = OK;
 		}
 		else
 		{
-			if (GetConsoleMode(hdl, &dwFlag))
-			{
-				win32_to_unix_output_flags(dwFlag, arg);
-				alt = WINCONSOLE.inp;
-				if (GetConsoleMode(alt, &dwFlag))
-				{
-					win32_to_unix_input_flags(dwFlag, arg);
-					code = OK;
-				}
-			}
+			// Fallback to cached value if we can't read console modes
+			*arg = WINCONSOLE.ttyflags;
+			code = OK;
 		}
 	}
 	T(("lib_win32con:_nc_console_getmode %s", _nc_trace_ttymode(arg)));
@@ -484,7 +504,7 @@ _nc_win32_tcgetattr(HANDLE hdl, TTY *arg)
 static void handle_signal_chars(wint_t ch) {
     if (_nc_stdout_is_conpty()) {
         TTY ttyflags;
-        if (_nc_win32_tcgetattr(WINCONSOLE.inp, &ttyflags) != OK) {
+        if (_nc_win32_tcgetattr(stdin, &ttyflags) != OK) {
             return;
         }
         
@@ -506,7 +526,7 @@ static void handle_signal_chars(wint_t ch) {
 
 NCURSES_EXPORT(int) _nc_console_process_input(wint_t *ch) {
     TTY ttyflags;
-    _nc_win32_tcgetattr(WINCONSOLE.inp, &ttyflags);
+    _nc_win32_tcgetattr(stdin, &ttyflags);
     
     // Handle special characters
     if (*ch == ttyflags.erase_char && !(ttyflags.c_lflag & RAW)) {
@@ -621,11 +641,9 @@ _nc_console_flush(void *hdl)
 
 	if (hdl != INVALID_HANDLE_VALUE)
 	{
-		if (hdl == WINCONSOLE.hdl ||
-			hdl == WINCONSOLE.inp ||
-			hdl == WINCONSOLE.out)
+		if (hdl == CON_STDIN_HANDLE || hdl == CON_STDOUT_HANDLE)
 		{
-			if (!FlushConsoleInputBuffer(WINCONSOLE.inp))
+			if (!FlushConsoleInputBuffer(CON_STDIN_HANDLE))
 				code = ERR;
 		}
 		else
@@ -645,7 +663,7 @@ NCURSES_EXPORT(bool)
 _nc_console_get_SBI(void)
 {
 	bool rc = FALSE;
-	if (GetConsoleScreenBufferInfo(WINCONSOLE.hdl, &(WINCONSOLE.SBI)))
+	if (GetConsoleScreenBufferInfo(CON_STDOUT_HANDLE, &(WINCONSOLE.SBI)))
 	{
 		T(("GetConsoleScreenBufferInfo"));
 		T(("... buffer(X:%d Y:%d)",
@@ -671,6 +689,91 @@ _nc_console_get_SBI(void)
 		T(("GetConsoleScreenBufferInfo ERR"));
 	}
 	return rc;
+}
+
+
+NCURSES_EXPORT(void)
+_nc_console_debug(const char* headline)
+{
+    DWORD input_mode = 0, output_mode = 0;
+    char debug_text[2048];
+       
+    /* Get current console modes */
+    if (CON_STDIN_HANDLE != INVALID_HANDLE_VALUE) {
+        GetConsoleMode(CON_STDIN_HANDLE, &input_mode);
+    }
+    if (CON_STDOUT_HANDLE != INVALID_HANDLE_VALUE) {
+        GetConsoleMode(CON_STDOUT_HANDLE, &output_mode);
+    }
+    
+    /* Format debug information with tabular layout */
+    sprintf(debug_text, 
+        "%s\n"
+        "===========================================\n\n"
+        "Console Handles:\n"
+        "  Input Handle ................. %p\n"
+        "  Output Handle ................ %p\n\n"
+        "INPUT CONSOLE MODE (0x%08lX):\n"
+        "  ENABLE_PROCESSED_INPUT ....... %s\n"
+        "  ENABLE_LINE_INPUT ............ %s\n" 
+        "  ENABLE_ECHO_INPUT ............ %s\n"
+        "  ENABLE_WINDOW_INPUT .......... %s\n"
+        "  ENABLE_MOUSE_INPUT ........... %s\n"
+        "  ENABLE_INSERT_MODE ........... %s\n"
+        "  ENABLE_QUICK_EDIT_MODE ....... %s\n"
+        "  ENABLE_EXTENDED_FLAGS ........ %s\n"
+        "  ENABLE_AUTO_POSITION ......... %s\n"
+        "  ENABLE_VIRTUAL_TERMINAL_INPUT  %s\n\n"
+        "OUTPUT CONSOLE MODE (0x%08lX):\n" 
+        "  ENABLE_PROCESSED_OUTPUT ...... %s\n"
+        "  ENABLE_WRAP_AT_EOL_OUTPUT .... %s\n"
+        "  ENABLE_VT_PROCESSING ......... %s\n"
+        "  DISABLE_NEWLINE_AUTO_RETURN .. %s\n"
+        "  ENABLE_LVB_GRID_WORLDWIDE .... %s\n\n"
+        "WINCONSOLE TTY FLAGS (c_lflag=0x%08lX):\n"
+        "  ISIG ......................... %s\n"
+        "  ICANON ....................... %s\n" 
+        "  ECHO ......................... %s\n"
+        "  ONLCR ........................ %s\n"
+        "  CBREAK ....................... %s\n"
+        "  RAW .......................... %s",
+        
+        headline ? headline : "NCurses ConPTY Debug Info",
+        
+        CON_STDIN_HANDLE, CON_STDOUT_HANDLE,
+        
+        input_mode,
+        (input_mode & 0x0001) ? "ON " : "OFF",
+        (input_mode & 0x0002) ? "ON " : "OFF",  
+        (input_mode & 0x0004) ? "ON " : "OFF",
+        (input_mode & 0x0008) ? "ON " : "OFF",
+        (input_mode & 0x0010) ? "ON " : "OFF",
+        (input_mode & 0x0020) ? "ON " : "OFF",
+        (input_mode & 0x0040) ? "ON " : "OFF",
+        (input_mode & 0x0080) ? "ON " : "OFF",
+        (input_mode & 0x0100) ? "ON " : "OFF",
+        (input_mode & 0x0200) ? "ON " : "OFF",
+        
+        output_mode,
+        (output_mode & 0x0001) ? "ON " : "OFF",
+        (output_mode & 0x0002) ? "ON " : "OFF",  
+        (output_mode & 0x0004) ? "ON " : "OFF",
+        (output_mode & 0x0008) ? "ON " : "OFF",
+        (output_mode & 0x0010) ? "ON " : "OFF",
+        
+        WINCONSOLE.ttyflags.c_lflag,
+        (WINCONSOLE.ttyflags.c_lflag & ISIG) ? "ON " : "OFF",
+        (WINCONSOLE.ttyflags.c_lflag & ICANON) ? "ON " : "OFF", 
+        (WINCONSOLE.ttyflags.c_lflag & ECHO) ? "ON " : "OFF",
+        (WINCONSOLE.ttyflags.c_lflag & ONLCR) ? "ON " : "OFF",
+        (WINCONSOLE.ttyflags.c_lflag & CBREAK) ? "ON " : "OFF",
+        (WINCONSOLE.ttyflags.c_lflag & RAW) ? "ON " : "OFF"
+    );
+    
+    /* Use MessageBox for reliable display */
+    MessageBox(NULL, debug_text, "NCurses ConPTY Debug", MB_OK | MB_ICONINFORMATION | MB_SYSTEMMODAL);
+    
+    returnVoid;
 }
 
 #endif /* defined(USE_WIN32_CONPTY)) */
