@@ -637,7 +637,7 @@ NCURSES_SP_NAME(_nc_setupscreen) (
     assert(NULL!= output);
     // ConPTY can have exactly one console with output on stdout
     assert(fileno(output)==STDOUT_FILENO);
-    _nc_setmode(fileno(output), false, true);
+    // _nc_setmode(fileno(output), false, true); JPF
 #endif
 
     T(("creating newscr"));

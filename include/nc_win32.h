@@ -147,23 +147,17 @@ struct win32_termio {
 #define CON_NUMPAIRS 64
 typedef struct {
     BOOL initialized;
-    BOOL window_only;
+    struct win32_termio ttyflags;
     BOOL progMode;
-    BOOL isMinTTY;
     HANDLE out;
     HANDLE inp;
     HANDLE hdl;
-    // JPF remove HANDLE lastOut;
     int numButtons;
     WORD pairs[CON_NUMPAIRS];
     COORD origin;
-    CHAR_INFO *save_screen;
-    COORD save_size;
-    SMALL_RECT save_region;
     CONSOLE_SCREEN_BUFFER_INFO SBI;
     CONSOLE_SCREEN_BUFFER_INFO save_SBI;
     CONSOLE_CURSOR_INFO save_CI;
-    struct win32_termio ttyflags;
 } ConsoleInfo;
 
 extern NCURSES_EXPORT_VAR(ConsoleInfo) _nc_CONSOLE;

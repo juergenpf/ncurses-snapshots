@@ -149,18 +149,11 @@ check_mouse_activity(SCREEN *sp, int delay EVENTLIST_2nd(_nc_eventlist * evl))
     } else
 # endif
     {
-# if defined(USE_WIN32_CONPTY)
-	rc = _nc_console_testmouse(sp,
-				   _nc_console_handle(sp->_ifd),
-				   delay
-				   EVENTLIST_2nd(evl));
-# else
 	rc = _nc_timed_wait(sp,
 			    TWAIT_MASK,
 			    delay,
 			    (int *) 0
 			    EVENTLIST_2nd(evl));
-# endif
 # if USE_SYSMOUSE
 	if ((sp->_mouse_type == M_SYSMOUSE)
 	    && (sp->_sysmouse_head < sp->_sysmouse_tail)
@@ -266,20 +259,10 @@ fifo_push(SCREEN *sp EVENTLIST_2nd(_nc_eventlist * evl))
     } else
 #endif
     {				/* Can block... */
-#if defined(USE_WIN32_CONPTY)
-	int buf;
-#endif
 	unsigned char c2 = 0;
 
 	_nc_set_read_thread(TRUE);
-#if defined(USE_WIN32_CONPTY)
-	n = _nc_console_read(sp,
-			     _nc_console_handle(sp->_ifd),
-			     &buf);
-	c2 = buf;
-#else
 	n = (int) read(sp->_ifd, &c2, (size_t) 1);
-#endif
 	_nc_set_read_thread(FALSE);
 	ch = c2;
     }

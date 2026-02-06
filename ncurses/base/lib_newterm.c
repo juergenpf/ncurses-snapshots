@@ -321,7 +321,7 @@ NCURSES_SP_NAME(newterm) (NCURSES_SP_DCLx
 	    _nc_initscr(NCURSES_SP_ARG);
 
 	    _nc_signal_handler(TRUE);
-#if defined(USE_WIN32_CONPTY) || defined(_NC_WINDOWS_NATIVE)
+#if 0 && (defined(USE_WIN32_CONPTY) || defined(_NC_WINDOWS_NATIVE)) // JPF
 	    _nc_setmode(fileno(_ifp), true, true);
     	    _nc_setmode(fileno(_ofp), false, true);
 #endif
