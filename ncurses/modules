@@ -252,6 +252,7 @@ widechars	lib             $(wide)		$(HEADER_DEPS)
 gettimeofday	lib		$(win32con)	$(HEADER_DEPS)
 #lib_win32con	lib		$(tinfo)	$(HEADER_DEPS)
 lib_win32conpty	lib		$(tinfo)	$(HEADER_DEPS)
+lib_win32tcattr	lib		$(tinfo)	$(HEADER_DEPS)
 lib_win32util	lib		$(tinfo)	$(HEADER_DEPS)
 wcwidth		lib             $(win32con)	$(HEADER_DEPS)
 

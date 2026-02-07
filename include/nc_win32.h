@@ -166,6 +166,10 @@ typedef struct {
     DWORD last_input_mode;         /* Last set input console mode */
     DWORD last_output_mode;        /* Last set output console mode */
     
+     /* Handle tracking for fd-based operations */
+    HANDLE used_input_handle;      /* Handle actually used for input operations */
+    HANDLE used_output_handle;     /* Handle actually used for output operations */
+
     int numButtons;
     WORD pairs[CON_NUMPAIRS];
     COORD origin;
