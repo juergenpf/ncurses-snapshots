@@ -153,6 +153,19 @@ typedef struct {
     BOOL initialized;
     unsigned int conhost_flags;
     struct win32_termio ttyflags;
+
+    /* Extended tracking for Windows console limitations */
+    unsigned int original_intent;  /* Original c_lflag as set by tcsetattr */
+    BOOL explicitly_raw;           /* Was RAW mode explicitly requested? */
+    BOOL explicitly_cbreak;        /* Was CBREAK mode explicitly requested? */
+    BOOL echo_only_mode;           /* ECHO without canonical or other flags? */
+    BOOL minimal_mode;             /* Zero flags mode? */
+    BOOL output_only_mode;         /* Only output processing requested? */
+    
+    /* Console mode state for verification */
+    DWORD last_input_mode;         /* Last set input console mode */
+    DWORD last_output_mode;        /* Last set output console mode */
+    
     int numButtons;
     WORD pairs[CON_NUMPAIRS];
     COORD origin;
