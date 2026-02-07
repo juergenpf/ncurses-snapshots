@@ -37,6 +37,8 @@
 #include <nc_win32.h>
 #include <locale.h>
 #include <stdio.h>
+#include <wchar.h>    /* For wide character functions */
+#include <string.h>   /* For memset */
 
 #define CONTROL_PRESSED (LEFT_CTRL_PRESSED | RIGHT_CTRL_PRESSED)
 
@@ -186,9 +188,8 @@ encoding_init(void)
 #endif
 	}
 
-	_nc_setmode(_fileno(stdin), true, false);
-	_nc_setmode(_fileno(stdout), false, false);
-	_nc_setmode(_fileno(stderr), false, false);
+	_nc_setmode(_fileno(stdin), false);
+	_nc_setmode(_fileno(stdout), false);
 }
 
 // Convert UNIX stty flags to Windows console flags
@@ -546,15 +547,79 @@ NCURSES_EXPORT(int) _nc_console_process_input(wint_t *ch) {
     return *ch;
 }
 
+/* Windows Console resize detection */
+static int last_console_lines = -1;
+static int last_console_cols = -1;
+
+/*
+ * Check if the Windows Console has been resized.
+ * This provides SIGWINCH-like functionality for Windows ConPTY.
+ * Returns TRUE if a resize was detected.
+ */
+NCURSES_EXPORT(bool)
+_nc_console_check_resize(void)
+{
+    int current_lines, current_cols;
+    bool resized = FALSE;
+    
+    /* Get current console size */
+    _nc_console_size(&current_lines, &current_cols);
+    
+    /* Check if this is the first call - initialize stored size */
+    if (last_console_lines == -1 || last_console_cols == -1) {
+        last_console_lines = current_lines;
+        last_console_cols = current_cols;
+        return FALSE;  /* Don't report resize on first call */
+    }
+    
+    /* Compare with stored size */
+    if (current_lines != last_console_lines || current_cols != last_console_cols) {
+        /* Console was resized */
+        
+        /* Update stored size */
+        last_console_lines = current_lines;
+        last_console_cols = current_cols;
+        
+        /* Set the global SIGWINCH flag (like Unix version) */
+        _nc_globals.have_sigwinch = 1;
+        
+        resized = TRUE;
+    }
+    
+    return resized;
+}
+
 NCURSES_EXPORT(void)
 _nc_console_size(int *Lines, int *Cols)
 {
 	if (Lines != NULL && Cols != NULL)
 	{
-		*Lines = (int)(WINCONSOLE.SBI.srWindow.Bottom + 1 -
-			       WINCONSOLE.SBI.srWindow.Top);
-		*Cols = (int)(WINCONSOLE.SBI.srWindow.Right + 1 -
-			      WINCONSOLE.SBI.srWindow.Left);
+		CONSOLE_SCREEN_BUFFER_INFO csbi;
+		HANDLE hStdOut = GetStdHandle(STD_OUTPUT_HANDLE);
+		
+		/* Get current console buffer information using GetStdHandle for Wine compatibility */
+		if (hStdOut != INVALID_HANDLE_VALUE && GetConsoleScreenBufferInfo(hStdOut, &csbi))
+		{
+			*Lines = (int)(csbi.srWindow.Bottom + 1 - csbi.srWindow.Top);
+			*Cols = (int)(csbi.srWindow.Right + 1 - csbi.srWindow.Left);
+		}
+		else
+		{
+			/* Try the original CON_STDOUT_HANDLE as fallback */
+			if (GetConsoleScreenBufferInfo(CON_STDOUT_HANDLE, &csbi))
+			{
+				*Lines = (int)(csbi.srWindow.Bottom + 1 - csbi.srWindow.Top);
+				*Cols = (int)(csbi.srWindow.Right + 1 - csbi.srWindow.Left);
+			}
+			else
+			{
+				/* Final fallback to cached values */
+				*Lines = (int)(WINCONSOLE.SBI.srWindow.Bottom + 1 -
+					       WINCONSOLE.SBI.srWindow.Top);
+				*Cols = (int)(WINCONSOLE.SBI.srWindow.Right + 1 -
+					      WINCONSOLE.SBI.srWindow.Left);
+			}
+		}
 	}
 }
 
@@ -692,88 +757,196 @@ _nc_console_get_SBI(void)
 }
 
 
-NCURSES_EXPORT(void)
-_nc_console_debug(const char* headline)
+
+/* UTF-8 input assembly for ConPTY binary mode (used by both widec and non-widec) */
+#define UTF8_MAX_BYTES 4  /* Maximum bytes in UTF-8 sequence */
+
+typedef struct {
+    unsigned char buffer[UTF8_MAX_BYTES];  /* Buffer for incomplete UTF-8 sequence */
+    size_t length;                         /* Current length of buffer */
+#if USE_WIDEC_SUPPORT
+    mbstate_t state;                       /* Multibyte conversion state */
+#endif
+} utf8_input_buffer_t;
+
+static utf8_input_buffer_t _nc_utf8_buffer = {0};
+
+/*
+ * Simple UTF-8 decoder that doesn't require wide character functions
+ * Returns Unicode codepoint or -1 for invalid sequences
+ */
+static int
+_nc_decode_utf8_simple(const unsigned char *bytes, size_t length, uint32_t *codepoint)
 {
-    DWORD input_mode = 0, output_mode = 0;
-    char debug_text[2048];
-       
-    /* Get current console modes */
-    if (CON_STDIN_HANDLE != INVALID_HANDLE_VALUE) {
-        GetConsoleMode(CON_STDIN_HANDLE, &input_mode);
+    if (length == 0) return 0;
+    
+    unsigned char first = bytes[0];
+    int expected_bytes;
+    uint32_t cp = 0;
+    
+    /* Determine expected number of bytes from first byte */
+    if ((first & 0x80) == 0) {
+        /* ASCII (0xxxxxxx) */
+        expected_bytes = 1;
+        cp = first;
+    } else if ((first & 0xE0) == 0xC0) {
+        /* 2-byte sequence (110xxxxx) */
+        expected_bytes = 2;
+        cp = first & 0x1F;
+    } else if ((first & 0xF0) == 0xE0) {
+        /* 3-byte sequence (1110xxxx) */
+        expected_bytes = 3;
+        cp = first & 0x0F;
+    } else if ((first & 0xF8) == 0xF0) {
+        /* 4-byte sequence (11110xxx) */
+        expected_bytes = 4;
+        cp = first & 0x07;
+    } else {
+        /* Invalid UTF-8 start byte */
+        return -1;
     }
-    if (CON_STDOUT_HANDLE != INVALID_HANDLE_VALUE) {
-        GetConsoleMode(CON_STDOUT_HANDLE, &output_mode);
+    
+    /* Check if we have enough bytes */
+    if ((int)length < expected_bytes) {
+        return 0; /* Need more bytes */
     }
     
-    /* Format debug information with tabular layout */
-    sprintf(debug_text, 
-        "%s\n"
-        "===========================================\n\n"
-        "Console Handles:\n"
-        "  Input Handle ................. %p\n"
-        "  Output Handle ................ %p\n\n"
-        "INPUT CONSOLE MODE (0x%08lX):\n"
-        "  ENABLE_PROCESSED_INPUT ....... %s\n"
-        "  ENABLE_LINE_INPUT ............ %s\n" 
-        "  ENABLE_ECHO_INPUT ............ %s\n"
-        "  ENABLE_WINDOW_INPUT .......... %s\n"
-        "  ENABLE_MOUSE_INPUT ........... %s\n"
-        "  ENABLE_INSERT_MODE ........... %s\n"
-        "  ENABLE_QUICK_EDIT_MODE ....... %s\n"
-        "  ENABLE_EXTENDED_FLAGS ........ %s\n"
-        "  ENABLE_AUTO_POSITION ......... %s\n"
-        "  ENABLE_VIRTUAL_TERMINAL_INPUT  %s\n\n"
-        "OUTPUT CONSOLE MODE (0x%08lX):\n" 
-        "  ENABLE_PROCESSED_OUTPUT ...... %s\n"
-        "  ENABLE_WRAP_AT_EOL_OUTPUT .... %s\n"
-        "  ENABLE_VT_PROCESSING ......... %s\n"
-        "  DISABLE_NEWLINE_AUTO_RETURN .. %s\n"
-        "  ENABLE_LVB_GRID_WORLDWIDE .... %s\n\n"
-        "WINCONSOLE TTY FLAGS (c_lflag=0x%08lX):\n"
-        "  ISIG ......................... %s\n"
-        "  ICANON ....................... %s\n" 
-        "  ECHO ......................... %s\n"
-        "  ONLCR ........................ %s\n"
-        "  CBREAK ....................... %s\n"
-        "  RAW .......................... %s",
-        
-        headline ? headline : "NCurses ConPTY Debug Info",
-        
-        CON_STDIN_HANDLE, CON_STDOUT_HANDLE,
-        
-        input_mode,
-        (input_mode & 0x0001) ? "ON " : "OFF",
-        (input_mode & 0x0002) ? "ON " : "OFF",  
-        (input_mode & 0x0004) ? "ON " : "OFF",
-        (input_mode & 0x0008) ? "ON " : "OFF",
-        (input_mode & 0x0010) ? "ON " : "OFF",
-        (input_mode & 0x0020) ? "ON " : "OFF",
-        (input_mode & 0x0040) ? "ON " : "OFF",
-        (input_mode & 0x0080) ? "ON " : "OFF",
-        (input_mode & 0x0100) ? "ON " : "OFF",
-        (input_mode & 0x0200) ? "ON " : "OFF",
-        
-        output_mode,
-        (output_mode & 0x0001) ? "ON " : "OFF",
-        (output_mode & 0x0002) ? "ON " : "OFF",  
-        (output_mode & 0x0004) ? "ON " : "OFF",
-        (output_mode & 0x0008) ? "ON " : "OFF",
-        (output_mode & 0x0010) ? "ON " : "OFF",
-        
-        WINCONSOLE.ttyflags.c_lflag,
-        (WINCONSOLE.ttyflags.c_lflag & ISIG) ? "ON " : "OFF",
-        (WINCONSOLE.ttyflags.c_lflag & ICANON) ? "ON " : "OFF", 
-        (WINCONSOLE.ttyflags.c_lflag & ECHO) ? "ON " : "OFF",
-        (WINCONSOLE.ttyflags.c_lflag & ONLCR) ? "ON " : "OFF",
-        (WINCONSOLE.ttyflags.c_lflag & CBREAK) ? "ON " : "OFF",
-        (WINCONSOLE.ttyflags.c_lflag & RAW) ? "ON " : "OFF"
-    );
+    /* Process continuation bytes */
+    for (int i = 1; i < expected_bytes; i++) {
+        if ((bytes[i] & 0xC0) != 0x80) {
+            return -1; /* Invalid continuation byte */
+        }
+        cp = (cp << 6) | (bytes[i] & 0x3F);
+    }
     
-    /* Use MessageBox for reliable display */
-    MessageBox(NULL, debug_text, "NCurses ConPTY Debug", MB_OK | MB_ICONINFORMATION | MB_SYSTEMMODAL);
-    
-    returnVoid;
+    *codepoint = cp;
+    return expected_bytes;
 }
+
+/*
+ * Assemble incoming UTF-8 bytes into complete characters
+ * Returns:
+ *  > 0: Complete character assembled (Unicode codepoint)
+ *  0:   Need more bytes
+ * -1:   Invalid UTF-8 sequence (reset buffer)
+ */
+static int
+_nc_assemble_utf8_input(unsigned char byte, wchar_t *wch)
+{
+    if (_nc_utf8_buffer.length >= UTF8_MAX_BYTES) {
+        memset(&_nc_utf8_buffer, 0, sizeof(_nc_utf8_buffer));
+        return -1;
+    }
+    
+    _nc_utf8_buffer.buffer[_nc_utf8_buffer.length++] = byte;
+    
+#if USE_WIDEC_SUPPORT
+    uint32_t codepoint;
+    int consumed = _nc_decode_utf8_simple(_nc_utf8_buffer.buffer, 
+                                          _nc_utf8_buffer.length, 
+                                          &codepoint);    
+    if (consumed > 0) {
+        memset(&_nc_utf8_buffer, 0, sizeof(_nc_utf8_buffer));
+        *wch = (wchar_t)codepoint; 
+        int return_value = (int)codepoint;
+        return return_value;
+    } else if (consumed == 0) {
+        return 0;
+    } else {
+        memset(&_nc_utf8_buffer, 0, sizeof(_nc_utf8_buffer));
+        return -1;
+    }
+#else
+    /* Use simple UTF-8 decoder for non-widec builds */
+    uint32_t codepoint;
+    int consumed = _nc_decode_utf8_simple(_nc_utf8_buffer.buffer, 
+                                          _nc_utf8_buffer.length, 
+                                          &codepoint);   
+    if (consumed > 0) {
+        memset(&_nc_utf8_buffer, 0, sizeof(_nc_utf8_buffer));
+        *wch = (wchar_t)codepoint; 
+        return (int)codepoint;
+    } else if (consumed == 0) {
+        return 0;
+    } else {
+        memset(&_nc_utf8_buffer, 0, sizeof(_nc_utf8_buffer));
+        return -1;
+    }
+#endif
+}
+
+#if USE_WIDEC_SUPPORT
+/*
+ * WIN32_CONPTY UTF-8 aware input function (widec mode)
+ */
+NCURSES_EXPORT(int)
+_nc_win32conpty_read(SCREEN *sp, int *result)
+{
+    unsigned char byte_buffer;
+    int n;
+    wchar_t wch;
+    int ch;
+    
+    _nc_set_read_thread(TRUE);
+    n = (int) read(sp->_ifd, &byte_buffer, (size_t) 1);
+    _nc_set_read_thread(FALSE);
+    
+    if (n <= 0) {
+        return n;
+    }
+       
+    ch = _nc_assemble_utf8_input(byte_buffer, &wch);
+    
+    if (ch > 0) {
+        *result = ch;
+        return 1;
+    } else if (ch == 0) {
+        return _nc_win32conpty_read(sp, result);
+    } else {
+        *result = (int)byte_buffer;
+        return 1;
+    }
+}
+#else /* !USE_WIDEC_SUPPORT */
+/*
+ * WIN32_CONPTY UTF-8 assembly function (non-widec mode)
+ * Still needs UTF-8 assembly to prevent multibyte sequences from appearing as separate bytes
+ */
+NCURSES_EXPORT(int)
+_nc_win32conpty_read(SCREEN *sp, int *result)
+{
+    unsigned char byte_buffer;
+    int n;
+    wchar_t wch;
+    int ch;
+    
+    /* Read single byte from console */
+    _nc_set_read_thread(TRUE);
+    n = (int) read(sp->_ifd, &byte_buffer, (size_t) 1);
+    _nc_set_read_thread(FALSE);
+    
+    if (n <= 0) {
+        return n;
+    }
+        
+    ch = _nc_assemble_utf8_input(byte_buffer, &wch);
+    
+    if (ch > 0) {
+        if (wch <= 0xFF) {
+            *result = (int)wch;
+        } else {
+            *result = (int)wch;
+        }
+        
+        return 1;
+    } else if (ch == 0) {
+        return _nc_win32conpty_read(sp, result);
+    } else {
+        *result = (int)byte_buffer;
+        return 1;
+    }
+}
+
+#endif /* USE_WIDEC_SUPPORT */
 
 #endif /* defined(USE_WIN32_CONPTY)) */

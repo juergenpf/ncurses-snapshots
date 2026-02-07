@@ -158,7 +158,6 @@ typedef struct {
 
 extern NCURSES_EXPORT_VAR(ConsoleInfo) _nc_CONSOLE;
 #define WINCONSOLE _nc_CONSOLE
-extern NCURSES_EXPORT(void) _nc_console_debug(const char* headline);
 
 #ifdef __cplusplus
 }
