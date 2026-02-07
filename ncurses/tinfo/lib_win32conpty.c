@@ -218,9 +218,7 @@ _nc_unix_to_win32_input_flags(DWORD dwFlags, const TTY* ttyflags) {
     return flags;
 }
 
-static void win32_to_unix_input_flags(DWORD dwFlags, TTY *ttyflags) {
-    ttyflags->c_lflag = 0;
-    
+static void win32_to_unix_input_flags(DWORD dwFlags, TTY *ttyflags) {    
     // Line input mode maps to canonical mode
     if (dwFlags & ENABLE_LINE_INPUT) {
         ttyflags->c_lflag |= ICANON;
@@ -291,6 +289,16 @@ _nc_console_checkinit()
 		START_TRACE();
 
 		encoding_init();
+
+		WINCONSOLE.conhost_flags = 0;
+		const char *env_flags = getenv("NC_CONHOST_FLAGS");
+		if (env_flags && *env_flags) {
+			char *endptr;
+			long flags_val = strtol(env_flags, &endptr, 0);
+			if (*endptr == '\0' && flags_val >= 0) {
+				WINCONSOLE.conhost_flags = (unsigned int)(flags_val & NC_CONHOST_FLAG_MASK);
+			} 
+		}
 
 		if (GetNumberOfConsoleMouseButtons(&num_buttons))
 		{
@@ -425,8 +433,8 @@ _nc_win32_tcsetattr(int fd, const TTY *arg)
 	int code = ERR;
 	if (arg)
 	{
-		HANDLE stdin_hdl = _nc_console_fd2handle(_fileno(stdin));
-		HANDLE stdout_hdl = _nc_console_fd2handle(_fileno(stdout));
+		HANDLE stdin_hdl = CON_STDIN_HANDLE;
+		HANDLE stdout_hdl = CON_STDOUT_HANDLE;
 		DWORD input_flags = CONMODE_IN_DEFAULT;
 		DWORD output_flags = CONMODE_OUT_DEFAULT;
 
@@ -459,8 +467,8 @@ _nc_win32_tcgetattr(int fd, TTY *arg)
 	
 	if (arg)
 	{
-		HANDLE stdin_hdl = _nc_console_fd2handle(_fileno(stdin));
-		HANDLE stdout_hdl = _nc_console_fd2handle(_fileno(stdout));
+		HANDLE stdin_hdl = CON_STDIN_HANDLE;
+		HANDLE stdout_hdl = CON_STDOUT_HANDLE;
 		DWORD input_mode = 0, output_mode = 0;
 		bool got_input = false, got_output = false;
 		

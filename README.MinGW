@@ -35,11 +35,19 @@ works at least on the Windows Console.
 
 Before we dive into the details how to build and test ncurses for Windows, let
 me set expectations. Although Windows now for a while has a console subsystem 
-that accepts ANSI control sequences, there is one fundamental difference to most
+that handles ANSI control sequences, there is one fundamental difference to most
 UNIX-like operating systems e.g. Linux. In Linux, when the console is in
 UTF-8 mode, the console handles the UTF-8 encoding for you if you send a
-non-ASCII character. This is not true on Windows. If the console is in UTF-8
-mode, it expects the application to send UTF-8 encoded character sequences. 
+non-ASCII character. This is not true per so on Windows, it depends on how the 
+host that spawns your program and uses ConPTY for the Pseudo Console handles
+this. Windows Terminal for example expects your program to emit already UTF-8
+encoded output. To facilitate an adaption to this dependency, for the Windows
+port we introduce and support an additional environment variable named
+
+	NC_CONHOST_FLAGS
+
+where you can configure various options that reflect implementation details of
+the parent on the Pseudo-Termial pipe.
 
 This fundamental difference in console behaviour has consequences for the 
 terminfo low level interface usage. As you know, terminfo is used to query

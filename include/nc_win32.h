@@ -144,9 +144,14 @@ struct win32_termio {
     unsigned char eof_char;   // EOF char (Ctrl+D)
 };
 
+#define NC_CONHOST_FLAG_ACCEPT_UNICODE 0x0001
+#define NC_CONHOST_FLAG_SUPPORT_EVENTS 0x0002
+#define NC_CONHOST_FLAG_MASK (NC_CONHOST_FLAG_ACCEPT_UNICODE | NC_CONHOST_FLAG_SUPPORT_EVENTS)
+
 #define CON_NUMPAIRS 64
 typedef struct {
     BOOL initialized;
+    unsigned int conhost_flags;
     struct win32_termio ttyflags;
     int numButtons;
     WORD pairs[CON_NUMPAIRS];
