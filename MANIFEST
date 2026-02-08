@@ -755,6 +755,7 @@
 ./menu/mf_common.h
 ./menu/modules
 ./misc/Makefile.in
+./misc/MinGW-WSL2-Profile.ps1
 ./misc/chkdef.cmd
 ./misc/cleantic.cmd
 ./misc/cmpdef.cmd
