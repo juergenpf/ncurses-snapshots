@@ -43,11 +43,7 @@
 #define CUR SP_TERMTYPE
 #endif
 
-#if USE_TERM_DRIVER
-#define MaxColors      InfoOf(SP_PARM).maxcolors
-#else
 #define MaxColors      max_colors
-#endif
 
 #if NCURSES_EXT_COLORS
 

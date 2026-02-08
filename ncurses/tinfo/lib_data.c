@@ -161,10 +161,6 @@ NCURSES_EXPORT_VAR(NCURSES_GLOBALS) _nc_globals = {
     0,				/* count_tparm */
 #endif /* HAVE_TSEARCH */
 
-#if USE_TERM_DRIVER
-    NULL,			/* term_driver */
-#endif
-
 #ifndef USE_SP_WINDOWLIST
     0,				/* _nc_windowlist */
 #endif

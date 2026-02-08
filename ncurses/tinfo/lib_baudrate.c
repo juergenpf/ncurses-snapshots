@@ -99,7 +99,7 @@ struct speed {
     int actual_speed;		/* the actual speed */
 };
 
-#if !defined(USE_WIN32CON_DRIVER)
+#if !defined(USE_WIN32_CONPTY)
 #define DATA(number) { B##number, number }
 
 static struct speed const speeds[] =
@@ -189,12 +189,12 @@ static struct speed const speeds[] =
 #endif
 #endif
 };
-#endif /* !USE_NAMED_PIPES */
+#endif /* !defined(USE_WIN32_CONPTY) */
 
 NCURSES_EXPORT(int)
 _nc_baudrate(int OSpeed)
 {
-#if defined(USE_WIN32CON_DRIVER)
+#if defined(USE_WIN32_CONPTY)
     /* On Windows this is a noop */
     (void) OSpeed;
     return (OK);
@@ -237,14 +237,14 @@ _nc_baudrate(int OSpeed)
 #endif
     }
     return (result);
-#endif /* !USE_NAMED_PIPES */
+#endif /* !defined(USE_WIN32_CONPTY) */
 }
 
 NCURSES_EXPORT(int)
 _nc_ospeed(int BaudRate)
 {
     int result = 1;
-#if defined(USE_WIN32CON_DRIVER)
+#if defined(USE_WIN32_CONPTY)
     (void) BaudRate;
 #else
     if (BaudRate >= 0) {
@@ -268,7 +268,7 @@ NCURSES_SP_NAME(baudrate) (NCURSES_SP_DCL0)
 
     T((T_CALLED("baudrate(%p)"), (void *) SP_PARM));
 
-#if defined(USE_WIN32CON_DRIVER)
+#if defined(USE_WIN32_CONPTY)
     (void) SP_PARM;
     result = OK;
 #else
@@ -305,7 +305,7 @@ NCURSES_SP_NAME(baudrate) (NCURSES_SP_DCL0)
     } else {
 	result = ERR;
     }
-#endif /* !USE_NAMED_PIPES */
+#endif /* !defined(USE_WIN32_CONPTY) */
     returnCode(result);
 }
 

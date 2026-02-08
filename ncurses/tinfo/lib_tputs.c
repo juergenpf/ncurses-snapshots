@@ -49,182 +49,286 @@
 #endif
 
 #include <ctype.h>
-#include <termcap.h>		/* ospeed */
+#include <termcap.h> /* ospeed */
 #include <tic.h>
 
 MODULE_ID("$Id: lib_tputs.c,v 1.116 2025/01/12 00:41:56 tom Exp $")
 
-NCURSES_EXPORT_VAR(char) PC = 0;              /* used by termcap library */
-NCURSES_EXPORT_VAR(NCURSES_OSPEED) ospeed = 0;        /* used by termcap library */
+NCURSES_EXPORT_VAR(char)
+PC = 0; /* used by termcap library */
+NCURSES_EXPORT_VAR(NCURSES_OSPEED)
+ospeed = 0; /* used by termcap library */
 
-NCURSES_EXPORT_VAR(int) _nc_nulls_sent = 0;
+NCURSES_EXPORT_VAR(int)
+_nc_nulls_sent = 0;
 
 #if NCURSES_NO_PADDING
 NCURSES_EXPORT(void)
 _nc_set_no_padding(SCREEN *sp)
 {
-    bool no_padding = (getenv("NCURSES_NO_PADDING") != NULL);
+	bool no_padding = (getenv("NCURSES_NO_PADDING") != NULL);
 
-    if (sp)
-	sp->_no_padding = no_padding;
-    else
-	_nc_prescreen._no_padding = no_padding;
+	if (sp)
+		sp->_no_padding = no_padding;
+	else
+		_nc_prescreen._no_padding = no_padding;
 
-    TR(TRACE_CHARPUT | TRACE_MOVE, ("padding will%s be used",
-				    GetNoPadding(sp) ? " not" : ""));
+	TR(TRACE_CHARPUT | TRACE_MOVE, ("padding will%s be used",
+									GetNoPadding(sp) ? " not" : ""));
 }
 #endif
 
 #if NCURSES_SP_FUNCS
-#define SetOutCh(func) if (SP_PARM) SP_PARM->_outch = func; else _nc_prescreen._outch = func
-#define GetOutCh()     (SP_PARM ? SP_PARM->_outch : _nc_prescreen._outch)
+#define SetOutCh(func)          \
+	if (SP_PARM)                \
+		SP_PARM->_outch = func; \
+	else                        \
+		_nc_prescreen._outch = func
+#define GetOutCh() (SP_PARM ? SP_PARM->_outch : _nc_prescreen._outch)
 #else
 #define SetOutCh(func) static_outch = func
-#define GetOutCh()     static_outch
+#define GetOutCh() static_outch
 static NCURSES_SP_OUTC static_outch = NCURSES_SP_NAME(_nc_outch);
 #endif
 
 NCURSES_EXPORT(int)
-NCURSES_SP_NAME(delay_output) (NCURSES_SP_DCLx int ms)
+NCURSES_SP_NAME(delay_output)(NCURSES_SP_DCLx int ms)
 {
-    T((T_CALLED("delay_output(%p,%d)"), (void *) SP_PARM, ms));
+	T((T_CALLED("delay_output(%p,%d)"), (void *)SP_PARM, ms));
 
-    if (ms > MAX_DELAY_MSECS)
-	ms = MAX_DELAY_MSECS;
+	if (ms > MAX_DELAY_MSECS)
+		ms = MAX_DELAY_MSECS;
 
-    if (!HasTInfoTerminal(SP_PARM))
-	returnCode(ERR);
+	if (!HasTInfoTerminal(SP_PARM))
+		returnCode(ERR);
 
-    if (no_pad_char) {
-	NCURSES_SP_NAME(_nc_flush) (NCURSES_SP_ARG);
-	napms(ms);
-    } else {
-	NCURSES_SP_OUTC my_outch = GetOutCh();
-	register int nullcount;
+	if (no_pad_char)
+	{
+		NCURSES_SP_NAME(_nc_flush)(NCURSES_SP_ARG);
+		napms(ms);
+	}
+	else
+	{
+		NCURSES_SP_OUTC my_outch = GetOutCh();
+		register int nullcount;
 
-	nullcount = (ms * _nc_baudrate(ospeed)) / (BAUDBYTE * 1000);
-	for (_nc_nulls_sent += nullcount; nullcount > 0; nullcount--)
-	    my_outch(NCURSES_SP_ARGx PC);
-	if (my_outch == NCURSES_SP_NAME(_nc_outch))
-	    NCURSES_SP_NAME(_nc_flush) (NCURSES_SP_ARG);
-    }
+		nullcount = (ms * _nc_baudrate(ospeed)) / (BAUDBYTE * 1000);
+		for (_nc_nulls_sent += nullcount; nullcount > 0; nullcount--)
+			my_outch(NCURSES_SP_ARGx PC);
+		if (my_outch == NCURSES_SP_NAME(_nc_outch))
+			NCURSES_SP_NAME(_nc_flush)(NCURSES_SP_ARG);
+	}
 
-    returnCode(OK);
+	returnCode(OK);
 }
 
 #if NCURSES_SP_FUNCS
 NCURSES_EXPORT(int)
 delay_output(int ms)
 {
-    return NCURSES_SP_NAME(delay_output) (CURRENT_SCREEN, ms);
+	return NCURSES_SP_NAME(delay_output)(CURRENT_SCREEN, ms);
 }
 #endif
 
 NCURSES_EXPORT(void)
-NCURSES_SP_NAME(_nc_flush) (NCURSES_SP_DCL0)
+NCURSES_SP_NAME(_nc_flush)(NCURSES_SP_DCL0)
 {
-    T((T_CALLED("_nc_flush(%p)"), (void *) SP_PARM));
-    if (SP_PARM != NULL && SP_PARM->_ofd >= 0) {
-	TR(TRACE_CHARPUT, ("ofd:%d inuse:%lu buffer:%p",
-			   SP_PARM->_ofd,
-			   (unsigned long) SP_PARM->out_inuse,
-			   SP_PARM->out_buffer));
-	if (SP_PARM->out_inuse) {
-	    char *buf = SP_PARM->out_buffer;
-	    size_t amount = SP_PARM->out_inuse;
+	T((T_CALLED("_nc_flush(%p)"), (void *)SP_PARM));
+	if (SP_PARM != NULL && SP_PARM->_ofd >= 0)
+	{
+		TR(TRACE_CHARPUT, ("ofd:%d inuse:%lu buffer:%p",
+						   SP_PARM->_ofd,
+						   (unsigned long)SP_PARM->out_inuse,
+						   SP_PARM->out_buffer));
+		if (SP_PARM->out_inuse)
+		{
+			char *buf = SP_PARM->out_buffer;
+			size_t amount = SP_PARM->out_inuse;
 
-	    TR(TRACE_CHARPUT, ("flushing %ld/%ld bytes",
-			       (unsigned long) amount, _nc_outchars));
-	    while (amount) {
-		ssize_t res = write(SP_PARM->_ofd, buf, amount);
-		if (res > 0) {
-		    /* if the write was incomplete, try again */
-		    amount -= (size_t) res;
-		    buf += res;
-		} else if (errno == EAGAIN) {
-		    continue;
-		} else if (errno == EINTR) {
-		    continue;
-		} else {
-		    break;	/* an error we can not recover from */
+			TR(TRACE_CHARPUT, ("flushing %ld/%ld bytes",
+							   (unsigned long)amount, _nc_outchars));
+			while (amount)
+			{
+				ssize_t res = write(SP_PARM->_ofd, buf, amount);
+				if (res > 0)
+				{
+					/* if the write was incomplete, try again */
+					amount -= (size_t)res;
+					buf += res;
+				}
+				else if (errno == EAGAIN)
+				{
+					continue;
+				}
+				else if (errno == EINTR)
+				{
+					continue;
+				}
+				else
+				{
+					break; /* an error we can not recover from */
+				}
+			}
 		}
-	    }
-	} else if (SP_PARM->out_buffer == NULL) {
-	    TR(TRACE_CHARPUT, ("flushing stdout/stderr"));
-	    fflush(stdout);
-	    fflush(stderr);
+		else if (SP_PARM->out_buffer == NULL)
+		{
+			TR(TRACE_CHARPUT, ("flushing stdout/stderr"));
+			fflush(stdout);
+			fflush(stderr);
+		}
 	}
-    } else {
-	TR(TRACE_CHARPUT, ("flushing stdout/stderr"));
-	fflush(stdout);
-	fflush(stderr);
-    }
-    if (SP_PARM != NULL)
-	SP_PARM->out_inuse = 0;
-    returnVoid;
+	else
+	{
+		TR(TRACE_CHARPUT, ("flushing stdout/stderr"));
+		fflush(stdout);
+		fflush(stderr);
+	}
+	if (SP_PARM != NULL)
+		SP_PARM->out_inuse = 0;
+	returnVoid;
 }
 
 #if NCURSES_SP_FUNCS
 NCURSES_EXPORT(void)
 _nc_flush(void)
 {
-    NCURSES_SP_NAME(_nc_flush) (CURRENT_SCREEN);
+	NCURSES_SP_NAME(_nc_flush)(CURRENT_SCREEN);
 }
 #endif
 
 NCURSES_EXPORT(int)
-NCURSES_SP_NAME(_nc_outch) (NCURSES_SP_DCLx int ch)
+NCURSES_SP_NAME(_nc_outch)(NCURSES_SP_DCLx int ch)
 {
-    int rc = OK;
+	int rc = OK;
 
-    COUNT_OUTCHARS(1);
+	COUNT_OUTCHARS(1);
 
-    if (HasTInfoTerminal(SP_PARM)
-	&& SP_PARM != NULL) {
-	if (SP_PARM->out_buffer != NULL) {
-	    if (SP_PARM->out_inuse + 1 >= SP_PARM->out_limit)
-		NCURSES_SP_NAME(_nc_flush) (NCURSES_SP_ARG);
-	    SP_PARM->out_buffer[SP_PARM->out_inuse++] = (char) ch;
-	} else {
-	    char tmp = (char) ch;
-	    /*
-	     * POSIX says write() is safe in a signal handler, but the
-	     * buffered I/O is not.
-	     */
-	    if (write(fileno(NC_OUTPUT(SP_PARM)), &tmp, (size_t) 1) == -1)
-		rc = ERR;
+	if (HasTInfoTerminal(SP_PARM) && SP_PARM != NULL)
+	{
+		if (SP_PARM->out_buffer != NULL)
+		{
+			if (SP_PARM->out_inuse + 1 >= SP_PARM->out_limit)
+				NCURSES_SP_NAME(_nc_flush)(NCURSES_SP_ARG);
+			SP_PARM->out_buffer[SP_PARM->out_inuse++] = (char)ch;
+		}
+		else
+		{
+			char tmp = (char)ch;
+			/*
+			 * POSIX says write() is safe in a signal handler, but the
+			 * buffered I/O is not.
+			 */
+			if (write(fileno(NC_OUTPUT(SP_PARM)), &tmp, (size_t)1) == -1)
+				rc = ERR;
+		}
 	}
-    } else {
-	char tmp = (char) ch;
-	if (write(fileno(stdout), &tmp, (size_t) 1) == -1)
-	    rc = ERR;
-    }
-    return rc;
+	else
+	{
+		char tmp = (char)ch;
+		if (write(fileno(stdout), &tmp, (size_t)1) == -1)
+			rc = ERR;
+	}
+	return rc;
 }
+
+#if defined(USE_WIN32_CONPTY) && USE_WIDEC_SUPPORT
+// Helper function to adress the issue, that for pragmatic reasons we have 
+// to output UTF-8 encoded data to the Windows Console in _O_BINARY mode.
+static size_t 
+wchar_to_utf8_win(wchar_t wc, char utf8[4]) {
+    wchar_t wstr[2] = {wc, L'\0'};
+    int result;
+    
+    result = WideCharToMultiByte(CP_UTF8,0,wstr,1,utf8,4,NULL,NULL);
+    if (result > 0)
+        return (size_t)result;
+	else
+    	return 0; // signals error
+}
+
+/*
+We have to operate the Windows Console Output stream in _O_BINARY mode, so no UTF-8
+translation is performed by the OS. Therefore we have to encode UTF-8 characters
+ourselves.
+
+This routine is only used by the PUTC macro in the core update function of tty_updat.c
+ */
+NCURSES_EXPORT(int)
+NCURSES_SP_NAME(_nc_outch_ex)(NCURSES_SP_DCLx int ch)
+{
+	int rc = OK;
+	int len;
+	int i;
+	char utf8[4];
+			
+	COUNT_OUTCHARS(1);
+
+	/*
+	In Windows wchar_t is an unsigned short, so it requires strange operations
+	to get a negative value when propagating to an int. The only plausible
+	scenario on Windows that ch could be negative is, that it was propagated
+	from a char to an int. So the follwing is safe.
+	*/
+	if (ch < 0) ch &= 0xFF;
+	
+	len = wchar_to_utf8_win((wchar_t)ch, utf8);
+	if (len == 0)
+		return ERR; // conversion error
+
+	if (HasTInfoTerminal(SP_PARM) && SP_PARM != NULL)
+	{
+		if (SP_PARM->out_buffer != NULL)
+		{
+			if (SP_PARM->out_inuse + len >= SP_PARM->out_limit)
+				NCURSES_SP_NAME(_nc_flush)(NCURSES_SP_ARG);
+			for(i=0; i<len; i++) {
+				SP_PARM->out_buffer[SP_PARM->out_inuse++] = utf8[i];
+			}
+		}
+		else
+		{
+			if (write(fileno(NC_OUTPUT(SP_PARM)), utf8, (size_t)len) == -1)
+				rc = ERR;
+		}
+	} else {
+		if (write(fileno(stdout), utf8, (size_t)len) == -1)
+			rc = ERR;		
+	}
+	return rc;
+}
+#endif
 
 #if NCURSES_SP_FUNCS
 NCURSES_EXPORT(int)
 _nc_outch(int ch)
 {
-    return NCURSES_SP_NAME(_nc_outch) (CURRENT_SCREEN, ch);
+	return NCURSES_SP_NAME(_nc_outch)(CURRENT_SCREEN, ch);
 }
+
+#if defined(USE_WIN32_CONPTY) && USE_WIDEC_SUPPORT
+NCURSES_EXPORT(int)
+_nc_outch_ex(int ch)
+{
+	return NCURSES_SP_NAME(_nc_outch_ex)(CURRENT_SCREEN, ch);
+}
+#endif
 #endif
 
 /*
  * This is used for the putp special case.
  */
 NCURSES_EXPORT(int)
-NCURSES_SP_NAME(_nc_putchar) (NCURSES_SP_DCLx int ch)
+NCURSES_SP_NAME(_nc_putchar)(NCURSES_SP_DCLx int ch)
 {
-    (void) SP_PARM;
-    return putchar(ch);
+	(void)SP_PARM;
+	return putchar(ch);
 }
 
 #if NCURSES_SP_FUNCS
 NCURSES_EXPORT(int)
 _nc_putchar(int ch)
 {
-    return putchar(ch);
+	return putchar(ch);
 }
 #endif
 
@@ -235,17 +339,18 @@ _nc_putchar(int ch)
  * from within the library.
  */
 NCURSES_EXPORT(int)
-NCURSES_SP_NAME(putp) (NCURSES_SP_DCLx const char *string)
+NCURSES_SP_NAME(putp)(NCURSES_SP_DCLx const char *string)
 {
-    return NCURSES_SP_NAME(tputs) (NCURSES_SP_ARGx
-				   string, 1, NCURSES_SP_NAME(_nc_putchar));
+	return NCURSES_SP_NAME(tputs)(NCURSES_SP_ARGx
+									  string,
+								  1, NCURSES_SP_NAME(_nc_putchar));
 }
 
 #if NCURSES_SP_FUNCS
 NCURSES_EXPORT(int)
 putp(const char *string)
 {
-    return NCURSES_SP_NAME(putp) (CURRENT_SCREEN, string);
+	return NCURSES_SP_NAME(putp)(CURRENT_SCREEN, string);
 }
 #endif
 
@@ -253,208 +358,234 @@ putp(const char *string)
  * Use these entrypoints rather than "putp" within the library.
  */
 NCURSES_EXPORT(int)
-NCURSES_SP_NAME(_nc_putp) (NCURSES_SP_DCLx
-			   const char *name GCC_UNUSED,
-			   const char *string)
+NCURSES_SP_NAME(_nc_putp)(NCURSES_SP_DCLx const char *name GCC_UNUSED,
+						  const char *string)
 {
-    int rc = ERR;
+	int rc = ERR;
 
-    if (string != NULL) {
-	TPUTS_TRACE(name);
-	rc = NCURSES_SP_NAME(tputs) (NCURSES_SP_ARGx
-				     string, 1, NCURSES_SP_NAME(_nc_outch));
-    }
-    return rc;
+	if (string != NULL)
+	{
+		TPUTS_TRACE(name);
+		rc = NCURSES_SP_NAME(tputs)(NCURSES_SP_ARGx
+										string,
+									1, NCURSES_SP_NAME(_nc_outch));
+	}
+	return rc;
 }
 
 #if NCURSES_SP_FUNCS
 NCURSES_EXPORT(int)
 _nc_putp(const char *name, const char *string)
 {
-    return NCURSES_SP_NAME(_nc_putp) (CURRENT_SCREEN, name, string);
+	return NCURSES_SP_NAME(_nc_putp)(CURRENT_SCREEN, name, string);
 }
 #endif
 
 NCURSES_EXPORT(int)
-NCURSES_SP_NAME(tputs) (NCURSES_SP_DCLx
-			const char *string,
-			int affcnt,
-			NCURSES_SP_OUTC outc)
+NCURSES_SP_NAME(tputs)(NCURSES_SP_DCLx const char *string,
+					   int affcnt,
+					   NCURSES_SP_OUTC outc)
 {
-    NCURSES_SP_OUTC my_outch = GetOutCh();
-    bool always_delay = FALSE;
-    bool normal_delay = FALSE;
-    int number;
+	NCURSES_SP_OUTC my_outch = GetOutCh();
+	bool always_delay = FALSE;
+	bool normal_delay = FALSE;
+	int number;
 #if BSD_TPUTS
-    int trailpad;
+	int trailpad;
 #endif /* BSD_TPUTS */
 
 #ifdef TRACE
-    if (USE_TRACEF(TRACE_TPUTS)) {
-	char addrbuf[32];
-	TR_FUNC_BFR(1);
+	if (USE_TRACEF(TRACE_TPUTS))
+	{
+		char addrbuf[32];
+		TR_FUNC_BFR(1);
 
-	if (outc == NCURSES_SP_NAME(_nc_outch)) {
-	    _nc_STRCPY(addrbuf, "_nc_outch", sizeof(addrbuf));
-	} else {
-	    _nc_SPRINTF(addrbuf, _nc_SLIMIT(sizeof(addrbuf)) "%s",
-			TR_FUNC_ARG(0, outc));
+		if (outc == NCURSES_SP_NAME(_nc_outch))
+		{
+			_nc_STRCPY(addrbuf, "_nc_outch", sizeof(addrbuf));
+		}
+		else
+		{
+			_nc_SPRINTF(addrbuf, _nc_SLIMIT(sizeof(addrbuf)) "%s",
+						TR_FUNC_ARG(0, outc));
+		}
+		if (_nc_tputs_trace)
+		{
+			_tracef("tputs(%s = %s, %d, %s) called", _nc_tputs_trace,
+					_nc_visbuf(string), affcnt, addrbuf);
+		}
+		else
+		{
+			_tracef("tputs(%s, %d, %s) called", _nc_visbuf(string), affcnt, addrbuf);
+		}
+		TPUTS_TRACE(NULL);
+		_nc_unlock_global(tracef);
 	}
-	if (_nc_tputs_trace) {
-	    _tracef("tputs(%s = %s, %d, %s) called", _nc_tputs_trace,
-		    _nc_visbuf(string), affcnt, addrbuf);
-	} else {
-	    _tracef("tputs(%s, %d, %s) called", _nc_visbuf(string), affcnt, addrbuf);
-	}
-	TPUTS_TRACE(NULL);
-	_nc_unlock_global(tracef);
-    }
 #endif /* TRACE */
 
-    if (!VALID_STRING(string))
-	return ERR;
+	if (!VALID_STRING(string))
+		return ERR;
 
-    if (SP_PARM != NULL && HasTInfoTerminal(SP_PARM)) {
-	if (
+	if (SP_PARM != NULL && HasTInfoTerminal(SP_PARM))
+	{
+		if (
 #if NCURSES_SP_FUNCS
-	       (SP_PARM != NULL && SP_PARM->_term == NULL)
+			(SP_PARM != NULL && SP_PARM->_term == NULL)
 #else
-	       cur_term == NULL
+			cur_term == NULL
 #endif
-	    ) {
-	    always_delay = FALSE;
-	    normal_delay = TRUE;
-	} else {
-	    always_delay = (string == bell) || (string == flash_screen);
-	    normal_delay =
-		!xon_xoff
-		&& padding_baud_rate
+		)
+		{
+			always_delay = FALSE;
+			normal_delay = TRUE;
+		}
+		else
+		{
+			always_delay = (string == bell) || (string == flash_screen);
+			normal_delay =
+				!xon_xoff && padding_baud_rate
 #if NCURSES_NO_PADDING
-		&& !GetNoPadding(SP_PARM)
+				&& !GetNoPadding(SP_PARM)
 #endif
-		&& (_nc_baudrate(ospeed) >= padding_baud_rate);
+				&& (_nc_baudrate(ospeed) >= padding_baud_rate);
+		}
 	}
-    }
 #if BSD_TPUTS
-    /*
-     * This ugly kluge deals with the fact that some ancient BSD programs
-     * (like nethack) actually do the likes of tputs("50") to get delays.
-     */
-    trailpad = 0;
-    if (isdigit(UChar(*string))) {
-	while (isdigit(UChar(*string))) {
-	    trailpad = trailpad * 10 + (*string - '0');
-	    string++;
-	}
-	trailpad *= 10;
-	if (*string == '.') {
-	    string++;
-	    if (isdigit(UChar(*string))) {
-		trailpad += (*string - '0');
-		string++;
-	    }
-	    while (isdigit(UChar(*string)))
-		string++;
-	}
+	/*
+	 * This ugly kluge deals with the fact that some ancient BSD programs
+	 * (like nethack) actually do the likes of tputs("50") to get delays.
+	 */
+	trailpad = 0;
+	if (isdigit(UChar(*string)))
+	{
+		while (isdigit(UChar(*string)))
+		{
+			trailpad = trailpad * 10 + (*string - '0');
+			string++;
+		}
+		trailpad *= 10;
+		if (*string == '.')
+		{
+			string++;
+			if (isdigit(UChar(*string)))
+			{
+				trailpad += (*string - '0');
+				string++;
+			}
+			while (isdigit(UChar(*string)))
+				string++;
+		}
 
-	if (*string == '*') {
-	    trailpad *= affcnt;
-	    string++;
+		if (*string == '*')
+		{
+			trailpad *= affcnt;
+			string++;
+		}
 	}
-    }
 #endif /* BSD_TPUTS */
 
-    SetOutCh(outc);		/* redirect delay_output() */
-    while (*string) {
-	if (*string != '$')
-	    (*outc) (NCURSES_SP_ARGx *string);
-	else {
-	    string++;
-	    if (*string != '<') {
-		(*outc) (NCURSES_SP_ARGx '$');
-		if (*string)
-		    (*outc) (NCURSES_SP_ARGx *string);
-	    } else {
-		bool mandatory;
+	SetOutCh(outc); /* redirect delay_output() */
+	while (*string)
+	{
+		if (*string != '$')
+			(*outc)(NCURSES_SP_ARGx *string);
+		else
+		{
+			string++;
+			if (*string != '<')
+			{
+				(*outc)(NCURSES_SP_ARGx '$');
+				if (*string)
+					(*outc)(NCURSES_SP_ARGx *string);
+			}
+			else
+			{
+				bool mandatory;
+
+				string++;
+				if ((!isdigit(UChar(*string)) && *string != '.') || !strchr(string, '>'))
+				{
+					(*outc)(NCURSES_SP_ARGx '$');
+					(*outc)(NCURSES_SP_ARGx '<');
+					continue;
+				}
+
+				number = 0;
+				while (isdigit(UChar(*string)))
+				{
+					number = number * 10 + (*string - '0');
+					string++;
+				}
+				number *= 10;
+				if (*string == '.')
+				{
+					string++;
+					if (isdigit(UChar(*string)))
+					{
+						number += (*string - '0');
+						string++;
+					}
+					while (isdigit(UChar(*string)))
+						string++;
+				}
+
+				mandatory = FALSE;
+				while (*string == '*' || *string == '/')
+				{
+					if (*string == '*')
+					{
+						number *= affcnt;
+						string++;
+					}
+					else
+					{ /* if (*string == '/') */
+						mandatory = TRUE;
+						string++;
+					}
+				}
+
+				if (number > 0 && (always_delay || normal_delay || mandatory))
+					NCURSES_SP_NAME(delay_output)(NCURSES_SP_ARGx number / 10);
+
+			} /* endelse (*string == '<') */
+		} /* endelse (*string == '$') */
+
+		if (*string == '\0')
+			break;
 
 		string++;
-		if ((!isdigit(UChar(*string)) && *string != '.')
-		    || !strchr(string, '>')) {
-		    (*outc) (NCURSES_SP_ARGx '$');
-		    (*outc) (NCURSES_SP_ARGx '<');
-		    continue;
-		}
-
-		number = 0;
-		while (isdigit(UChar(*string))) {
-		    number = number * 10 + (*string - '0');
-		    string++;
-		}
-		number *= 10;
-		if (*string == '.') {
-		    string++;
-		    if (isdigit(UChar(*string))) {
-			number += (*string - '0');
-			string++;
-		    }
-		    while (isdigit(UChar(*string)))
-			string++;
-		}
-
-		mandatory = FALSE;
-		while (*string == '*' || *string == '/') {
-		    if (*string == '*') {
-			number *= affcnt;
-			string++;
-		    } else {	/* if (*string == '/') */
-			mandatory = TRUE;
-			string++;
-		    }
-		}
-
-		if (number > 0
-		    && (always_delay
-			|| normal_delay
-			|| mandatory))
-		    NCURSES_SP_NAME(delay_output) (NCURSES_SP_ARGx number / 10);
-
-	    }			/* endelse (*string == '<') */
-	}			/* endelse (*string == '$') */
-
-	if (*string == '\0')
-	    break;
-
-	string++;
-    }
+	}
 
 #if BSD_TPUTS
-    /*
-     * Emit any BSD-style prefix padding that we've accumulated now.
-     */
-    if (trailpad > 0
-	&& (always_delay || normal_delay))
-	NCURSES_SP_NAME(delay_output) (NCURSES_SP_ARGx trailpad / 10);
+	/*
+	 * Emit any BSD-style prefix padding that we've accumulated now.
+	 */
+	if (trailpad > 0 && (always_delay || normal_delay))
+		NCURSES_SP_NAME(delay_output)(NCURSES_SP_ARGx trailpad / 10);
 #endif /* BSD_TPUTS */
 
-    SetOutCh(my_outch);
-    return OK;
+	SetOutCh(my_outch);
+	return OK;
 }
 
 #if NCURSES_SP_FUNCS
 NCURSES_EXPORT(int)
 _nc_outc_wrapper(SCREEN *sp, int c)
 {
-    if (NULL == sp) {
-	return fputc(c, stdout);
-    } else {
-	return sp->jump(c);
-    }
+	if (NULL == sp)
+	{
+		return fputc(c, stdout);
+	}
+	else
+	{
+		return sp->jump(c);
+	}
 }
 
 NCURSES_EXPORT(int)
-tputs(const char *string, int affcnt, int (*outc) (int))
+tputs(const char *string, int affcnt, int (*outc)(int))
 {
-    SetSafeOutcWrapper(outc);
-    return NCURSES_SP_NAME(tputs) (NCURSES_SP_ARGx string, affcnt, _nc_outc_wrapper);
+	SetSafeOutcWrapper(outc);
+	return NCURSES_SP_NAME(tputs)(NCURSES_SP_ARGx string, affcnt, _nc_outc_wrapper);
 }
 #endif
