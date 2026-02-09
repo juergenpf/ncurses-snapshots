@@ -267,7 +267,7 @@ main(int argc, char *argv[])
     if (optind < argc) {
 	railroad(argv + optind);
     } else {
-	static char world[] = "Hello World";
+	static char world[] = "Ä Hello World";
 	static char *hello[] =
 	{world, NULL};
 	railroad(hello);

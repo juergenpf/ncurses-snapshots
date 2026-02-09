@@ -193,7 +193,7 @@ extern int errno;
 #define HAVE_SIZECHANGE 0
 #endif
 
-#if HAVE_SIZECHANGE && USE_SIGWINCH && defined(SIGWINCH)
+#if (HAVE_SIZECHANGE && USE_SIGWINCH && defined(SIGWINCH)) || defined(USE_WIN32_CONPTY)
 #define USE_SIZECHANGE 1
 #else
 #define USE_SIZECHANGE 0
@@ -311,13 +311,7 @@ extern NCURSES_EXPORT(void *) _nc_memmove (void *, const void *, size_t);
 /*
  * Options for terminal drivers, etc...
  */
-#if USE_TERM_DRIVER
-#define NO_TERMINAL "unknown"
-#define USE_SP_RIPOFF     1
-#define USE_SP_TERMTYPE   1
-#else
-#define NO_TERMINAL 0
-#endif
+#define NO_TERMINAL 0 /* JPF check use */
 
 #define VALID_TERM_ENV(term_env, no_terminal) \
 	(term_env = (NonEmpty(term_env) \
@@ -419,16 +413,6 @@ typedef TRIES {
 #endif
 
 #include <term.priv.h>		/* defines TERMIOS via term.h */
-
-#if USE_TERM_DRIVER
-#if defined(TERMIOS)
-#undef  USE_NAMED_PIPES
-#define USE_NAMED_PIPES 0
-#undef  USE_WIN32CON_DRIVER
-#elif defined(_NC_WINDOWS)
-#include <nc_win32.h>
-#endif /* TERMIOS */
-#endif /* USE_TERM_DRIVER */
 
 #ifndef FixupPathname
 #define FixupPathname(path) /* nothing */
@@ -607,6 +591,13 @@ typedef union {
 #define NCURSES_OUTC_FUNC       NCURSES_SP_NAME(_nc_outch)
 #define NCURSES_PUTP2(name,value)    NCURSES_SP_NAME(_nc_putp)(NCURSES_SP_ARGx name, value)
 #define NCURSES_PUTP2_FLUSH(name,value)    NCURSES_SP_NAME(_nc_putp_flush)(NCURSES_SP_ARGx name, value)
+
+#if USE_WIDEC_SUPPORT && defined(USE_WIN32_CONPTY)
+#define NCURSES_OUTC_FUNC_EX    NCURSES_SP_NAME(_nc_outch_ex)
+// #define NCURSES_OUTC_FUNC_EX    NCURSES_SP_NAME(_nc_outch)
+#else
+#define NCURSES_OUTC_FUNC_EX    NCURSES_OUTC_FUNC
+#endif
 
 #if NCURSES_NO_PADDING
 #define GetNoPadding(sp)	((sp) ? (sp)->_no_padding : _nc_prescreen._no_padding)
@@ -845,9 +836,6 @@ typedef enum {
 #if USE_SYSMOUSE
 	,M_SYSMOUSE		/* FreeBSD sysmouse on console */
 #endif
-#if USE_TERM_DRIVER
-	,M_TERM_DRIVER		/* Win32 console, etc */
-#endif
 } MouseType;
 
 typedef enum {
@@ -977,12 +965,7 @@ typedef int (*TYPE_Gpm_GetEvent) (Gpm_Event *);
 #define TRACEMSE_MAX	(80 + (5 * 10) + (32 * 15))
 #define TRACEMSE_FMT	"id %2d  at (%2d, %2d, %2d) state %4lx = {" /* } */
 
-#if USE_TERM_DRIVER
-struct DriverTCB; /* Terminal Control Block forward declaration */
-#define INIT_TERM_DRIVER()	_nc_globals.term_driver = _nc_get_driver
-#else
-#define INIT_TERM_DRIVER()	/* nothing */
-#endif
+#define INIT_TERM_DRIVER()	/* nothing JPF check use */
 
 extern NCURSES_EXPORT_VAR(NCURSES_GLOBALS) _nc_globals;
 
@@ -1255,7 +1238,7 @@ typedef struct screen {
 	int		_sysmouse_new_buttons;
 #endif
 
-#if USE_TERM_DRIVER || USE_NAMED_PIPES
+#if USE_NAMED_PIPES
 	MEVENT		_drv_mouse_fifo[FIFO_SIZE];
 	int		_drv_mouse_head;
 	int		_drv_mouse_tail;
@@ -1501,8 +1484,8 @@ extern NCURSES_EXPORT_VAR(SIG_ATOMIC_T) _nc_have_sigwinch;
 #define PUTC(ch)	do { if(!isWidecExt(ch)) {				    \
 			if (Charable(ch)) {					    \
 			    TR_PUTC(CharOf(ch));				    \
-			    NCURSES_OUTC_FUNC (NCURSES_SP_ARGx (int) CharOf(ch));	    \
-			    COUNT_OUTCHARS(1);					    \
+			    NCURSES_OUTC_FUNC_EX (NCURSES_SP_ARGx (int) CharOf(ch));	    \
+			    /*COUNT_OUTCHARS(1);*/					    \
 			} else {						    \
 			    for (PUTC_i = 0; PUTC_i < CCHARW_MAX; ++PUTC_i) {	    \
 				PUTC_ch = (ch).chars[PUTC_i];			    \
@@ -1514,22 +1497,22 @@ extern NCURSES_EXPORT_VAR(SIG_ATOMIC_T) _nc_have_sigwinch;
 				if (PUTC_n <= 0) {				    \
 				    if (PUTC_ch && is8bits(PUTC_ch) && PUTC_i == 0) { \
 					TR_PUTC(CharOf(ch));			    \
-					NCURSES_OUTC_FUNC (NCURSES_SP_ARGx (int) CharOf(ch)); \
+					NCURSES_OUTC_FUNC_EX (NCURSES_SP_ARGx (int) CharOf(ch)); \
 				    }						    \
 				    break;					    \
 				} else if (PUTC_n > 1 || !is8bits(PUTC_ch)) {	    \
 				    int PUTC_j;					    \
 				    for (PUTC_j = 0; PUTC_j < PUTC_n; ++PUTC_j) {   \
 					TR_PUTC(PUTC_buf[PUTC_j]);		    \
-					NCURSES_OUTC_FUNC (NCURSES_SP_ARGx PUTC_buf[PUTC_j]); \
+					NCURSES_OUTC_FUNC_EX (NCURSES_SP_ARGx PUTC_buf[PUTC_j]); \
 				    }						    \
 				} else {					    \
 				    PUTC_buf[0] = (char) PUTC_ch;			    \
 				    TR_PUTC(PUTC_buf[0]);			    \
-				    NCURSES_OUTC_FUNC (NCURSES_SP_ARGx PUTC_buf[0]); \
+				    NCURSES_OUTC_FUNC_EX (NCURSES_SP_ARGx PUTC_buf[0]); \
 				}						    \
 			    }							    \
-			    COUNT_OUTCHARS(PUTC_i);				    \
+			    /*COUNT_OUTCHARS(PUTC_i);*/				    \
 			} } } while (0)
 
 #define BLANK		NewChar2(' ', WA_NORMAL)
@@ -2226,6 +2209,10 @@ extern NCURSES_EXPORT(void) _nc_signal_handler (int);
 extern NCURSES_EXPORT(void) _nc_synchook (WINDOW *);
 extern NCURSES_EXPORT(void) _nc_trace_tries (TRIES *);
 
+#if USE_WIDEC_SUPPORT && defined(USE_WIN32_CONPTY)
+extern NCURSES_EXPORT(int) _nc_outch_ex(int);
+#endif
+
 #if NCURSES_EXT_NUMBERS
 extern NCURSES_EXPORT(const TERMTYPE2 *) _nc_fallback2 (const char *);
 #else
@@ -2422,115 +2409,13 @@ extern NCURSES_EXPORT(int) _nc_get_tty_mode(TTY *);
     }\
     sp->jump = outc
 
-#if USE_TERM_DRIVER
-
-typedef struct _termInfo
-{
-    bool caninit;
-
-    bool hascolor;
-    bool initcolor;
-    bool canchange;
-
-    int  tabsize;
-
-    int  maxcolors;
-    int  maxpairs;
-    int  nocolorvideo;
-
-    int  numbuttons;
-    int  numlabels;
-    int  labelwidth;
-    int  labelheight;
-
-    const color_t* defaultPalette;
-} TerminalInfo;
-
-typedef struct term_driver {
-    bool   isTerminfo;
-    const char* (*td_name)(struct DriverTCB*);
-    bool   (*td_CanHandle)(struct DriverTCB*, const char*, int*);
-    void   (*td_init)(struct DriverTCB*);
-    void   (*td_release)(struct DriverTCB*);
-    int    (*td_size)(struct DriverTCB*, int* Line, int *Cols);
-    int    (*td_sgmode)(struct DriverTCB*, int setFlag, TTY*);
-    chtype (*td_conattr)(struct DriverTCB*);
-    int    (*td_hwcur)(struct DriverTCB*, int yold, int xold, int y, int x);
-    int    (*td_mode)(struct DriverTCB*, int progFlag, int defFlag);
-    bool   (*td_rescol)(struct DriverTCB*);
-    bool   (*td_rescolors)(struct DriverTCB*);
-    void   (*td_color)(struct DriverTCB*, int fore, int color, int(*)(SCREEN*, int));
-    int    (*td_doBeepOrFlash)(struct DriverTCB*, int);
-    void   (*td_initpair)(struct DriverTCB*, int, int, int);
-    void   (*td_initcolor)(struct DriverTCB*, int, int, int, int);
-    void   (*td_docolor)(struct DriverTCB*, int, int, int, int(*)(SCREEN*, int));
-    void   (*td_initmouse)(struct DriverTCB*);
-    int    (*td_testmouse)(struct DriverTCB*, int EVENTLIST_2nd(_nc_eventlist*));
-    void   (*td_setfilter)(struct DriverTCB*);
-    void   (*td_hwlabel)(struct DriverTCB*, int, char*);
-    void   (*td_hwlabelOnOff)(struct DriverTCB*, int);
-    int    (*td_update)(struct DriverTCB*);
-    int    (*td_defaultcolors)(struct DriverTCB*, int, int);
-    int    (*td_print)(struct DriverTCB*, char*, int);
-    int    (*td_getsize)(struct DriverTCB*, int*, int*);
-    int    (*td_setsize)(struct DriverTCB*, int, int);
-    void   (*td_initacs)(struct DriverTCB*, chtype*, chtype*);
-    void   (*td_scinit)(SCREEN *);
-    void   (*td_scexit)(SCREEN *);
-    int    (*td_twait)(struct DriverTCB*, int, int, int* EVENTLIST_2nd(_nc_eventlist*));
-    int    (*td_read)(struct DriverTCB*, int*);
-    int    (*td_nap)(struct DriverTCB*, int);
-    int    (*td_kpad)(struct DriverTCB*, int);
-    int    (*td_kyOk)(struct DriverTCB*, int, int);
-    bool   (*td_kyExist)(struct DriverTCB*, int);
-    int    (*td_cursorSet)(struct DriverTCB*, int);
-} TERM_DRIVER;
-
-typedef struct DriverTCB
-{
-    TERMINAL      term;   /* needs to be the first Element !!! */
-    TERM_DRIVER*  drv;    /* The driver for that Terminal */
-    SCREEN*       csp;    /* The screen that owns that Terminal */
-    TerminalInfo  info;   /* Driver independent core capabilities of the Terminal */
-    void*         prop;   /* Driver dependent property storage to be used by the Driver */
-    long          magic;
-} TERMINAL_CONTROL_BLOCK;
-
-#define NCDRV_MAGIC(id) (0x47110000 | (id&0xffff))
-#define NCDRV_TINFO      0x01
-#define NCDRV_WINCONSOLE 0x02
-
-#define TCBOf(sp)    ((TERMINAL_CONTROL_BLOCK*)(TerminalOf(sp)))
-#define InfoOf(sp)   TCBOf(sp)->info
-#define CallDriver(sp,method)                        TCBOf(sp)->drv->method(TCBOf(sp))
-#define CallDriver_1(sp,method,arg1)                 TCBOf(sp)->drv->method(TCBOf(sp),arg1)
-#define CallDriver_2(sp,method,arg1,arg2)            TCBOf(sp)->drv->method(TCBOf(sp),arg1,arg2)
-#define CallDriver_3(sp,method,arg1,arg2,arg3)       TCBOf(sp)->drv->method(TCBOf(sp),arg1,arg2,arg3)
-#define CallDriver_4(sp,method,arg1,arg2,arg3,arg4)  TCBOf(sp)->drv->method(TCBOf(sp),arg1,arg2,arg3,arg4)
-
-extern NCURSES_EXPORT_VAR(const color_t*) _nc_cga_palette;
-extern NCURSES_EXPORT_VAR(const color_t*) _nc_hls_palette;
-
-extern NCURSES_EXPORT(int)      _nc_get_driver(TERMINAL_CONTROL_BLOCK*, const char*, int*);
-extern NCURSES_EXPORT(void)     _nc_get_screensize_ex(SCREEN *, TERMINAL *, int *, int *);
-#endif /* USE_TERM_DRIVER */
-
 /*
  * Entrypoints which are actually provided in the terminal driver, which would
  * be an sp-name otherwise.
  */
-#if USE_TERM_DRIVER
-#define TINFO_HAS_KEY           _nc_tinfo_has_key
-#define TINFO_DOUPDATE          _nc_tinfo_doupdate
-#define TINFO_MVCUR             _nc_tinfo_mvcur
-extern NCURSES_EXPORT(int)      TINFO_HAS_KEY(SCREEN*, int);
-extern NCURSES_EXPORT(int)      TINFO_DOUPDATE(SCREEN *);
-extern NCURSES_EXPORT(int)      TINFO_MVCUR(SCREEN*, int, int, int, int);
-#else
 #define TINFO_HAS_KEY           NCURSES_SP_NAME(has_key)
 #define TINFO_DOUPDATE          NCURSES_SP_NAME(doupdate)
 #define TINFO_MVCUR             NCURSES_SP_NAME(_nc_mvcur)
-#endif
 
 #ifdef _NC_WINDOWS
 #if USE_WIDEC_SUPPORT
@@ -2548,16 +2433,6 @@ extern NCURSES_EXPORT(int)      TINFO_MVCUR(SCREEN*, int, int, int, int);
 /*
  * Entrypoints using an extra parameter with the terminal driver.
  */
-#if USE_TERM_DRIVER
-extern NCURSES_EXPORT(void)   _nc_get_screensize(SCREEN *, TERMINAL *, int *, int *);
-extern NCURSES_EXPORT(int)    _nc_setupterm_ex(TERMINAL **, const char *, int , int *, int);
-#define TINFO_GET_SIZE(sp, tp, lp, cp) \
-	_nc_get_screensize(sp, tp, lp, cp)
-#define TINFO_SET_CURTERM(sp, tp) \
-	NCURSES_SP_NAME(set_curterm)(sp, tp)
-#define TINFO_SETUP_TERM(tpp, name, fd, err, reuse) \
-	_nc_setupterm_ex(tpp, name, fd, err, reuse)
-#else /* !USE_TERM_DRIVER */
 extern NCURSES_EXPORT(void)   _nc_get_screensize(SCREEN *, int *, int *);
 #define TINFO_GET_SIZE(sp, tp, lp, cp) \
 	_nc_get_screensize(sp, lp, cp)
@@ -2565,47 +2440,34 @@ extern NCURSES_EXPORT(void)   _nc_get_screensize(SCREEN *, int *, int *);
 	set_curterm(tp)
 #define TINFO_SETUP_TERM(tpp, name, fd, err, reuse) \
 	_nc_setupterm(name, fd, err, reuse)
-#endif /* !USE_TERM_DRIVER */
 
-#if USE_TERM_DRIVER
-extern NCURSES_EXPORT_VAR(TERM_DRIVER) _nc_WIN_DRIVER;
-extern NCURSES_EXPORT_VAR(TERM_DRIVER) _nc_TINFO_DRIVER;
-#endif /* USE_TERM_DRIVER */
 
-#ifdef TERMIOS
-#define USE_WINCONMODE 0
-#elif defined(USE_WIN32CON_DRIVER)
-#define USE_WINCONMODE 1
-extern NCURSES_EXPORT(int)  _nc_console_setmode(void* handle, const ConsoleMode* arg);
-extern NCURSES_EXPORT(int)  _nc_console_getmode(void* handle, ConsoleMode* arg);
-extern NCURSES_EXPORT(bool)  _nc_console_checkinit(bool assumeTermInfo);
+#if defined(USE_WIN32_CONPTY)
+extern NCURSES_EXPORT(void) _nc_setmode(int fd, bool isCurses);
+extern NCURSES_EXPORT(int)  _nc_console_vt_supported(void);
+extern NCURSES_EXPORT(int)  _nc_console_isatty(int fd);
 extern NCURSES_EXPORT(void*) _nc_console_fd2handle(int fd);
+extern NCURSES_EXPORT(int)  _nc_win32_tcsetattr(int fd, const TTY* arg);
+extern NCURSES_EXPORT(int)  _nc_win32_tcgetattr(int fd, TTY*  arg);
+extern NCURSES_EXPORT(HANDLE) _nc_console_handle(int fd);
+extern NCURSES_EXPORT(void) _nc_console_size(int *Lines, int *Cols);
+extern NCURSES_EXPORT(bool) _nc_console_check_resize(void);
+extern NCURSES_EXPORT(bool)  _nc_console_checkinit(void);
 extern NCURSES_EXPORT(WORD) _nc_console_MapColor(bool fore, int color);
 extern NCURSES_EXPORT(int)  _nc_console_flush(void* handle);
 extern NCURSES_EXPORT(bool) _nc_console_get_SBI(void);
-extern NCURSES_EXPORT(HANDLE) _nc_console_handle(int fd);
-extern NCURSES_EXPORT(int)  _nc_console_isatty(int fd);
-extern NCURSES_EXPORT(bool) _nc_console_keyExist(int keycode);
-extern NCURSES_EXPORT(int)  _nc_console_keyok(int keycode, int flag);
-extern NCURSES_EXPORT(int)  _nc_console_read(SCREEN *sp, HANDLE fd, int *buf);
-extern NCURSES_EXPORT(bool) _nc_console_restore(void);
-extern NCURSES_EXPORT(void) _nc_console_selectActiveHandle(void);
-extern NCURSES_EXPORT(void) _nc_console_set_scrollback(bool normal, CONSOLE_SCREEN_BUFFER_INFO * info);
-extern NCURSES_EXPORT(void) _nc_console_size(int *Lines, int *Cols);
-extern NCURSES_EXPORT(int)  _nc_console_test(int fd);
-extern NCURSES_EXPORT(int)  _nc_console_testmouse(const SCREEN *sp, HANDLE fd, int delay EVENTLIST_2nd(_nc_eventlist*));
-extern NCURSES_EXPORT(int)  _nc_console_twait(const SCREEN *sp, HANDLE hdl,int mode,int msec,int *left EVENTLIST_2nd(_nc_eventlist * evl));
-extern NCURSES_EXPORT(int)  _nc_console_vt_supported(void);
+extern NCURSES_EXPORT(bool) _nc_stdout_is_conpty(void);
+extern NCURSES_EXPORT(DWORD) _nc_unix_to_win32_output_flags(DWORD dwFlags, const TTY *ttyflags);
+extern NCURSES_EXPORT(DWORD) _nc_unix_to_win32_input_flags(DWORD dwFlags, const TTY *ttyflags);
+extern NCURSES_EXPORT(int) _nc_win32conpty_read(SCREEN *sp, int *result);
 
 #ifdef _NC_CHECK_MINTTY
 extern NCURSES_EXPORT(int)    _nc_console_checkmintty(int fd, LPHANDLE pMinTTY);
 #endif
 
-#else
-#error unsupported driver configuration
-#endif /* USE_WIN32CON_DRIVER */
+#endif /* USE_WIN32_CONPTY */
 
-#if USE_TERM_DRIVER && defined(USE_WIN32CON_DRIVER)
+#if defined(USE_WIN32_CONPTY)
 #define NC_ISATTY(fd) (0 != _nc_console_isatty(fd))
 #else
 #define NC_ISATTY(fd) isatty(fd)
@@ -2619,24 +2481,13 @@ extern NCURSES_EXPORT(int)    _nc_console_checkmintty(int fd, LPHANDLE pMinTTY);
 	 && (value = ttyname(fd)) != NULL \
 	 && strncmp(value, "/dev/pts/", 9))
 
-#if USE_TERM_DRIVER
-#  define IsTermInfo(sp)       ((TCBOf(sp) != NULL) && ((TCBOf(sp)->drv != NULL)) && ((TCBOf(sp)->drv->isTerminfo)))
-#  define HasTInfoTerminal(sp) ((NULL != TerminalOf(sp)) && IsTermInfo(sp))
-#  if USE_NAMED_PIPES
-#    define IsTermInfoOnConsole(sp) (IsTermInfo(sp) && _nc_console_test(TerminalOf(sp)->Filedes))
-#  elif defined(USE_WIN32CON_DRIVER)
-#    define IsTermInfoOnConsole(sp) (IsTermInfo(sp) && _nc_console_test(TerminalOf(sp)->Filedes))
-#  else
-#    define IsTermInfoOnConsole(sp) FALSE
-#  endif
+/* JPF check use */
+#define IsTermInfo(sp)       TRUE
+#define HasTInfoTerminal(sp) (NULL != TerminalOf(sp))
+#if USE_NAMED_PIPES
+#  define IsTermInfoOnConsole(sp) _nc_console_test(TerminalOf(sp)->Filedes)
 #else
-#  define IsTermInfo(sp)       TRUE
-#  define HasTInfoTerminal(sp) (NULL != TerminalOf(sp))
-#  if USE_NAMED_PIPES
-#    define IsTermInfoOnConsole(sp) _nc_console_test(TerminalOf(sp)->Filedes)
-#  else
-#    define IsTermInfoOnConsole(sp) FALSE
-#  endif
+#  define IsTermInfoOnConsole(sp) FALSE
 #endif
 
 #define IsValidTIScreen(sp)  (HasTInfoTerminal(sp))
@@ -2707,6 +2558,9 @@ extern NCURSES_EXPORT(void)     NCURSES_SP_NAME(_nc_linedump)(SCREEN*);
 
 #if USE_WIDEC_SUPPORT
 extern NCURSES_EXPORT(wchar_t *) NCURSES_SP_NAME(_nc_wunctrl)(SCREEN*, cchar_t *);
+#if defined(USE_WIN32_CONPTY)
+extern NCURSES_EXPORT(int)      NCURSES_SP_NAME(_nc_outch_ex)(SCREEN*, int);
+#endif
 #endif
 
 #endif /* NCURSES_SP_FUNCS */

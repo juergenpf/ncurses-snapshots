@@ -59,13 +59,8 @@
 
 MODULE_ID("$Id: lib_set_term.c,v 1.199 2025/12/27 12:28:45 tom Exp $")
 
-#if USE_TERM_DRIVER
-#define MaxColors      InfoOf(sp).maxcolors
-#define NumLabels      InfoOf(sp).numlabels
-#else
 #define MaxColors      max_colors
 #define NumLabels      num_labels
-#endif
 
 NCURSES_EXPORT(SCREEN *)
 set_term(SCREEN *screenp)
@@ -318,15 +313,12 @@ NCURSES_SP_NAME(_nc_setupscreen) (
 				     bool filtered,
 				     int slk_format)
 {
-#if !USE_TERM_DRIVER
     static const TTY null_TTY;	/* all zeros iff uninitialized */
-#endif
+
     char *env;
     int bottom_stolen = 0;
     SCREEN *sp;
-#if !USE_TERM_DRIVER
     bool support_cookies = USE_XMC_SUPPORT;
-#endif
 
     T((T_CALLED("_nc_setupscreen(%d, %d, %p, %d, %d)"),
        slines, scolumns, (void *) output, filtered, slk_format));
@@ -386,12 +378,8 @@ NCURSES_SP_NAME(_nc_setupscreen) (
      */
     _nc_set_screen(sp);
     sp->_term = cur_term;
-#if USE_TERM_DRIVER
-    TCBOf(sp)->csp = sp;
-    _nc_get_screensize(sp, sp->_term, &slines, &scolumns);
-#else
     _nc_get_screensize(sp, &slines, &scolumns);
-#endif
+
     if (scolumns < 0)
 	scolumns = 0;
     if (slines < 0)
@@ -408,9 +396,6 @@ NCURSES_SP_NAME(_nc_setupscreen) (
     if (filtered) {
 	slines = 1;
 	SET_LINES(slines);
-#if USE_TERM_DRIVER
-	CallDriver(sp, td_setfilter);
-#else
 	/* *INDENT-EQLS* */
 	clear_screen     = ABSENT_STRING;
 	cursor_address   = ABSENT_STRING;
@@ -424,14 +409,8 @@ NCURSES_SP_NAME(_nc_setupscreen) (
 	if (back_color_erase)
 	    clr_eos = ABSENT_STRING;
 
-#endif
 	T(("filter screensize %dx%d", slines, scolumns));
     }
-#if USE_NAMED_PIPES
-    T(("setting output mode to binary"));
-    fflush(output);
-    _setmode(fileno(output), _O_BINARY);
-#endif
     sp->_lines = (NCURSES_SIZE_T) slines;
     sp->_lines_avail = (NCURSES_SIZE_T) slines;
     sp->_columns = (NCURSES_SIZE_T) scolumns;
@@ -439,10 +418,6 @@ NCURSES_SP_NAME(_nc_setupscreen) (
     fflush(output);
     sp->_ofd = output ? fileno(output) : -1;
     sp->_ofp = output;
-#if USE_NAMED_PIPES
-    if (output)
-	_setmode(fileno(output), _O_BINARY);
-#endif
     sp->out_limit = (size_t) ((2 + slines) * (6 + scolumns));
     if ((sp->out_buffer = malloc(sp->out_limit)) == NULL)
 	sp->out_limit = 0;
@@ -553,9 +528,6 @@ NCURSES_SP_NAME(_nc_setupscreen) (
     if (NCURSES_SP_NAME(has_colors) (NCURSES_SP_ARG)) {
 	sp->_ok_attributes |= A_COLOR;
     }
-#if USE_TERM_DRIVER
-    _nc_cookie_init(sp);
-#else
 #if USE_XMC_SUPPORT
     /*
      * If we have no magic-cookie support compiled-in, or if it is suppressed
@@ -635,7 +607,6 @@ NCURSES_SP_NAME(_nc_setupscreen) (
 	set_attributes = NULL;
     }
 #endif
-#endif
 
     NCURSES_SP_NAME(_nc_init_acs) (NCURSES_SP_ARG);
 #if USE_WIDEC_SUPPORT
@@ -661,6 +632,13 @@ NCURSES_SP_NAME(_nc_setupscreen) (
 
     sp->oldhash = NULL;
     sp->newhash = NULL;
+
+#if defined(USE_WIN32_CONPTY)
+    assert(NULL!= output);
+    // ConPTY can have exactly one console with output on stdout
+    assert(fileno(output)==STDOUT_FILENO);
+    // _nc_setmode(fileno(output), false, true); JPF
+#endif
 
     T(("creating newscr"));
     NewScreen(sp) = NCURSES_SP_NAME(newwin) (NCURSES_SP_ARGx slines, scolumns,
@@ -690,10 +668,6 @@ NCURSES_SP_NAME(_nc_setupscreen) (
      * Get the current tty-modes. setupterm() may already have done this,
      * unless we use the term-driver.
      */
-#if !USE_TERM_DRIVER
-    if (cur_term != NULL &&
-	!memcmp(&cur_term->Ottyb, &null_TTY, sizeof(TTY)))
-#endif
     {
 	NCURSES_SP_NAME(def_shell_mode) (NCURSES_SP_ARG);
 	NCURSES_SP_NAME(def_prog_mode) (NCURSES_SP_ARG);

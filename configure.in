@@ -1145,31 +1145,6 @@ fi
 AC_SUBST(NCURSES_SP_FUNCS)
 AC_SUBST(GENERATED_SP_FUNCS)
 
-case "$cf_cv_system_name" in
-(*mingw32*|*mingw64*|*-msvc*)
-	cf_dft_term_driver=yes
-	;;
-(*)
-	cf_dft_term_driver=no
-	;;
-esac
-
-AC_MSG_CHECKING(if you want to build with terminal-driver)
-AC_ARG_ENABLE(term-driver,
-	[  --enable-term-driver    enable terminal-driver],
-	[with_term_driver=$enableval],
-	[with_term_driver=$cf_dft_term_driver])
-AC_MSG_RESULT($with_term_driver)
-if test "x$with_term_driver" = xyes ; then
-	AC_DEFINE(USE_TERM_DRIVER,1,[Define to 1 to enable terminal-driver])
-	if test "x$with_termlib" != xno ; then
-		AC_MSG_ERROR(The term-driver option conflicts with the termlib option)
-	fi
-	if test "x$with_sp_funcs" != xyes ; then
-		AC_MSG_ERROR(The term-driver option relies upon sp-funcs)
-	fi
-fi
-
 ###   use option --enable-const to turn on use of const beyond that in XSI.
 AC_MSG_CHECKING(for extended use of const keyword)
 AC_ARG_ENABLE(const,
@@ -1631,6 +1606,10 @@ case "$cf_cv_system_name" in
 		[AC_MSG_WARN(The --enable-exp-win32 option is obsolete)])
 	;;
 esac
+
+AC_ARG_ENABLE(term-driver,
+	[  --enable-term-driver    obsolete option, no longer implemented],
+	[AC_MSG_WARN(The --enable-term-driver option is obsolete)])
 
 ###############################################################################
 CF_HELP_MESSAGE(Testing/development Options:)
@@ -2104,30 +2083,11 @@ fi
 
 LIB_SUBSETS="${LIB_SUBSETS}base"
 
-# Most term-driver calls are to tinfo, but some like init_pair are to the
-# base library (so it resides in base).
-if test "$with_term_driver" != no ; then
-	LIB_SUBSETS="${LIB_SUBSETS}+port_drivers"
-	case "$cf_cv_system_name" in
-	(*mingw32*|*mingw64*)
-		if test "x$with_named_pipes" = xyes ; then
-			LIB_SUBSETS="${LIB_SUBSETS}+port_tinfo+port_win32"
-		else
-			LIB_SUBSETS="${LIB_SUBSETS}+port_tinfo+port_win32con"
-		fi
-		CPPFLAGS="$CPPFLAGS -DUSE_WIN32CON_DRIVER"
-		;;
-	(*msys*|*cygwin*)
-		LIB_SUBSETS="${LIB_SUBSETS}+port_tinfo+port_msys2"
-		;;
-	(*)
-		LIB_SUBSETS="${LIB_SUBSETS}+port_tinfo"
-		;;
-	esac
-elif test "x$with_named_pipes" = xyes ; then
+if test "x$with_named_pipes" = xyes ; then
 	case "$cf_cv_system_name" in
 	(*mingw32*|*mingw64*)
 		LIB_SUBSETS="${LIB_SUBSETS}+port_win32"
+		CPPFLAGS="$CPPFLAGS -DUSE_WIN32_CONPTY"
 		;;
 	(*)
 		;;
@@ -2256,14 +2216,8 @@ if test "$with_termlib" != no ; then
 	else
 		TEST_ARGS="-l${TINFO_ARG_SUFFIX}"
 		TEST_ARG2="-l${TINFO_ARG_SUFFIX}"
-		if test "x$with_term_driver" != xno ; then
-			TICS_LIST="$SHLIB_LIST -l${LIB_NAME}${USE_ARG_SUFFIX}"
-			TICS_LIBS="$TICS_LIBS -l${LIB_NAME}${USE_ARG_SUFFIX}"
-			TINFO_LIBS="-l${LIB_NAME}${USE_ARG_SUFFIX} $TEST_ARGS"
-		else
-			TICS_LIST="$SHLIB_LIST -l${TINFO_LIB_SUFFIX}"
-			TINFO_LIBS="$TEST_ARGS"
-		fi
+		TICS_LIST="$SHLIB_LIST -l${TINFO_LIB_SUFFIX}"
+		TINFO_LIBS="$TEST_ARGS"
 		TINFO_LDFLAGS="-L${LIB_DIR}"
 		SHLIB_LIST="$SHLIB_LIST -l${TINFO_LIB_SUFFIX}"
 	fi
@@ -2576,7 +2530,6 @@ AC_CONFIG_FILES([\
 	include/MKterm.h.awk \
 	include/curses.head:include/curses.h.in \
 	include/ncurses_dll.h \
-	include/nc_win32.h \
 	include/termcap.h \
 	include/unctrl.h \
 	man/MKterminfo.tmp:man/MKterminfo.sh \
@@ -2665,7 +2618,6 @@ cf_cv_shared_soname='$cf_cv_shared_soname'
 cf_cv_shlib_version="$cf_cv_shlib_version"
 cf_cv_shlib_version_infix="$cf_cv_shlib_version_infix"
 cf_cv_system_name="$cf_cv_system_name"
-cf_cv_term_driver="$with_term_driver"
 cf_with_ada="$cf_with_ada"
 cf_with_cxx_binding="$cf_with_cxx_binding"
 cf_with_db_install="$cf_with_db_install"

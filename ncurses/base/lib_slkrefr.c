@@ -46,11 +46,7 @@
 
 MODULE_ID("$Id: lib_slkrefr.c,v 1.35 2025/12/27 12:41:23 tom Exp $")
 
-#if USE_TERM_DRIVER
-#define NumLabels    InfoOf(SP_PARM).numlabels
-#else
 #define NumLabels    num_labels
-#endif
 
 /*
  * Paint the info line for the PC style SLK emulation.
@@ -97,16 +93,12 @@ slk_intern_refresh(SCREEN *sp)
 	if (slk->dirty || slk->ent[i].dirty) {
 	    if (slk->ent[i].visible) {
 		if (numlab > 0 && SLK_STDFMT(fmt)) {
-#if USE_TERM_DRIVER
-		    CallDriver_2(sp, td_hwlabel, i + 1, slk->ent[i].form_text);
-#else
 		    if (i < num_labels) {
 			NCURSES_PUTP2("plab_norm",
 				      TPARM_2(plab_norm,
 					      i + 1,
 					      slk->ent[i].form_text));
 		    }
-#endif
 		} else {
 		    if (fmt == 4)
 			slk_paint_info(slk->win);
@@ -125,15 +117,11 @@ slk_intern_refresh(SCREEN *sp)
     slk->dirty = FALSE;
 
     if (numlab > 0) {
-#if USE_TERM_DRIVER
-	CallDriver_1(sp, td_hwlabelOnOff, slk->hidden ? FALSE : TRUE);
-#else
 	if (slk->hidden) {
 	    NCURSES_PUTP2("label_off", label_off);
 	} else {
 	    NCURSES_PUTP2("label_on", label_on);
 	}
-#endif
     }
 }
 

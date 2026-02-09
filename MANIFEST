@@ -562,7 +562,7 @@
 ./include/nc_string.h
 ./include/nc_termios.h
 ./include/nc_tparm.h
-./include/nc_win32.h.in
+./include/nc_win32.h
 ./include/ncurses_cfg.hin
 ./include/ncurses_defs
 ./include/ncurses_dll.h.in
@@ -755,6 +755,7 @@
 ./menu/mf_common.h
 ./menu/modules
 ./misc/Makefile.in
+./misc/MinGW-WSL2-Profile.ps1
 ./misc/chkdef.cmd
 ./misc/cleantic.cmd
 ./misc/cmpdef.cmd
@@ -816,7 +817,6 @@
 ./ncurses/base/lib_delch.c
 ./ncurses/base/lib_delwin.c
 ./ncurses/base/lib_dft_fgbg.c
-./ncurses/base/lib_driver.c
 ./ncurses/base/lib_echo.c
 ./ncurses/base/lib_endwin.c
 ./ncurses/base/lib_erase.c
@@ -948,7 +948,8 @@
 ./ncurses/tinfo/lib_tparm.c
 ./ncurses/tinfo/lib_tputs.c
 ./ncurses/tinfo/lib_ttyflags.c
-./ncurses/tinfo/lib_win32con.c
+./ncurses/tinfo/lib_win32conpty.c
+./ncurses/tinfo/lib_win32tcattr.c
 ./ncurses/tinfo/lib_win32util.c
 ./ncurses/tinfo/make_hash.c
 ./ncurses/tinfo/make_keys.c
@@ -958,7 +959,6 @@
 ./ncurses/tinfo/read_entry.c
 ./ncurses/tinfo/read_termcap.c
 ./ncurses/tinfo/strings.c
-./ncurses/tinfo/tinfo_driver.c
 ./ncurses/tinfo/trim_sgr0.c
 ./ncurses/tinfo/use_screen.c
 ./ncurses/tinfo/write_entry.c
@@ -1006,7 +1006,6 @@
 ./ncurses/widechar/widechars.c
 ./ncurses/win32con/gettimeofday.c
 ./ncurses/win32con/wcwidth.c
-./ncurses/win32con/win32_driver.c
 ./package/debian-mingw/changelog
 ./package/debian-mingw/compat
 ./package/debian-mingw/control

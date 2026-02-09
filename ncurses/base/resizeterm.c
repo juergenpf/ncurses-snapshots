@@ -407,12 +407,8 @@ NCURSES_SP_NAME(resize_term) (NCURSES_SP_DCLx int ToLines, int ToCols)
 	    screen_lines(SP_PARM) = (NCURSES_SIZE_T) ToLines;
 	    screen_columns(SP_PARM) = (NCURSES_SIZE_T) ToCols;
 
-#if USE_TERM_DRIVER
-	    CallDriver_2(SP_PARM, td_setsize, ToLines, ToCols);
-#else
 	    lines = (NCURSES_INT2) ToLines;
 	    columns = (NCURSES_INT2) ToCols;
-#endif
 
 	    SP_PARM->_lines_avail = (NCURSES_SIZE_T) (ToLines - was_stolen);
 

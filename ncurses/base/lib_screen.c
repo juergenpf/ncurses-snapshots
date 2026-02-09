@@ -1023,11 +1023,7 @@ NCURSES_SP_NAME(scr_init) (NCURSES_SP_DCLx const char *file)
     T((T_CALLED("scr_init(%p,%s)"), (void *) SP_PARM, _nc_visbuf(file)));
 
     if (SP_PARM != NULL &&
-#if USE_TERM_DRIVER
-	InfoOf(SP_PARM).caninit
-#else
 	!(exit_ca_mode && non_rev_rmcup)
-#endif
 	) {
 	FILE *fp = NULL;
 

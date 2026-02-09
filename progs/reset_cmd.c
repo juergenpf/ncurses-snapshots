@@ -370,7 +370,7 @@ reset_tty_settings(int fd, TTY * tty_settings, int noset)
 				      | ECHOK
 				      | ECHOCTL
 				      | ECHOKE));
-#elif defined(_NC_WINDOWS)
+#elif defined(_NC_WINDOWS) && defined(JPF) // JPF Check 
     /* reference:
        https://learn.microsoft.com/en-us/windows/console/setconsolemode
        https://learn.microsoft.com/en-us/windows/console/high-level-console-modes

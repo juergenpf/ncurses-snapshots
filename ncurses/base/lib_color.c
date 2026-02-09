@@ -51,15 +51,6 @@
 
 MODULE_ID("$Id: lib_color.c,v 1.157 2025/12/27 12:31:03 tom Exp $")
 
-#if USE_TERM_DRIVER
-#define CanChange      InfoOf(SP_PARM).canchange
-#define DefaultPalette InfoOf(SP_PARM).defaultPalette
-#define HasColor       InfoOf(SP_PARM).hascolor
-#define InitColor      InfoOf(SP_PARM).initcolor
-#define MaxColors      InfoOf(SP_PARM).maxcolors
-#define MaxPairs       InfoOf(SP_PARM).maxpairs
-#define UseHlsPalette  (DefaultPalette == _nc_hls_palette)
-#else
 #define CanChange      can_change
 #define DefaultPalette (hue_lightness_saturation ? hls_palette : cga_palette)
 #define HasColor       has_color
@@ -67,9 +58,7 @@ MODULE_ID("$Id: lib_color.c,v 1.157 2025/12/27 12:31:03 tom Exp $")
 #define MaxColors      max_colors
 #define MaxPairs       max_pairs
 #define UseHlsPalette  (hue_lightness_saturation)
-#endif
 
-#if !USE_TERM_DRIVER
 /*
  * These should be screen structure members.  They need to be globals for
  * historical reasons.  So we assign them in start_color() and also in
@@ -90,7 +79,6 @@ NCURSES_PUBLIC_VAR(COLORS) (void)
 NCURSES_EXPORT_VAR(int) COLOR_PAIRS = 0;
 NCURSES_EXPORT_VAR(int) COLORS = 0;
 #endif
-#endif /* !USE_TERM_DRIVER */
 
 #define DATA(r,g,b) {r,g,b, 0,0,0, 0}
 
@@ -132,10 +120,6 @@ static const color_t hls_palette[] =
     DATA(	0,	50,	100),		/* COLOR_WHITE */
 };
 
-#if USE_TERM_DRIVER
-NCURSES_EXPORT_VAR(const color_t*) _nc_cga_palette = cga_palette;
-NCURSES_EXPORT_VAR(const color_t*) _nc_hls_palette = hls_palette;
-#endif
 
 /* *INDENT-ON* */
 #if NCURSES_EXT_FUNCS
@@ -159,7 +143,6 @@ default_bg(NCURSES_SP_DCL0)
 #define default_bg(sp) COLOR_BLACK
 #endif
 
-#if !USE_TERM_DRIVER
 /*
  * SVr4 curses is known to interchange color codes (1,4) and (3,6), possibly
  * to maintain compatibility with a pre-ANSI scheme.  The same scheme is
@@ -176,14 +159,10 @@ toggled_colors(int c)
     }
     return c;
 }
-#endif
 
 static void
 set_background_color(NCURSES_SP_DCLx int bg, NCURSES_SP_OUTC outc)
 {
-#if USE_TERM_DRIVER
-    CallDriver_3(SP_PARM, td_color, FALSE, bg, outc);
-#else
     if (set_a_background) {
 	TPUTS_TRACE("set_a_background");
 	NCURSES_SP_NAME(tputs) (NCURSES_SP_ARGx
@@ -195,15 +174,11 @@ set_background_color(NCURSES_SP_DCLx int bg, NCURSES_SP_OUTC outc)
 				TIPARM_1(set_background, toggled_colors(bg)),
 				1, outc);
     }
-#endif
 }
 
 static void
 set_foreground_color(NCURSES_SP_DCLx int fg, NCURSES_SP_OUTC outc)
 {
-#if USE_TERM_DRIVER
-    CallDriver_3(SP_PARM, td_color, TRUE, fg, outc);
-#else
     if (set_a_foreground) {
 	TPUTS_TRACE("set_a_foreground");
 	NCURSES_SP_NAME(tputs) (NCURSES_SP_ARGx
@@ -215,7 +190,6 @@ set_foreground_color(NCURSES_SP_DCLx int fg, NCURSES_SP_OUTC outc)
 				TIPARM_1(set_foreground, toggled_colors(fg)),
 				1, outc);
     }
-#endif
 }
 
 static void
@@ -306,9 +280,6 @@ init_direct_colors(NCURSES_SP_DCL0)
 static bool
 reset_color_pair(NCURSES_SP_DCL0)
 {
-#if USE_TERM_DRIVER
-    return CallDriver(SP_PARM, td_rescol);
-#else
     bool result = FALSE;
 
     (void) SP_PARM;
@@ -317,7 +288,6 @@ reset_color_pair(NCURSES_SP_DCL0)
 	result = TRUE;
     }
     return result;
-#endif
 }
 
 /*
@@ -336,14 +306,10 @@ NCURSES_SP_NAME(_nc_reset_colors) (NCURSES_SP_DCL0)
     if (reset_color_pair(NCURSES_SP_ARG))
 	result = TRUE;
 
-#if USE_TERM_DRIVER
-    result = CallDriver(SP_PARM, td_rescolors);
-#else
     if (orig_colors != NULL) {
 	NCURSES_PUTP2("orig_colors", orig_colors);
 	result = TRUE;
     }
-#endif
     returnBool(result);
 }
 
@@ -658,9 +624,6 @@ _nc_init_pair(SCREEN *sp, int pair, int f, int b)
     if (GET_SCREEN_PAIR(sp) == pair)
 	SET_SCREEN_PAIR(sp, (int) (~0));	/* force attribute update */
 
-#if USE_TERM_DRIVER
-    CallDriver_3(sp, td_initpair, pair, f, b);
-#else
     if (initialize_pair && InPalette(f) && InPalette(b)) {
 	const color_t *tp = DefaultPalette;
 
@@ -680,7 +643,6 @@ _nc_init_pair(SCREEN *sp, int pair, int f, int b)
 			       (int) tp[b].green,
 			       (int) tp[b].blue));
     }
-#endif
 
     returnCode(OK);
 }
@@ -741,12 +703,9 @@ _nc_init_color(SCREEN *sp, int color, int r, int g, int b)
 	    sp->_color_table[color].blue = b;
 	}
 
-#if USE_TERM_DRIVER
-	CallDriver_4(sp, td_initcolor, color, r, g, b);
-#else
 	NCURSES_PUTP2("initialize_color",
 		      TIPARM_4(initialize_color, color, r, g, b));
-#endif
+
 	sp->_color_defs = Max(color + 1, sp->_color_defs);
 
 	result = OK;
@@ -805,16 +764,12 @@ NCURSES_SP_NAME(has_colors) (NCURSES_SP_DCL0)
     (void) SP_PARM;
     T((T_CALLED("has_colors(%p)"), (void *) SP_PARM));
     if (HasTerminal(SP_PARM)) {
-#if USE_TERM_DRIVER
-	code = HasColor;
-#else
 	code = ((VALID_NUMERIC(max_colors) && VALID_NUMERIC(max_pairs)
 		 && (((set_foreground != NULL)
 		      && (set_background != NULL))
 		     || ((set_a_foreground != NULL)
 			 && (set_a_background != NULL))
 		     || set_color_pair)) ? TRUE : FALSE);
-#endif
     }
     returnBool(code);
 }
@@ -993,9 +948,6 @@ NCURSES_SP_NAME(_nc_do_color) (NCURSES_SP_DCLx
 			       int reverse,
 			       NCURSES_SP_OUTC outc)
 {
-#if USE_TERM_DRIVER
-    CallDriver_4(SP_PARM, td_docolor, old_pair, pair, reverse, outc);
-#else
     int fg = COLOR_DEFAULT;
     int bg = COLOR_DEFAULT;
     int old_fg = -1;
@@ -1067,7 +1019,6 @@ NCURSES_SP_NAME(_nc_do_color) (NCURSES_SP_DCLx
     if (!isDefaultColor(bg)) {
 	set_background_color(NCURSES_SP_ARGx bg, outc);
     }
-#endif
 }
 
 #if NCURSES_SP_FUNCS
