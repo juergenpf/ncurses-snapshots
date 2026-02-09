@@ -40,22 +40,139 @@
 #include <wchar.h>  /* For wide character functions */
 #include <string.h> /* For memset */
 
+#define CON_STDIN_HANDLE GetStdHandle(STD_INPUT_HANDLE)
+#define CON_STDOUT_HANDLE GetStdHandle(STD_OUTPUT_HANDLE)
+#define CON_STDERR_HANDLE GetStdHandle(STD_ERROR_HANDLE)
+
+typedef enum { NotKnown, Input, Output } HandleType;
+
+static HandleType classify_handle(HANDLE hdl) {
+    DWORD mode;
+    DWORD handle_type;
+    DWORD test_input;
+    DWORD test_output;
+    DWORD original_mode;
+
+    if (!GetConsoleMode(hdl, &mode)) {
+        return NotKnown;
+    }
+
+    handle_type = GetFileType(hdl);
+    if (handle_type != FILE_TYPE_CHAR) {
+        return NotKnown;
+    }
+
+    // Check against standard handles first (most reliable)
+    if (hdl == CON_STDIN_HANDLE) {
+        return Input;
+    }
+    if (hdl == CON_STDOUT_HANDLE || hdl == CON_STDERR_HANDLE) {
+        return Output;
+    }
+
+    // Try to determine by testing which mode types work
+    test_input = ENABLE_LINE_INPUT | ENABLE_ECHO_INPUT;
+    test_output = ENABLE_PROCESSED_OUTPUT | ENABLE_WRAP_AT_EOL_OUTPUT;
+
+    original_mode = mode;
+
+    // Try setting input-specific flags
+    if (SetConsoleMode(hdl, test_input)) {
+        SetConsoleMode(hdl, original_mode);  // Restore
+        return Input;
+    }
+
+    // Try setting output-specific flags
+    if (SetConsoleMode(hdl, test_output)) {
+        SetConsoleMode(hdl, original_mode);  // Restore
+        return Output;
+    }
+
+    return NotKnown;
+}
+
+static HANDLE
+fd2handle(int fd)
+{
+	HANDLE hdl = _get_osfhandle(fd);
+
+	if (fd == _fileno(stdin))
+	{
+		T(("lib_win32conpty:validateHandle %d -> stdin handle", fd));
+	}
+	else if (fd == _fileno(stdout))
+	{
+		T(("lib_win32conpty:validateHandle %d -> stdout handle", fd));
+	}
+	else
+	{
+		T(("lib_win32conpty:validateHandle %d maps to unknown fd", fd));
+	}
+	return hdl;
+}
+
+NCURSES_EXPORT(int)
+_nc_console_flush(int fd)
+{
+	int code = OK;
+	HANDLE hdl = fd2handle(fd);
+
+	T((T_CALLED("lib_win32conpty::_nc_console_flush(hdl=%p"), hdl));
+
+	if (hdl != INVALID_HANDLE_VALUE)
+	{
+		HANDLE hdlIn = GetStdHandle(STD_INPUT_HANDLE);
+		HANDLE hdlOut = GetStdHandle(STD_OUTPUT_HANDLE);
+		if (hdl == hdlIn)
+		{
+			if (!FlushConsoleInputBuffer(hdlIn))
+				code = ERR;
+		}
+		else if (hdl == hdlOut)
+		{
+			/* Flush output buffer - use FlushFileBuffers for proper VT processing */
+			if (!FlushFileBuffers(hdlOut))
+				code = ERR;
+		}
+		else
+		{
+			code = ERR;
+			T(("_nc_console_flush not requesting a handle owned by console."));
+		}
+	}
+	/* Note: This function works in both ConPTY and legacy console modes */
+	returnCode(code);
+}
+
+/* Verification macros for VT processing */
+#define VERIFY_VT_INPUT(hdl) \
+    do { \
+        DWORD _mode; \
+        if ((hdl) != INVALID_HANDLE_VALUE && GetConsoleMode((hdl), &_mode)) { \
+            assert((_mode & ENABLE_VIRTUAL_TERMINAL_INPUT) && "VT input processing not enabled"); \
+        } \
+    } while(0)
+
+#define VERIFY_VT_OUTPUT(hdl) \
+    do { \
+        DWORD _mode; \
+        if ((hdl) != INVALID_HANDLE_VALUE && GetConsoleMode((hdl), &_mode)) { \
+            assert((_mode & ENABLE_VIRTUAL_TERMINAL_PROCESSING) && "VT output processing not enabled"); \
+        } \
+    } while(0)
+
 NCURSES_EXPORT(DWORD)
 _nc_unix_to_win32_input_flags(DWORD dwFlags, const TTY *ttyflags)
 {
-	// ENABLE_VIRTUAL_TERMINAL_PROCESSING is for OUTPUT modes only, not input modes
-	// Native Windows rejects it in input modes (Error 87), unlike Wine
 	DWORD flags = ENABLE_MOUSE_INPUT | ENABLE_VIRTUAL_TERMINAL_INPUT;
 
 	// Raw mode disables most processing
 	if (!(ttyflags->c_lflag & RAW))
 	{
-		// Build flags based on Unix settings
 		if (ttyflags->c_lflag & ICANON)
 		{
 			flags |= ENABLE_LINE_INPUT;
 		}
-		// If neither ICANON nor RAW, it's implied CBREAK (no line input)
 		if (ttyflags->c_lflag & ISIG)
 		{
 			flags |= ENABLE_PROCESSED_INPUT;
@@ -66,13 +183,11 @@ _nc_unix_to_win32_input_flags(DWORD dwFlags, const TTY *ttyflags)
 		{
 			if (flags & ENABLE_LINE_INPUT)
 			{
-				// Canonical mode - echo works normally
 				flags |= ENABLE_ECHO_INPUT;
 			}
 			else
 			{
-				// Non-canonical mode - Windows doesn't support echo without line input
-				// Force line input to make echo work, effectively making it canonical
+				// Force line input to make echo work
 				flags |= ENABLE_LINE_INPUT | ENABLE_ECHO_INPUT;
 			}
 		}
@@ -81,44 +196,36 @@ _nc_unix_to_win32_input_flags(DWORD dwFlags, const TTY *ttyflags)
 	return flags;
 }
 
-static 
-void win32_to_unix_input_flags(DWORD dwFlags, TTY *ttyflags)
+static void win32_to_unix_input_flags(DWORD dwFlags, TTY *ttyflags)
 {
-	// Line input mode maps to canonical mode
 	if (dwFlags & ENABLE_LINE_INPUT)
 	{
 		ttyflags->c_lflag |= ICANON;
 	}
 	else
 	{
-		// No line input - determine if RAW or CBREAK based on processing flags
 		DWORD processing_flags = dwFlags & (ENABLE_PROCESSED_INPUT | ENABLE_ECHO_INPUT);
-		DWORD core_flags = dwFlags & ~(ENABLE_MOUSE_INPUT | ENABLE_VIRTUAL_TERMINAL_INPUT | ENABLE_VIRTUAL_TERMINAL_PROCESSING);
+		DWORD core_flags = dwFlags & ~(ENABLE_MOUSE_INPUT | ENABLE_VIRTUAL_TERMINAL_INPUT);
 
 		if (processing_flags != 0)
 		{
-			// Any processing flags present = CBREAK mode
 			ttyflags->c_lflag |= CBREAK;
 		}
 		else if (core_flags == 0)
 		{
-			// Only base flags (mouse, VT input, VT processing) = RAW mode
 			ttyflags->c_lflag |= RAW;
 		}
 		else
 		{
-			// Other combinations default to CBREAK
 			ttyflags->c_lflag |= CBREAK;
 		}
 	}
 
-	// Echo processing - only set if line input is also enabled
 	if ((dwFlags & ENABLE_ECHO_INPUT) && (dwFlags & ENABLE_LINE_INPUT))
 	{
 		ttyflags->c_lflag |= ECHO;
 	}
 
-	// Signal processing
 	if (dwFlags & ENABLE_PROCESSED_INPUT)
 	{
 		ttyflags->c_lflag |= ISIG;
@@ -128,347 +235,238 @@ void win32_to_unix_input_flags(DWORD dwFlags, TTY *ttyflags)
 NCURSES_EXPORT(DWORD) 
 _nc_unix_to_win32_output_flags(DWORD dwFlags, const TTY *ttyflags)
 {
-    // Always start with VT processing for ConPTY
-    DWORD flags = ENABLE_VIRTUAL_TERMINAL_PROCESSING;
+    /* Windows VT processing requires both flags to work properly */
+    DWORD flags = ENABLE_VIRTUAL_TERMINAL_PROCESSING | ENABLE_PROCESSED_OUTPUT;
 
-    // In Unix, ONLCR is an output flag (c_oflag). 
-    // If it's set, we need ENABLE_PROCESSED_OUTPUT.
-    if (ttyflags->c_lflag & ONLCR) {
-        flags |= ENABLE_PROCESSED_OUTPUT;
-    }
-
-    // If we are in RAW mode, we typically want to disable the auto-return
-    // to let the application control the cursor via VT sequences entirely.
     if (ttyflags->c_lflag & RAW) {
         flags |= DISABLE_NEWLINE_AUTO_RETURN;
     }
 
+    assert(flags & ENABLE_VIRTUAL_TERMINAL_PROCESSING);
     return flags;
 }
 
-static 
-void win32_to_unix_output_flags(DWORD dwFlags, TTY *ttyflags)
+static void win32_to_unix_output_flags(DWORD dwFlags, TTY *ttyflags)
 {
-	// Output processing affects newline translation
 	if (dwFlags & ENABLE_PROCESSED_OUTPUT)
 	{
 		ttyflags->c_lflag |= ONLCR;
 	}
-	// Don't set RAW based on output flags alone - that's determined by input flags
 }
-
-/* Convert a file descriptor into a HANDLE
-   That's not necessarily a console HANDLE
-*/
-NCURSES_EXPORT(HANDLE)
-_nc_console_handle(int fd)
-{
-	intptr_t value = _get_osfhandle(fd);
-	return (HANDLE)value;
-}
-
-NCURSES_EXPORT(HANDLE)
-_nc_console_fd2handle(int fd)
-{
-	HANDLE hdl = _nc_console_handle(fd);
-
-	if (fd == _fileno(stdin))
-	{
-		T(("lib_win32con:validateHandle %d -> stdin handle", fd));
-	}
-	else if (fd == _fileno(stdout))
-	{
-		T(("lib_win32con:validateHandle %d -> stdout handle", fd));
-	}
-	else
-	{
-		T(("lib_win32con:validateHandle %d maps to unknown fd", fd));
-	}
-	return hdl;
-}
-
+ 
 NCURSES_EXPORT(int)
 _nc_win32_tcsetattr(int fd, const TTY *arg)
 {
-	int code = ERR;
-	if (arg)
-	{
-		HANDLE console_hdl = INVALID_HANDLE_VALUE;
-		HANDLE stdin_hdl = GetStdHandle(STD_INPUT_HANDLE);
-		HANDLE stdout_hdl = GetStdHandle(STD_OUTPUT_HANDLE);
-		
-		// Try to get console handle from fd first
-		if (fd >= 0) {
-			HANDLE fdl = _nc_console_fd2handle(fd);
-			if (fdl != INVALID_HANDLE_VALUE) {
-				DWORD test_mode;
-				// Test if this handle refers to a console
-				if (GetConsoleMode(fdl, &test_mode)) {
-					console_hdl = fdl;  // Use this handle for both input/output
-				}
+	if (!arg) return ERR;
+	
+	HANDLE stdin_hdl = GetStdHandle(STD_INPUT_HANDLE);
+	HANDLE stdout_hdl = GetStdHandle(STD_OUTPUT_HANDLE);
+	HANDLE fd_hdl = INVALID_HANDLE_VALUE;
+	HandleType fd_type = NotKnown;
+	
+	// Get handle from fd
+	if (fd >= 0) {
+		fd_hdl = (HANDLE)_get_osfhandle(fd);
+		if (fd_hdl != INVALID_HANDLE_VALUE) {
+			DWORD test_mode;
+			if (GetConsoleMode(fd_hdl, &test_mode)) {
+				fd_type = classify_handle(fd_hdl);
 			}
 		}
-		
-		// Fall back to standard handles if fd doesn't refer to console
-		if (console_hdl == INVALID_HANDLE_VALUE) {
-			// Use standard handles as fallback (current behavior)
-			console_hdl = stdin_hdl;  // We'll apply modes to both handles
-		}
-
-		// Analyze input for special mode patterns and enhance if needed
-		TTY enhanced_tty = *arg;
-
-		// Enhance flags based on common patterns
-		if (!(enhanced_tty.c_lflag & (RAW | ICANON | CBREAK)))
-		{
-			// No explicit mode - add CBREAK for non-canonical behavior
-			enhanced_tty.c_lflag |= CBREAK;
-		}
-
-		// Convert Unix flags to Windows console modes
-		DWORD input_flags = _nc_unix_to_win32_input_flags(0, &enhanced_tty);
-		DWORD output_flags = _nc_unix_to_win32_output_flags(0, &enhanced_tty);
-
-		// Set console modes - try to use fd handle first, fall back to standard handles
-		bool input_ok = false, output_ok = false;
-		HANDLE used_input_hdl = INVALID_HANDLE_VALUE, used_output_hdl = INVALID_HANDLE_VALUE;
-		
-		if (console_hdl != INVALID_HANDLE_VALUE && console_hdl != stdin_hdl) {
-			// fd refers to a console - try to use it for input first
-			input_ok = SetConsoleMode(console_hdl, input_flags);
-			if (input_ok) {
-				used_input_hdl = console_hdl;
-			}
-			
-			// Try to use same handle for output
-			output_ok = SetConsoleMode(console_hdl, output_flags);
-			if (output_ok) {
-				used_output_hdl = console_hdl;
-			}
-		}
-		
-		// Fall back to standard handles if fd handle didn't work
-		if (!input_ok && stdin_hdl != INVALID_HANDLE_VALUE) {
-			input_ok = SetConsoleMode(stdin_hdl, input_flags);
-			if (input_ok) {
-				used_input_hdl = stdin_hdl;
-			}
-		}
-		
-		if (!output_ok && stdout_hdl != INVALID_HANDLE_VALUE) {
-			output_ok = SetConsoleMode(stdout_hdl, output_flags);
-			if (output_ok) {
-				used_output_hdl = stdout_hdl;
-			}
-		}
-
-		// Check for handle issues (not in console environment)
-		if (!input_ok || !output_ok)
-		{
-			DWORD error = GetLastError();
-						
-			if (error == 6)
-			{ // Invalid handle - not a console
-				// Simulate success for testing purposes
-				input_ok = output_ok = true;
-			}
-			else
-			{
-				// Other actual console mode errors - these might be invalid flag combinations
-				if (error == 87)
-				{ // Invalid parameter
-					T(("DEBUG: Invalid console mode combination detected for flags 0x%x\n", enhanced_tty.c_lflag));
-					// Try with base flags only
-					DWORD base_input = ENABLE_MOUSE_INPUT | ENABLE_VIRTUAL_TERMINAL_INPUT | ENABLE_VIRTUAL_TERMINAL_PROCESSING;
-					DWORD base_output = ENABLE_VIRTUAL_TERMINAL_PROCESSING;
-
-					if (SetConsoleMode(stdin_hdl, base_input) && SetConsoleMode(stdout_hdl, base_output))
-					{
-						input_flags = base_input;
-						output_flags = base_output;
-						input_ok = output_ok = true;
-						T(("DEBUG: Using base console modes instead\n"));
-					}
-				}
-				else
-				{
-					T(("DEBUG: Console mode setting failed - Input: 0x%lx (%s), Output: 0x%lx (%s)\n",
-					   input_flags, input_ok ? "OK" : "FAIL",
-					   output_flags, output_ok ? "OK" : "FAIL"));
-					T(("  Windows Error: %lu\n", error));
-				}
-			}
-		}
-
-		if (input_ok && output_ok)
-		{
-			// Store original intent and enhanced version
-			TTY effective_tty = enhanced_tty;
-
-			// Windows forces canonical mode when echo is used
-			if ((enhanced_tty.c_lflag & ECHO) && !(enhanced_tty.c_lflag & ICANON))
-			{
-				effective_tty.c_lflag &= ~(CBREAK | RAW); // Remove CBREAK/RAW
-				effective_tty.c_lflag |= ICANON;	  // Force canonical
-			}
-
-			// Store the effective mode (what Windows actually implements)
-			WINCONSOLE.ttyflags = effective_tty;
-			WINCONSOLE.original_intent = arg->c_lflag; // Keep original for tracking
-			WINCONSOLE.last_input_mode = input_flags;
-			WINCONSOLE.last_output_mode = output_flags;
-			
-			// Store which handles were actually used for tcgetattr
-			WINCONSOLE.used_input_handle = used_input_hdl;
-			WINCONSOLE.used_output_handle = used_output_hdl;
-			
-			// Analyze and track special mode combinations based on original intent
-			WINCONSOLE.explicitly_raw = (arg->c_lflag & RAW) != 0;
-			WINCONSOLE.explicitly_cbreak = (arg->c_lflag & CBREAK) != 0;
-			WINCONSOLE.echo_only_mode = (arg->c_lflag == ECHO);
-			WINCONSOLE.minimal_mode = (arg->c_lflag == 0);
-			WINCONSOLE.output_only_mode = (arg->c_lflag == ONLCR);
-
-			code = OK;
-		}
-		assert(_nc_stdout_is_conpty());
 	}
-	return (code);
+	
+	// Enhance flags
+	TTY enhanced_tty = *arg;
+	if (!(enhanced_tty.c_lflag & (RAW | ICANON | CBREAK))) {
+		enhanced_tty.c_lflag |= CBREAK;
+	}
+	
+	// Convert Unix flags to Windows console modes
+	DWORD input_flags = _nc_unix_to_win32_input_flags(0, &enhanced_tty);
+	DWORD output_flags = _nc_unix_to_win32_output_flags(0, &enhanced_tty);
+	
+	// Determine which handles to use based on classification
+	HANDLE input_target = INVALID_HANDLE_VALUE;
+	HANDLE output_target = INVALID_HANDLE_VALUE;
+	
+	if (fd_type == Input) {
+		input_target = fd_hdl;
+		output_target = stdout_hdl;
+	} else if (fd_type == Output) {
+		input_target = stdin_hdl;
+		output_target = fd_hdl;
+	} else {
+		input_target = stdin_hdl;
+		output_target = stdout_hdl;
+	}
+	
+	// Apply modes to appropriate handles
+	bool input_ok = false, output_ok = false;
+	
+	if (input_target != INVALID_HANDLE_VALUE) {
+		input_ok = SetConsoleMode(input_target, input_flags);
+		if (input_ok) {
+			WINCONSOLE.used_input_handle = input_target;
+			VERIFY_VT_INPUT(input_target);
+		}
+	}
+	
+	if (output_target != INVALID_HANDLE_VALUE) {
+		output_ok = SetConsoleMode(output_target, output_flags);
+		if (output_ok) {
+			WINCONSOLE.used_output_handle = output_target;
+			VERIFY_VT_OUTPUT(output_target);
+		}
+	}
+	
+	// Handle errors
+	if (!input_ok || !output_ok)
+	{
+		DWORD error = GetLastError();
+		
+		if (error == 6) {
+			// Not a console - simulate success for testing
+			input_ok = output_ok = true;
+		} else {
+			return ERR;
+		}
+	}
+	
+	if (input_ok && output_ok)
+	{
+		TTY effective_tty = enhanced_tty;
+		
+		// Windows forces canonical mode when echo is used
+		if ((enhanced_tty.c_lflag & ECHO) && !(enhanced_tty.c_lflag & ICANON))
+		{
+			effective_tty.c_lflag &= ~(CBREAK | RAW);
+			effective_tty.c_lflag |= ICANON;
+		}
+		
+		WINCONSOLE.ttyflags = effective_tty;
+		WINCONSOLE.original_intent = arg->c_lflag;
+		WINCONSOLE.last_input_mode = input_flags;
+		WINCONSOLE.last_output_mode = output_flags;
+		
+		WINCONSOLE.explicitly_raw = (arg->c_lflag & RAW) != 0;
+		WINCONSOLE.explicitly_cbreak = (arg->c_lflag & CBREAK) != 0;
+		
+		return OK;
+	}
+	
+	return ERR;
 }
 
 NCURSES_EXPORT(int)
 _nc_win32_tcgetattr(int fd, TTY *arg)
 {
-	int code = ERR;
+	if (!arg) return ERR;
 	
-	if (arg)
-	{
-		HANDLE console_hdl = INVALID_HANDLE_VALUE;
-		HANDLE stdin_hdl = GetStdHandle(STD_INPUT_HANDLE);
-		HANDLE stdout_hdl = GetStdHandle(STD_OUTPUT_HANDLE);
-		
-		// Try to get console handle from fd first
-		if (fd >= 0) {
-			HANDLE fdl = _nc_console_fd2handle(fd);
-			if (fdl != INVALID_HANDLE_VALUE) {
-				DWORD test_mode;
-				if (GetConsoleMode(fdl, &test_mode)) {
-					console_hdl = fdl;
-				}
+	HANDLE stdin_hdl = GetStdHandle(STD_INPUT_HANDLE);
+	HANDLE stdout_hdl = GetStdHandle(STD_OUTPUT_HANDLE);
+	HANDLE fd_hdl = INVALID_HANDLE_VALUE;
+	HandleType fd_type = NotKnown;
+	
+	// Classify fd handle
+	if (fd >= 0) {
+		fd_hdl = (HANDLE)_get_osfhandle(fd);
+		if (fd_hdl != INVALID_HANDLE_VALUE) {
+			DWORD test_mode;
+			if (GetConsoleMode(fd_hdl, &test_mode)) {
+				fd_type = classify_handle(fd_hdl);
 			}
-		}
-		
-		DWORD input_mode = 0, output_mode = 0;
-		bool got_input = false, got_output = false;
-		HANDLE input_hdl = INVALID_HANDLE_VALUE, output_hdl = INVALID_HANDLE_VALUE;
-		
-		// Strategy: Try fd handle first, then stored handles from tcsetattr, finally standard handles
-		
-		// 1. Try to use console handle from fd first
-		if (console_hdl != INVALID_HANDLE_VALUE && console_hdl != stdin_hdl) {
-			// Try to get input mode from fd handle
-			if (GetConsoleMode(console_hdl, &input_mode)) {
-				got_input = true;
-				input_hdl = console_hdl;
-			}
-			// Try to get output mode from same fd handle
-			if (GetConsoleMode(console_hdl, &output_mode)) {
-				got_output = true;
-				output_hdl = console_hdl;
-			}
-		}
-		
-		// 2. Fall back to handles that were actually used in tcsetattr
-		if (!got_input && WINCONSOLE.used_input_handle != INVALID_HANDLE_VALUE) {
-			if (GetConsoleMode(WINCONSOLE.used_input_handle, &input_mode)) {
-				got_input = true;
-				input_hdl = WINCONSOLE.used_input_handle;
-			}
-		}
-		
-		if (!got_output && WINCONSOLE.used_output_handle != INVALID_HANDLE_VALUE) {
-			if (GetConsoleMode(WINCONSOLE.used_output_handle, &output_mode)) {
-				got_output = true;
-				output_hdl = WINCONSOLE.used_output_handle;
-			}
-		}
-		
-		// 3. Final fallback to standard handles
-		if (!got_input && stdin_hdl != INVALID_HANDLE_VALUE) {
-			if (GetConsoleMode(stdin_hdl, &input_mode)) {
-				got_input = true;
-				input_hdl = stdin_hdl;
-			} else if (GetLastError() == 6) {
-				// Not a console - use cached mode
-				input_mode = WINCONSOLE.last_input_mode;
-				got_input = (input_mode != 0);
-				input_hdl = stdin_hdl;
-			}
-		}
-		
-		if (!got_output && stdout_hdl != INVALID_HANDLE_VALUE) {
-			if (GetConsoleMode(stdout_hdl, &output_mode)) {
-				got_output = true;
-				output_hdl = stdout_hdl;
-			} else if (GetLastError() == 6) {
-				// Not a console - use cached mode  
-				output_mode = WINCONSOLE.last_output_mode;
-				got_output = (output_mode != 0);
-				output_hdl = stdout_hdl;
-			}
-		}
-		
-		if (got_input || got_output)
-		{
-			// Use enhanced tracking for perfect round-trip consistency
-			if (WINCONSOLE.original_intent != 0 || WINCONSOLE.ttyflags.c_lflag != 0) {
-				// We have tracking data - return the enhanced flags
-				*arg = WINCONSOLE.ttyflags;
-				
-				// Verify console hasn't been changed externally
-				if ((got_input && input_mode != WINCONSOLE.last_input_mode) ||
-				    (got_output && output_mode != WINCONSOLE.last_output_mode)) {
-					// Console changed externally - rebuild but preserve special knowledge
-					TTY current_state;
-					memset(&current_state, 0, sizeof(current_state));
-					
-					if (got_input) {
-						win32_to_unix_input_flags(input_mode, &current_state);
-					}
-					if (got_output) {
-						win32_to_unix_output_flags(output_mode, &current_state);
-					}
-					
-					// Apply special mode knowledge from tracking
-					if (WINCONSOLE.explicitly_raw && !(current_state.c_lflag & ICANON)) {
-						current_state.c_lflag = (current_state.c_lflag & ~CBREAK) | RAW;
-					}
-					else if (WINCONSOLE.explicitly_cbreak && !(current_state.c_lflag & ICANON)) {
-						current_state.c_lflag = (current_state.c_lflag & ~RAW) | CBREAK;
-					}
-					
-					*arg = current_state;
-				}
-			} else {
-				// No tracking data - reconstruct from console state
-				memset(arg, 0, sizeof(*arg));
-				if (got_input) {
-					win32_to_unix_input_flags(input_mode, arg);
-				}
-				if (got_output) {
-					win32_to_unix_output_flags(output_mode, arg);
-				}
-			}			
-			code = OK;
-		}
-		else
-		{
-			// Fallback to cached value if we can't read console modes
-			*arg = WINCONSOLE.ttyflags;
-			code = OK;
 		}
 	}
-	return (code);
+	
+	// Determine which handles to query based on classification
+	HANDLE input_source = INVALID_HANDLE_VALUE;
+	HANDLE output_source = INVALID_HANDLE_VALUE;
+	
+	if (fd_type == Input) {
+		input_source = fd_hdl;
+		output_source = WINCONSOLE.used_output_handle != INVALID_HANDLE_VALUE 
+		               ? WINCONSOLE.used_output_handle : stdout_hdl;
+	} else if (fd_type == Output) {
+		input_source = WINCONSOLE.used_input_handle != INVALID_HANDLE_VALUE 
+		              ? WINCONSOLE.used_input_handle : stdin_hdl;
+		output_source = fd_hdl;
+	} else {
+		input_source = WINCONSOLE.used_input_handle != INVALID_HANDLE_VALUE 
+		              ? WINCONSOLE.used_input_handle : stdin_hdl;
+		output_source = WINCONSOLE.used_output_handle != INVALID_HANDLE_VALUE 
+		               ? WINCONSOLE.used_output_handle : stdout_hdl;
+	}
+	
+	DWORD input_mode = 0, output_mode = 0;
+	bool got_input = false, got_output = false;
+	
+	// Read modes from appropriate handles
+	if (input_source != INVALID_HANDLE_VALUE) {
+		got_input = GetConsoleMode(input_source, &input_mode);
+		if (!got_input && GetLastError() == 6) {
+			input_mode = WINCONSOLE.last_input_mode;
+			got_input = (input_mode != 0);
+		}
+	}
+	
+	if (output_source != INVALID_HANDLE_VALUE) {
+		got_output = GetConsoleMode(output_source, &output_mode);
+		if (!got_output && GetLastError() == 6) {
+			output_mode = WINCONSOLE.last_output_mode;
+			got_output = (output_mode != 0);
+		}
+	}
+	
+	// Verify VT processing is enabled
+	if (got_output) {
+		VERIFY_VT_OUTPUT(output_source);
+	}
+	if (got_input) {
+		VERIFY_VT_INPUT(input_source);
+	}
+	
+	// Reconstruct Unix flags
+	if (got_input || got_output) {
+		if (WINCONSOLE.original_intent != 0 || WINCONSOLE.ttyflags.c_lflag != 0) {
+			*arg = WINCONSOLE.ttyflags;
+			
+			// Verify console hasn't been changed externally
+			if ((got_input && input_mode != WINCONSOLE.last_input_mode) ||
+			    (got_output && output_mode != WINCONSOLE.last_output_mode)) {
+				TTY current_state;
+				memset(&current_state, 0, sizeof(current_state));
+				
+				if (got_input) {
+					win32_to_unix_input_flags(input_mode, &current_state);
+				}
+				if (got_output) {
+					win32_to_unix_output_flags(output_mode, &current_state);
+				}
+				
+				// Apply special mode knowledge from tracking
+				if (WINCONSOLE.explicitly_raw && !(current_state.c_lflag & ICANON)) {
+					current_state.c_lflag = (current_state.c_lflag & ~CBREAK) | RAW;
+				}
+				else if (WINCONSOLE.explicitly_cbreak && !(current_state.c_lflag & ICANON)) {
+					current_state.c_lflag = (current_state.c_lflag & ~RAW) | CBREAK;
+				}
+				
+				*arg = current_state;
+			}
+		} else {
+			memset(arg, 0, sizeof(*arg));
+			if (got_input) {
+				win32_to_unix_input_flags(input_mode, arg);
+			}
+			if (got_output) {
+				win32_to_unix_output_flags(output_mode, arg);
+			}
+		}
+		return OK;
+	}
+	
+	*arg = WINCONSOLE.ttyflags;
+	return OK;
 }
 
 #endif /* defined(USE_WIN32_CONPTY)) */

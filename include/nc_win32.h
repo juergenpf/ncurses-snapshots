@@ -97,7 +97,13 @@
    * Various Console mode definitions
    */
 
-  /* Default flags for input/output modes */
+  /*
+  * Masks for Console input and output modes  
+  */
+#define CONMODE_IN_MASK (ENABLE_PROCESSED_INPUT | ENABLE_LINE_INPUT | ENABLE_ECHO_INPUT | ENABLE_WINDOW_INPUT | ENABLE_MOUSE_INPUT | ENABLE_VIRTUAL_TERMINAL_INPUT)
+#define CONMODE_OUT_MASK (ENABLE_PROCESSED_OUTPUT | ENABLE_WRAP_AT_EOL_OUTPUT | ENABLE_VIRTUAL_TERMINAL_PROCESSING | DISABLE_NEWLINE_AUTO_RETURN | ENABLE_LVB_GRID_WORLDWIDE)   
+
+/* Default flags for input/output modes */
 #define CONMODE_IN_DEFAULT (ENABLE_VIRTUAL_TERMINAL_INPUT | ENABLE_LINE_INPUT | ENABLE_PROCESSED_INPUT | ENABLE_ECHO_INPUT | ENABLE_WINDOW_INPUT | ENABLE_MOUSE_INPUT)
 #define CONMODE_OUT_DEFAULT (ENABLE_VIRTUAL_TERMINAL_PROCESSING | ENABLE_PROCESSED_OUTPUT)
 
@@ -151,16 +157,13 @@ struct win32_termio {
 #define CON_NUMPAIRS 64
 typedef struct {
     BOOL initialized;
-    unsigned int conhost_flags;
-    struct win32_termio ttyflags;
+    unsigned int conhost_flags;    /* Host configuration flags */
+    struct win32_termio ttyflags;  /* Current Unix-like flags  */
 
     /* Extended tracking for Windows console limitations */
     unsigned int original_intent;  /* Original c_lflag as set by tcsetattr */
     BOOL explicitly_raw;           /* Was RAW mode explicitly requested? */
     BOOL explicitly_cbreak;        /* Was CBREAK mode explicitly requested? */
-    BOOL echo_only_mode;           /* ECHO without canonical or other flags? */
-    BOOL minimal_mode;             /* Zero flags mode? */
-    BOOL output_only_mode;         /* Only output processing requested? */
     
     /* Console mode state for verification */
     DWORD last_input_mode;         /* Last set input console mode */

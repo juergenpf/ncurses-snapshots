@@ -244,7 +244,9 @@ _nc_console_checkinit()
 
 		WINCONSOLE.ttyflags.c_lflag = 0;
 		SetConsoleMode(GetStdHandle(STD_INPUT_HANDLE), dwFlagIn);
+		WINCONSOLE.last_input_mode = dwFlagIn;
 		SetConsoleMode(GetStdHandle(STD_OUTPUT_HANDLE), dwFlagOut);
+		WINCONSOLE.last_output_mode = dwFlagOut;
 		_nc_win32_tcgetattr(_fileno(stdin), &WINCONSOLE.ttyflags);
 
 		if (GetStdHandle(STD_OUTPUT_HANDLE) != INVALID_HANDLE_VALUE)
@@ -535,31 +537,6 @@ _nc_stdout_is_conpty(void)
 	returnCode(result);
 }
 
-NCURSES_EXPORT(int)
-_nc_console_flush(void *hdl)
-{
-	int code = OK;
-
-	T((T_CALLED("lib_win32conpty::_nc_console_flush(hdl=%p"), hdl));
-
-	if (hdl != INVALID_HANDLE_VALUE)
-	{
-		HANDLE hdlIn = GetStdHandle(STD_INPUT_HANDLE);
-		HANDLE hdlOut = GetStdHandle(STD_OUTPUT_HANDLE);
-		if (hdl == hdlIn || hdl == hdlOut)
-		{
-			if (!FlushConsoleInputBuffer(hdlIn))
-				code = ERR;
-		}
-		else
-		{
-			code = ERR;
-			T(("_nc_console_flush not requesting a handle owned by console."));
-		}
-	}
-	assert(_nc_stdout_is_conpty());
-	returnCode(code);
-}
 
 #define MIN_WIDE 80
 #define MIN_HIGH 24
