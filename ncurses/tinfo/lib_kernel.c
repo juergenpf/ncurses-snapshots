@@ -157,7 +157,7 @@ flush_input(int fd)
     errno = 0;
     do {
 #if defined(USE_WIN32_CONPTY)
-	_nc_console_flush(_nc_console_fd2handle(fd));
+	_nc_console_flush(fd);
 #else
 	ioctl(fd, TIOCFLUSH, 0);
 #endif

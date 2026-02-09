@@ -34,35 +34,28 @@ This is work in progress, but it is in a state where one can see it
 works at least on the Windows Console.
 
 Before we dive into the details how to build and test ncurses for Windows, let
-me set expectations. Although Windows now for a while has a console subsystem 
-that accepts ANSI control sequences, there is one fundamental difference to most
-UNIX-like operating systems e.g. Linux. In Linux, when the console is in
-UTF-8 mode, the console handles the UTF-8 encoding for you if you send a
-non-ASCII character. This is not true on Windows. If the console is in UTF-8
-mode, it expects the application to send UTF-8 encoded character sequences. 
+me set expectations. The current MinGW based port to Windows has been started
+at a time, where virtual terminal processing and pseudo console wasn't
+available in Windows. Therefore we developed an alternative driver concept
+that could use other mechanisms than traditional terminfo to manipulate the
+terminal. For Windows we used the classical console API to directly manipulate
+the console screen buffer. 
 
-This fundamental difference in console behaviour has consequences for the 
-terminfo low level interface usage. As you know, terminfo is used to query
-the terminal capability database and to translate abstract requests into 
-concrete code to be send to the terminal, like doing cursor positioning,
-enabling/disabling character attributes like boldness etc. or sending
-sequences to clear the screen, insert or delete lines etc. - you get it.
-All this works with this Windows port on all Windows versions since
-10.0 Build 17763. The terminfo paradigm assumes, that everything else
-to be written to the console is done by standard library I/O routines.
-And this makes the use of terminfo not really portable to Windows, 
-because as said above, in Windows you have to take care of UTF-8 encoding
-yourself. There is no way to fix that easily.
+When virtual terminal became available, we decided to keep support for legacy
+Windows in the code and built support for virtual terminal support into that
+already exisitng codebase. This led to a mixture of code for the new and the 
+old world that suffers when it comes to readability, clarity of concept and 
+correctness. Our future plan is to drop legacy support and to only support 
+Windows versions with virtuale console and pseudo terminal support 
+(Windows 10.0 build 17763, released in 2018).
 
-Nevertheless is terminfo usable on Windows, it's just that it only works like
-on UNIX as long as you don't output something that requires multibyte UTF-8
-encoding. And of course all that is if you use --enable-widec when configuring
-the build. If you use --disable-widec and build a legacy non-unicode version of
-the library, everything should be compatible.
+In the legacy Windows code for versions oölder than the above mentioned, there is
+no terminfo support. We have just support for the classical ncurses, panel, menu
+and form library. This is important to notice, because there a some programs whole
+use and link against ncurses, but actually are using terminfo functionality. these
+programs won't run like expected on legacy Windows.
 
-In the layer above terminfo, the ncurses, panel, menu and form library we
-have full control over the output and can handle this issue, so these
-libraries are fully portable, even for Windows Versions before 10.0.17763!
+In current Windows version we have full support for terminfo.
 
 But now let's talk about building and testing the libraries.
 
@@ -148,10 +141,17 @@ hooks for interop, I recommend using these options:
 	--disable-home-terminfo
 	--enable-database
 	--disable-termcap
-	--enable-sp-funcs
+	--disable-sp-funcs
 	--enable-term-driver
 	--enable-named-pipes
 	--enable-interop
+
+One Remark: we use --disable-sp-funcs for Windows, because in Windows we always have
+exactly one Console in a process that we manipulate. There are no real other
+character devices. Ok, one might attach a terminal to a COM: port and want to
+talk to that using ncurses, but at least for the moment we don't support that. So
+there is no need for the sp functions which were designed to ease concurrent access
+from ncurses to multiple terminals from within one process.
 
 The following example demonstrates the configuration command line which I am using 
 at the moment, assuming you are in your ncurses source directory. I assume you have 
@@ -205,7 +205,7 @@ $ ../configure \
 	--disable-reentrant \
 	--without-pthread \
 	--enable-widec \
-	--enable-sp-funcs \
+	--disable-sp-funcs \
 	--enable-interop \
 	--with-debug \
 	--with-progs \

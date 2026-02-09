@@ -411,11 +411,6 @@ NCURSES_SP_NAME(_nc_setupscreen) (
 
 	T(("filter screensize %dx%d", slines, scolumns));
     }
-#if defined(USE_WIN32_CONPTY)
-    T(("setting output mode to binary"));
-    fflush(output);
-    _nc_setmode(fileno(output), false, true);
-#endif
     sp->_lines = (NCURSES_SIZE_T) slines;
     sp->_lines_avail = (NCURSES_SIZE_T) slines;
     sp->_columns = (NCURSES_SIZE_T) scolumns;
@@ -423,10 +418,6 @@ NCURSES_SP_NAME(_nc_setupscreen) (
     fflush(output);
     sp->_ofd = output ? fileno(output) : -1;
     sp->_ofp = output;
-#if defined(USE_WIN32_CONPTY)
-    if (output)
-	_nc_setmode(fileno(output), false, true);
-#endif
     sp->out_limit = (size_t) ((2 + slines) * (6 + scolumns));
     if ((sp->out_buffer = malloc(sp->out_limit)) == NULL)
 	sp->out_limit = 0;
@@ -641,6 +632,13 @@ NCURSES_SP_NAME(_nc_setupscreen) (
 
     sp->oldhash = NULL;
     sp->newhash = NULL;
+
+#if defined(USE_WIN32_CONPTY)
+    assert(NULL!= output);
+    // ConPTY can have exactly one console with output on stdout
+    assert(fileno(output)==STDOUT_FILENO);
+    // _nc_setmode(fileno(output), false, true); JPF
+#endif
 
     T(("creating newscr"));
     NewScreen(sp) = NCURSES_SP_NAME(newwin) (NCURSES_SP_ARGx slines, scolumns,

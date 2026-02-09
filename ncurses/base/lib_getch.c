@@ -48,6 +48,10 @@ MODULE_ID("$Id: lib_getch.c,v 1.154 2025/12/27 12:28:45 tom Exp $")
 
 #include <fifo_defs.h>
 
+#ifdef USE_WIN32_CONPTY
+#include <windows.h>
+#endif
+
 #if USE_REENTRANT
 #define GetEscdelay(sp) *_nc_ptr_Escdelay(sp)
 NCURSES_EXPORT(int)
@@ -149,18 +153,11 @@ check_mouse_activity(SCREEN *sp, int delay EVENTLIST_2nd(_nc_eventlist * evl))
     } else
 # endif
     {
-# if defined(USE_WIN32_CONPTY)
-	rc = _nc_console_testmouse(sp,
-				   _nc_console_handle(sp->_ifd),
-				   delay
-				   EVENTLIST_2nd(evl));
-# else
 	rc = _nc_timed_wait(sp,
 			    TWAIT_MASK,
 			    delay,
 			    (int *) 0
 			    EVENTLIST_2nd(evl));
-# endif
 # if USE_SYSMOUSE
 	if ((sp->_mouse_type == M_SYSMOUSE)
 	    && (sp->_sysmouse_head < sp->_sysmouse_tail)
@@ -187,7 +184,7 @@ static NCURSES_INLINE int
 fifo_pull(SCREEN *sp)
 {
     int ch = (head >= 0) ? sp->_fifo[head] : ERR;
-
+    
     TR(TRACE_IEVENT, ("pulling %s from %d", _nc_tracechar(sp, ch), head));
 
     if (peek == head) {
@@ -267,21 +264,16 @@ fifo_push(SCREEN *sp EVENTLIST_2nd(_nc_eventlist * evl))
 #endif
     {				/* Can block... */
 #if defined(USE_WIN32_CONPTY)
-	int buf;
-#endif
+	/* Use UTF-8 assembly for WIN32_CONPTY */
+	n = _nc_win32conpty_read(sp, &ch);
+#else
 	unsigned char c2 = 0;
 
 	_nc_set_read_thread(TRUE);
-#if defined(USE_WIN32_CONPTY)
-	n = _nc_console_read(sp,
-			     _nc_console_handle(sp->_ifd),
-			     &buf);
-	c2 = buf;
-#else
 	n = (int) read(sp->_ifd, &c2, (size_t) 1);
-#endif
 	_nc_set_read_thread(FALSE);
 	ch = c2;
+#endif
     }
 
     if ((n == -1) || (n == 0)) {
@@ -291,6 +283,7 @@ fifo_push(SCREEN *sp EVENTLIST_2nd(_nc_eventlist * evl))
     TR(TRACE_IEVENT, ("read %d characters", n));
 
     sp->_fifo[tail] = ch;
+    
     sp->_fifohold = 0;
     if (head == -1)
 	head = peek = tail;
@@ -404,6 +397,7 @@ _nc_wgetch(WINDOW *win,
     if (cooked_key_in_fifo()) {
 	recur_wrefresh(win);
 	*result = fifo_pull(sp);
+	
 	returnCode(*result >= KEY_MIN ? KEY_CODE_YES : OK);
     }
 #ifdef NCURSES_WGETCH_EVENTS
@@ -539,8 +533,38 @@ _nc_wgetch(WINDOW *win,
 	ch = fifo_pull(sp);
     }
 
+#if USE_WIN32_CONPTY
+    /* Check for console resize events after getting input */
+    if (_nc_console_check_resize()) {
+	/* Resize detected - preserve the triggering character */
+	safe_ungetch(sp, ch);
+    }
+#endif
+
+#if USE_SIZECHANGE
+    /* Always process pending SIGWINCH, not just on ERR */
+    if (_nc_handle_sigwinch(sp)) {
+	_nc_update_screensize(sp);
+	/* resizeterm can push KEY_RESIZE */
+	if (cooked_key_in_fifo()) {
+	    *result = fifo_pull(sp);
+	    /*
+	     * Get the ERR from queue -- it is from WINCH,
+	     * so we should take it out, the "error" is handled.
+	     */
+	    if (fifo_peek(sp) == -1)
+		fifo_pull(sp);
+	    returnCode(*result >= KEY_MIN ? KEY_CODE_YES : OK);
+	}
+    }
+#endif
+
     if (ch == ERR) {
       check_sigwinch:
+#if USE_WIN32_CONPTY
+	/* Check for console resize events before SIGWINCH handling */
+	_nc_console_check_resize();
+#endif
 #if USE_SIZECHANGE
 	if (_nc_handle_sigwinch(sp)) {
 	    _nc_update_screensize(sp);
@@ -636,6 +660,7 @@ wgetch(WINDOW *win)
 		      EVENTLIST_2nd((_nc_eventlist *) 0));
     if (code != ERR)
 	code = value;
+	
     returnCode(code);
 }
 

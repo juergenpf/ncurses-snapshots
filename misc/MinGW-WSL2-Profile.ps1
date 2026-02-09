@@ -69,6 +69,10 @@ function Test-NCurses {
     [string]$DefaultLocale="German_Germany.UTF-8"
     [string]$gdb=Get-MinGWGDBPath
 
+    if (-not (Test-Path -Path $target -PathType Container)) {
+        Write-Error "Test directory not found: $target"
+        return
+    }
     if (Test-Path -Path $ConfigLog -PathType Leaf) {
         $Legacy=Select-String -Path $ConfigLog -Pattern "--disable-widec" -Quiet
     }

@@ -85,11 +85,9 @@ _nc_initscr(NCURSES_SP_DCL0)
 #elif HAVE_SGTTY_H
 	buf.sg_flags &= ~(ECHO | CRMOD);
 #elif defined(USE_WIN32_CONPTY)
-	buf.dwFlagIn = CONMODE_IN_DEFAULT;
-	buf.dwFlagOut = CONMODE_OUT_DEFAULT | VT_FLAG_OUT;
-	if (WINCONSOLE.isTermInfoConsole) {
-	    buf.dwFlagIn |= VT_FLAG_IN;
-	}
+	buf.c_lflag &= (unsigned) ~(ECHO | ONLCR);
+	buf.c_lflag &= (unsigned) ~(ICANON | RAW | CBREAK);
+	buf.c_lflag |= ISIG;
 #else
 	memset(&buf, 0, sizeof(buf));
 #endif
@@ -323,10 +321,6 @@ NCURSES_SP_NAME(newterm) (NCURSES_SP_DCLx
 	    _nc_initscr(NCURSES_SP_ARG);
 
 	    _nc_signal_handler(TRUE);
-#if defined(USE_WIN32_CONPTY) || defined(_NC_WINDOWS_NATIVE)
-	    _nc_setmode(fileno(_ifp), true, true);
-    	    _nc_setmode(fileno(_ofp), false, true);
-#endif
 	    result = SP_PARM;
 	}
     }

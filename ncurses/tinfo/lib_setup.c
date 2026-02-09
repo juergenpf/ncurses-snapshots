@@ -650,6 +650,15 @@ _nc_update_screensize(SCREEN *sp)
 		 */
 		if (sp->_resize != NULL)
 		{
+#if defined(USE_WIN32_CONPTY)
+			/* On Windows ConPTY, always push KEY_RESIZE if SIGWINCH flag is set */
+			if (sp->_sig_winch && (sp->_ungetch != NULL)) {
+				sp->_ungetch(SP_PARM, KEY_RESIZE);
+			} else if ((new_lines != old_lines) || (new_cols != old_cols)) {
+				sp->_resize(NCURSES_SP_ARGx new_lines, new_cols);
+			}
+#else
+			/* Original Unix logic */
 			if ((new_lines != old_lines) || (new_cols != old_cols))
 			{
 				sp->_resize(NCURSES_SP_ARGx new_lines, new_cols);
@@ -658,6 +667,7 @@ _nc_update_screensize(SCREEN *sp)
 			{
 				sp->_ungetch(SP_PARM, KEY_RESIZE); /* so application can know this */
 			}
+#endif
 			sp->_sig_winch = FALSE;
 		}
 	}
@@ -882,10 +892,6 @@ TINFO_SETUP_TERM(TERMINAL **tp,
 
 	T(("your terminal name is %s", myname));
 
-#if defined(USE_WIN32_CONPTY) || defined(_NC_WINDOWS_NATIVE)
-		_nc_win32_encoding_init();
-#endif
-
 	/*
 	 * Allow output redirection.  This is what SVr3 does.  If stdout is
 	 * directed to a file, screen updates go to standard error.
@@ -1015,6 +1021,9 @@ TINFO_SETUP_TERM(TERMINAL **tp,
 	}
 
 	sp = SP;
+#if defined(USE_WIN32_CONPTY) || defined(_NC_WINDOWS_NATIVE)
+		_nc_console_checkinit();
+#endif
 
 	/*
 	 * We should always check the screensize, just in case.
