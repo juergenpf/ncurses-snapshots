@@ -32,9 +32,9 @@
  *     and: Thomas E. Dickey                                                *
  ****************************************************************************/
 
-#if defined(USE_WIN32_CONPTY)
 #include <curses.priv.h>
-#include <nc_win32.h>
+#if defined(_NC_WINDOWS_NATIVE)
+// #include <nc_win32.h>
 #include <locale.h>
 #include <stdio.h>
 #include <wchar.h>  /* For wide character functions */

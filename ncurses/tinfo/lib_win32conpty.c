@@ -32,15 +32,15 @@
  *     and: Thomas E. Dickey                                                *
  ****************************************************************************/
 
-#if defined(USE_WIN32_CONPTY)
 #include <curses.priv.h>
-#include <nc_win32.h>
+
+#if defined(_NC_WINDOWS_NATIVE)
 #include <locale.h>
 #include <stdio.h>
 #include <wchar.h>  /* For wide character functions */
 #include <string.h> /* For memset */
 
-#define CONTROL_PRESSED (LEFT_CTRL_PRESSED | RIGHT_CTRL_PRESSED)
+MODULE_ID("$Id$")
 
 /*   A process can only have a single console, so it is safe
 	 to maintain all the information about it in a single
@@ -226,7 +226,7 @@ conpty_supported(void)
 
 static bool console_initialized = FALSE;
 
-NCURSES_EXPORT(bool)
+NCURSES_EXPORT(BOOL)
 _nc_console_checkinit()
 {
 	bool res = FALSE;
@@ -394,7 +394,7 @@ static int last_console_cols = -1;
  * This provides SIGWINCH-like functionality for Windows ConPTY.
  * Returns TRUE if a resize was detected.
  */
-NCURSES_EXPORT(bool)
+NCURSES_EXPORT(BOOL)
 _nc_console_check_resize(void)
 {
 	int current_lines, current_cols;
@@ -464,7 +464,7 @@ _nc_console_size(int *Lines, int *Cols)
 }
 
 NCURSES_EXPORT(WORD)
-_nc_console_MapColor(bool fore, int color)
+_nc_console_MapColor(BOOL fore, int color)
 {
 	static const int _cmap[] =
 	    {0, 4, 2, 6, 1, 5, 3, 7};
@@ -485,7 +485,7 @@ _nc_console_MapColor(bool fore, int color)
  *   true  - stdout is in ConPTY mode (virtual terminal processing enabled)
  *   false - stdout is in legacy console mode or not a console at all
  */
-NCURSES_EXPORT(bool)
+NCURSES_EXPORT(BOOL)
 _nc_stdout_is_conpty(void)
 {
 	HANDLE stdout_handle;
@@ -541,7 +541,7 @@ _nc_stdout_is_conpty(void)
 #define MIN_WIDE 80
 #define MIN_HIGH 24
 
-NCURSES_EXPORT(bool)
+NCURSES_EXPORT(BOOL)
 _nc_console_get_SBI(void)
 {
 	bool rc = FALSE;

@@ -2087,7 +2087,6 @@ if test "x$with_named_pipes" = xyes ; then
 	case "$cf_cv_system_name" in
 	(*mingw32*|*mingw64*)
 		LIB_SUBSETS="${LIB_SUBSETS}+port_win32"
-		CPPFLAGS="$CPPFLAGS -DUSE_WIN32_CONPTY"
 		;;
 	(*)
 		;;
@@ -2529,6 +2528,7 @@ CF_LD_SEARCHPATH
 AC_CONFIG_FILES([\
 	include/MKterm.h.awk \
 	include/curses.head:include/curses.h.in \
+	include/nc_win32.h:include/nc_win32.h.in \
 	include/ncurses_dll.h \
 	include/termcap.h \
 	include/unctrl.h \
