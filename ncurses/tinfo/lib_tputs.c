@@ -261,9 +261,6 @@ NCURSES_SP_NAME(_nc_outch_ex)(NCURSES_SP_DCLx int ch)
 	int i;
 	char utf8[4];
 
-	if (WINCONSOLE.conhost_flags & NC_CONHOST_FLAG_ACCEPT_UNICODE) {
-		return NCURSES_SP_NAME(_nc_outch)(NCURSES_SP_ARGx ch);
-	}
 	COUNT_OUTCHARS(1);
 
 	/*

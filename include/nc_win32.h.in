@@ -64,11 +64,6 @@
 #  define WINVER 0x0600
 #endif
 
-#undef _NC_CHECK_MINTTY
-#if WINVER >= 0x0600
-#define _NC_CHECK_MINTTY
-#endif
-
 #include <windows.h>
 
 #if HAVE_SYS_TIME_H
@@ -152,9 +147,8 @@ struct win32_termio {
     unsigned char eof_char;   // EOF char (Ctrl+D)
 };
 
-#define NC_CONHOST_FLAG_ACCEPT_UNICODE 0x0001
-#define NC_CONHOST_FLAG_SUPPORT_EVENTS 0x0002
-#define NC_CONHOST_FLAG_MASK (NC_CONHOST_FLAG_ACCEPT_UNICODE | NC_CONHOST_FLAG_SUPPORT_EVENTS)
+#define NC_CONHOST_FLAG_SUPPORT_EVENTS 0x0001
+#define NC_CONHOST_FLAG_MASK (NC_CONHOST_FLAG_SUPPORT_EVENTS)
 
 #define CON_NUMPAIRS 64
 typedef struct {
