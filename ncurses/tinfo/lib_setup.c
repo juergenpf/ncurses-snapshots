@@ -289,7 +289,7 @@ use_tioctl(bool f)
 }
 #endif
 
-#if 1 || !defined(USE_WIN32_CONPTY) // JPF Check
+#if 1 || !(defined(_NC_WINDOWS_NATIVE) || defined(USE_WIN32_CONPTY)) // JPF Check
 static void
 _nc_default_screensize(TERMINAL *termp, int *linep, int *colp)
 {
@@ -434,7 +434,7 @@ _nc_check_screensize(SCREEN *sp, TERMINAL *termp, int *linep, int *colp)
 	int fd = termp->Filedes;
 	TTY saved;
 	const char *name = NULL;
-#if !defined(USE_WIN32_CONPTY) // JPF Check
+#if !(defined(_NC_WINDOWS_NATIVE) || defined(USE_WIN32_CONPTY)) // JPF Check
 	if (IsRealTty(fd, name) && VALID_STRING(cursor_address) && is_expected(user7, "6n") && (is_expected(user6, "%i%d;%dR") || is_expected(user6, "%i%p1%d;%p2%dR")) && GET_TTY(fd, &saved) == OK)
 	{
 		int current_y = -1, current_x = -1;
@@ -491,7 +491,7 @@ _nc_get_screensize(SCREEN *sp, int *linep, int *colp)
 	bool useTioctl = _nc_prescreen.use_tioctl;
 
 	T((T_CALLED("_nc_get_screensize (%p)"), (void *)sp));
-#if defined(USE_WIN32_CONPTY)
+#if defined(_NC_WINDOWS_NATIVE) || defined(USE_WIN32_CONPTY)
 	/* If we are here, then Windows console is used in terminfo mode.
 	   We need to figure out the size using the console API
 	 */

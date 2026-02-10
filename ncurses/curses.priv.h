@@ -311,7 +311,7 @@ extern NCURSES_EXPORT(void *) _nc_memmove (void *, const void *, size_t);
 /*
  * Options for terminal drivers, etc...
  */
-#define NO_TERMINAL 0 /* JPF check use */
+#define NO_TERMINAL 0
 
 #define VALID_TERM_ENV(term_env, no_terminal) \
 	(term_env = (NonEmpty(term_env) \
@@ -964,8 +964,6 @@ typedef int (*TYPE_Gpm_GetEvent) (Gpm_Event *);
 #define TRACECHR_BUF	40
 #define TRACEMSE_MAX	(80 + (5 * 10) + (32 * 15))
 #define TRACEMSE_FMT	"id %2d  at (%2d, %2d, %2d) state %4lx = {" /* } */
-
-#define INIT_TERM_DRIVER()	/* nothing JPF check use */
 
 extern NCURSES_EXPORT_VAR(NCURSES_GLOBALS) _nc_globals;
 
@@ -2474,15 +2472,7 @@ extern NCURSES_EXPORT(void)  _nc_console_DumpTitle(const char* title);
 	 && (value = ttyname(fd)) != NULL \
 	 && strncmp(value, "/dev/pts/", 9))
 
-/* JPF check use */
-#define IsTermInfo(sp)       TRUE
 #define HasTInfoTerminal(sp) (NULL != TerminalOf(sp))
-#if USE_NAMED_PIPES
-#  define IsTermInfoOnConsole(sp) _nc_console_test(TerminalOf(sp)->Filedes)
-#else
-#  define IsTermInfoOnConsole(sp) FALSE
-#endif
-
 #define IsValidTIScreen(sp)  (HasTInfoTerminal(sp))
 
 /*

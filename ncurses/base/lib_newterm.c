@@ -195,8 +195,6 @@ NCURSES_SP_NAME(newterm) (NCURSES_SP_DCLx
     current = CURRENT_SCREEN;
     its_term = (current ? current->_term : NULL);
 
-    INIT_TERM_DRIVER();
-
     /* this loads the capability entry, then sets LINES and COLS */
     if (
 	   TINFO_SETUP_TERM(&new_term, name,
