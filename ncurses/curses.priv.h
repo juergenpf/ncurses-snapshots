@@ -2443,19 +2443,19 @@ extern NCURSES_EXPORT(void)   _nc_get_screensize(SCREEN *, int *, int *);
 
 
 #if defined(USE_WIN32_CONPTY)
-extern NCURSES_EXPORT(void) _nc_setmode(int fd, bool isCurses);
-extern NCURSES_EXPORT(int)  _nc_win32_tcsetattr(int fd, const TTY* arg);
-extern NCURSES_EXPORT(int)  _nc_win32_tcgetattr(int fd, TTY*  arg);
-extern NCURSES_EXPORT(void) _nc_console_size(int *Lines, int *Cols);
-extern NCURSES_EXPORT(BOOL) _nc_console_check_resize(void);
+extern NCURSES_EXPORT(void)  _nc_setmode(int fd, bool isCurses);
+extern NCURSES_EXPORT(int)   _nc_win32_tcsetattr(int fd, const TTY* arg);
+extern NCURSES_EXPORT(int)   _nc_win32_tcgetattr(int fd, TTY*  arg);
+extern NCURSES_EXPORT(void)  _nc_console_size(int *Lines, int *Cols);
+extern NCURSES_EXPORT(BOOL)  _nc_console_check_resize(void);
 extern NCURSES_EXPORT(BOOL)  _nc_console_checkinit(void);
-extern NCURSES_EXPORT(WORD) _nc_console_MapColor(BOOL fore, int color);
-extern NCURSES_EXPORT(int)  _nc_console_flush(int fd);
-extern NCURSES_EXPORT(BOOL) _nc_console_get_SBI(void);
-extern NCURSES_EXPORT(BOOL) _nc_stdout_is_conpty(void);
+extern NCURSES_EXPORT(WORD)  _nc_console_MapColor(BOOL fore, int color);
+extern NCURSES_EXPORT(int)   _nc_console_flush(int fd);
+extern NCURSES_EXPORT(BOOL)  _nc_console_get_SBI(void);
+extern NCURSES_EXPORT(BOOL)  _nc_stdout_is_conpty(void);
 extern NCURSES_EXPORT(DWORD) _nc_unix_to_win32_output_flags(DWORD dwFlags, const TTY *ttyflags);
 extern NCURSES_EXPORT(DWORD) _nc_unix_to_win32_input_flags(DWORD dwFlags, const TTY *ttyflags);
-extern NCURSES_EXPORT(int) _nc_win32conpty_read(SCREEN *sp, int *result);
+extern NCURSES_EXPORT(int)   _nc_win32conpty_read(SCREEN *sp, int *result);
 #endif /* USE_WIN32_CONPTY */
 
 #define NC_ISATTY(fd) isatty(fd)
