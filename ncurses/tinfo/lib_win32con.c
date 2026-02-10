@@ -40,6 +40,7 @@
 #include <curses.priv.h>
 #include <nc_win32.h>
 #include <locale.h>
+#include <winternl.h>
 
 #ifndef _O_BINARY
 #define _O_BINARY 0 /* FIXME: not defined in MSYS2 base */
@@ -96,41 +97,59 @@ _nc_CONSOLE;
 
 #define EnsureInit() (void)(console_initialized ? TRUE : _nc_console_checkinit(USE_NAMED_PIPES))
 
-#define REQUIRED_MAX_V (DWORD)10
-#define REQUIRED_MIN_V (DWORD)0
+#define REQUIRED_MAJOR_V (DWORD)10
+#define REQUIRED_MINOR_V (DWORD)0
 #define REQUIRED_BUILD (DWORD)17763
 /*
   This function returns 0 if the Windows version has no support for
   the modern Console interface, otherwise it returns 1
  */
+
+typedef NTSTATUS (WINAPI *RtlGetVersionPtr)(PRTL_OSVERSIONINFOW);
+
+static bool get_real_windows_version(DWORD* major, DWORD* minor, DWORD* build) {
+    HMODULE ntdll = GetModuleHandle(TEXT("ntdll.dll"));
+    if (ntdll) {
+        RtlGetVersionPtr RtlGetVersion = (RtlGetVersionPtr)GetProcAddress(ntdll, "RtlGetVersion");
+        if (RtlGetVersion) {
+            RTL_OSVERSIONINFOW osvi = {0};
+            osvi.dwOSVersionInfoSize = sizeof(osvi);
+            if (RtlGetVersion(&osvi) == 0) {
+                *major = osvi.dwMajorVersion;
+                *minor = osvi.dwMinorVersion; 
+                *build = osvi.dwBuildNumber;
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
 NCURSES_EXPORT(int)
-_nc_console_vt_supported(void)
-{
-	OSVERSIONINFO osvi;
-	int res = 0;
+ _nc_console_vt_supported(void)
+ {
+        int res = 0;
+	DWORD major, minor, build;
 
-	T((T_CALLED("lib_win32con::_nc_console_vt_supported")));
-	ZeroMemory(&osvi, sizeof(OSVERSIONINFO));
-	osvi.dwOSVersionInfoSize = sizeof(OSVERSIONINFO);
-
-	GetVersionEx(&osvi);
-	T(("GetVersionEx returnedMajor=%lu, Minor=%lu, Build=%lu",
-	   (unsigned long)osvi.dwMajorVersion,
-	   (unsigned long)osvi.dwMinorVersion,
-	   (unsigned long)osvi.dwBuildNumber));
-	if (osvi.dwMajorVersion >= REQUIRED_MAX_V)
-	{
-		if (osvi.dwMajorVersion == REQUIRED_MAX_V)
-		{
-			if (((osvi.dwMinorVersion == REQUIRED_MIN_V) &&
-				 (osvi.dwBuildNumber >= REQUIRED_BUILD)) ||
-				((osvi.dwMinorVersion > REQUIRED_MIN_V)))
-				res = 1;
-		}
-		else
-			res = 1;
-	}
-	returnCode(res);
+        T((T_CALLED("lib_win32con::_nc_console_vt_supported")));
+ 
+ 	if (!get_real_windows_version(&major, &minor, &build)) {
+		T(("GetVersionEx failed"));
+	    	returnCode(0);
+	}	
+        if (major >= REQUIRED_MAJOR_V)
+        {
+                if (major == REQUIRED_MAJOR_V)
+                {
+                        if (((minor == REQUIRED_MINOR_V) &&
+                             (build >= REQUIRED_BUILD)) ||
+                            ((minor > REQUIRED_MINOR_V)))
+                                res = 1;
+                }
+                else
+                        res = 1;
+        }
+        returnCode(res);
 }
 
 NCURSES_EXPORT(void)
