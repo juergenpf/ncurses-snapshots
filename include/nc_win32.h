@@ -88,9 +88,7 @@
 #define VALID_TERM_ENV(term_env, no_terminal) \
 	(term_env = (NonEmpty(term_env) \
 		      ? term_env \
-		      : (_nc_console_vt_supported() \
-		         ? DEFAULT_TERM_ENV \
-		         : no_terminal)), \
+		      : DEFAULT_TERM_ENV), \
 	 NonEmpty(term_env))
 
   /*

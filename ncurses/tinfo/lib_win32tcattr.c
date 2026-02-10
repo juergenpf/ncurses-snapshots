@@ -40,6 +40,8 @@
 #include <wchar.h>  /* For wide character functions */
 #include <string.h> /* For memset */
 
+MODULE_ID("$Id$")
+
 #define CON_STDIN_HANDLE GetStdHandle(STD_INPUT_HANDLE)
 #define CON_STDOUT_HANDLE GetStdHandle(STD_OUTPUT_HANDLE)
 #define CON_STDERR_HANDLE GetStdHandle(STD_ERROR_HANDLE)

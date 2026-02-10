@@ -193,6 +193,37 @@ encoding_init(void)
 }
 
 
+#define REQUIRED_MAX_V (DWORD)10
+#define REQUIRED_MIN_V (DWORD)0
+#define REQUIRED_BUILD (DWORD)17763
+/*
+  This function returns 0 if the Windows version has no support for
+  the modern Console interface, otherwise it returns 1
+ */
+static bool
+conpty_supported(void)
+{
+	OSVERSIONINFOEX osvi = {0};
+	bool res = true;
+
+	T((T_CALLED("lib_win32conpty::_nc_console_vt_supported")));
+
+	osvi.dwOSVersionInfoSize = sizeof(osvi);
+    	osvi.dwMajorVersion = 10;
+    	osvi.dwMinorVersion = 0;
+    	osvi.dwBuildNumber = 17763; // Windows 10 version 1809
+    
+    	ULONGLONG conditionMask = 0;
+    	VER_SET_CONDITION(conditionMask, VER_MAJORVERSION, VER_GREATER_EQUAL);
+    	VER_SET_CONDITION(conditionMask, VER_MINORVERSION, VER_GREATER_EQUAL);
+    	VER_SET_CONDITION(conditionMask, VER_BUILDNUMBER, VER_GREATER_EQUAL);
+    
+    	res = VerifyVersionInfo(&osvi, 
+                        VER_MAJORVERSION | VER_MINORVERSION | VER_BUILDNUMBER,
+                        conditionMask);
+	returnBool(res);
+}
+
 static bool console_initialized = FALSE;
 
 NCURSES_EXPORT(bool)
@@ -205,6 +236,12 @@ _nc_console_checkinit()
 	/* initialize once, or not at all */
 	if (!console_initialized)
 	{
+		if (!conpty_supported())
+		{
+			T(("... Windows version does not support ConPTY"));
+			fprintf(stderr, "ncurses: Windows version does not support ConPTY\n");
+			abort;
+		}
 		int i;
 		DWORD num_buttons;
 		WORD a;
@@ -268,43 +305,6 @@ _nc_console_checkinit()
 	   console_initialized,
 	   check));
 	returnBool(res);
-}
-
-#define REQUIRED_MAX_V (DWORD)10
-#define REQUIRED_MIN_V (DWORD)0
-#define REQUIRED_BUILD (DWORD)17763
-/*
-  This function returns 0 if the Windows version has no support for
-  the modern Console interface, otherwise it returns 1
- */
-NCURSES_EXPORT(int)
-_nc_console_vt_supported(void)
-{
-	OSVERSIONINFO osvi;
-	int res = 0;
-
-	T((T_CALLED("lib_win32con::_nc_console_vt_supported")));
-	ZeroMemory(&osvi, sizeof(OSVERSIONINFO));
-	osvi.dwOSVersionInfoSize = sizeof(OSVERSIONINFO);
-
-	GetVersionEx(&osvi);
-	T(("GetVersionEx returnedMajor=%lu, Minor=%lu, Build=%lu",
-	   (unsigned long)osvi.dwMajorVersion,
-	   (unsigned long)osvi.dwMinorVersion,
-	   (unsigned long)osvi.dwBuildNumber));
-	if (osvi.dwMajorVersion >= REQUIRED_MAX_V)
-	{
-		if (osvi.dwMajorVersion == REQUIRED_MAX_V)
-		{
-			if (((osvi.dwMinorVersion == REQUIRED_MIN_V) &&
-			     (osvi.dwBuildNumber >= REQUIRED_BUILD)) ||
-			    ((osvi.dwMinorVersion > REQUIRED_MIN_V)))
-				res = 1;
-		}
-		else
-			res = 1;
-	}
-	returnCode(res);
 }
 
 /*   Our replacement for the systems _isatty to include also

@@ -2444,7 +2444,6 @@ extern NCURSES_EXPORT(void)   _nc_get_screensize(SCREEN *, int *, int *);
 
 #if defined(USE_WIN32_CONPTY)
 extern NCURSES_EXPORT(void) _nc_setmode(int fd, bool isCurses);
-extern NCURSES_EXPORT(int)  _nc_console_vt_supported(void);
 extern NCURSES_EXPORT(int)  _nc_console_isatty(int fd);
 extern NCURSES_EXPORT(int)  _nc_win32_tcsetattr(int fd, const TTY* arg);
 extern NCURSES_EXPORT(int)  _nc_win32_tcgetattr(int fd, TTY*  arg);
