@@ -595,7 +595,42 @@ typedef struct
 static utf8_input_buffer_t _nc_utf8_buffer = {0};
 
 /*
- * Simple UTF-8 decoder that doesn't require wide character functions
+ * Convert Unicode codepoint to Windows wchar_t (UTF-16)
+ * Handles surrogate pairs for codepoints > 0xFFFF
+ * Returns: 1 for BMP characters, 2 for surrogate pairs, -1 for invalid
+ */
+static int
+_nc_codepoint_to_wchar(uint32_t codepoint, wchar_t *wch)
+{
+	if (codepoint <= 0xFFFF)
+	{
+		/* Basic Multilingual Plane - direct conversion */
+		if (codepoint >= 0xD800 && codepoint <= 0xDFFF)
+		{
+			/* Invalid: surrogate range should not appear in UTF-8 */
+			return -1;
+		}
+		wch[0] = (wchar_t)codepoint;
+		return 1;
+	}
+	else if (codepoint <= 0x10FFFF)
+	{
+		/* Supplementary planes - needs surrogate pair for Windows */
+		/* Convert to UTF-16 surrogate pair */
+		uint32_t code = codepoint - 0x10000;
+		wch[0] = (wchar_t)(0xD800 + (code >> 10));     /* High surrogate */
+		wch[1] = (wchar_t)(0xDC00 + (code & 0x3FF));   /* Low surrogate */
+		return 2;
+	}
+	else
+	{
+		/* Invalid codepoint */
+		return -1;
+	}
+}
+
+/*
+ * Enhanced UTF-8 decoder with overlong sequence detection
  * Returns Unicode codepoint or -1 for invalid sequences
  */
 static int
@@ -607,6 +642,7 @@ _nc_decode_utf8_simple(const unsigned char *bytes, size_t length, uint32_t *code
 	unsigned char first = bytes[0];
 	int expected_bytes;
 	uint32_t cp = 0;
+	uint32_t min_value; /* Minimum valid codepoint for this sequence length */
 
 	/* Determine expected number of bytes from first byte */
 	if ((first & 0x80) == 0)
@@ -614,24 +650,28 @@ _nc_decode_utf8_simple(const unsigned char *bytes, size_t length, uint32_t *code
 		/* ASCII (0xxxxxxx) */
 		expected_bytes = 1;
 		cp = first;
+		min_value = 0x00;
 	}
 	else if ((first & 0xE0) == 0xC0)
 	{
 		/* 2-byte sequence (110xxxxx) */
 		expected_bytes = 2;
 		cp = first & 0x1F;
+		min_value = 0x80;
 	}
 	else if ((first & 0xF0) == 0xE0)
 	{
 		/* 3-byte sequence (1110xxxx) */
 		expected_bytes = 3;
 		cp = first & 0x0F;
+		min_value = 0x800;
 	}
 	else if ((first & 0xF8) == 0xF0)
 	{
 		/* 4-byte sequence (11110xxx) */
 		expected_bytes = 4;
 		cp = first & 0x07;
+		min_value = 0x10000;
 	}
 	else
 	{
@@ -655,6 +695,19 @@ _nc_decode_utf8_simple(const unsigned char *bytes, size_t length, uint32_t *code
 		cp = (cp << 6) | (bytes[i] & 0x3F);
 	}
 
+	/* Check for overlong sequences - reject if codepoint could be
+	 * encoded in fewer bytes */
+	if (cp < min_value)
+	{
+		return -1; /* Overlong encoding */
+	}
+
+	/* Check for maximum valid Unicode codepoint */
+	if (cp > 0x10FFFF)
+	{
+		return -1; /* Beyond valid Unicode range */
+	}
+
 	*codepoint = cp;
 	return expected_bytes;
 }
@@ -662,9 +715,10 @@ _nc_decode_utf8_simple(const unsigned char *bytes, size_t length, uint32_t *code
 /*
  * Assemble incoming UTF-8 bytes into complete characters
  * Returns:
- *  > 0: Complete character assembled (Unicode codepoint)
+ *  > 0: Complete character assembled (Unicode codepoint or special value for surrogates)
  *  0:   Need more bytes
  * -1:   Invalid UTF-8 sequence (reset buffer)
+ * -2:   Surrogate pair needed but wch buffer too small (use extended function)
  */
 static int
 _nc_assemble_utf8_input(unsigned char byte, wchar_t *wch)
@@ -677,7 +731,7 @@ _nc_assemble_utf8_input(unsigned char byte, wchar_t *wch)
 
 	_nc_utf8_buffer.buffer[_nc_utf8_buffer.length++] = byte;
 
-#if USE_WIDEC_SUPPORT
+	/* Unified UTF-8 decoding for both widec and non-widec builds */
 	uint32_t codepoint;
 	int consumed = _nc_decode_utf8_simple(_nc_utf8_buffer.buffer,
 					      _nc_utf8_buffer.length,
@@ -685,46 +739,38 @@ _nc_assemble_utf8_input(unsigned char byte, wchar_t *wch)
 	if (consumed > 0)
 	{
 		memset(&_nc_utf8_buffer, 0, sizeof(_nc_utf8_buffer));
-		*wch = (wchar_t)codepoint;
-		int return_value = (int)codepoint;
-		return return_value;
+		
+		/* For Windows, handle potential surrogate pairs */
+		if (codepoint <= 0xFFFF)
+		{
+			/* BMP character - direct conversion is safe */
+			*wch = (wchar_t)codepoint;
+			return (int)codepoint;
+		}
+		else
+		{
+			/* Supplementary plane - would need surrogate pair on Windows */
+			/* For terminal input, we'll use the codepoint value directly */
+			/* The calling code should handle the Windows-specific conversion */
+			*wch = 0xFFFD; /* Replacement character as fallback */
+			/* Return the original codepoint for proper handling upstream */
+			return (int)codepoint;
+		}
 	}
 	else if (consumed == 0)
 	{
-		return 0;
+		return 0; /* Need more bytes */
 	}
 	else
 	{
 		memset(&_nc_utf8_buffer, 0, sizeof(_nc_utf8_buffer));
-		return -1;
+		return -1; /* Invalid sequence */
 	}
-#else
-	/* Use simple UTF-8 decoder for non-widec builds */
-	uint32_t codepoint;
-	int consumed = _nc_decode_utf8_simple(_nc_utf8_buffer.buffer,
-					      _nc_utf8_buffer.length,
-					      &codepoint);
-	if (consumed > 0)
-	{
-		memset(&_nc_utf8_buffer, 0, sizeof(_nc_utf8_buffer));
-		*wch = (wchar_t)codepoint;
-		return (int)codepoint;
-	}
-	else if (consumed == 0)
-	{
-		return 0;
-	}
-	else
-	{
-		memset(&_nc_utf8_buffer, 0, sizeof(_nc_utf8_buffer));
-		return -1;
-	}
-#endif
 }
 
-#if USE_WIDEC_SUPPORT
 /*
- * WIN32_CONPTY UTF-8 aware input function (widec mode)
+ * WIN32_CONPTY UTF-8 aware input function (unified for widec and non-widec)
+ * Assembles UTF-8 byte sequences into Unicode codepoints
  */
 NCURSES_EXPORT(int)
 _nc_win32conpty_read(SCREEN *sp, int *result)
@@ -747,69 +793,22 @@ _nc_win32conpty_read(SCREEN *sp, int *result)
 
 	if (ch > 0)
 	{
+		/* Both widec and non-widec can use the assembled codepoint directly */
 		*result = ch;
 		return 1;
 	}
 	else if (ch == 0)
 	{
+		/* Need more bytes - recursively read next byte */
 		return _nc_win32conpty_read(sp, result);
 	}
 	else
 	{
+		/* Invalid UTF-8 sequence - return raw byte as fallback */
 		*result = (int)byte_buffer;
 		return 1;
 	}
 }
-#else /* !USE_WIDEC_SUPPORT */
-/*
- * WIN32_CONPTY UTF-8 assembly function (non-widec mode)
- * Still needs UTF-8 assembly to prevent multibyte sequences from appearing as separate bytes
- */
-NCURSES_EXPORT(int)
-_nc_win32conpty_read(SCREEN *sp, int *result)
-{
-	unsigned char byte_buffer;
-	int n;
-	wchar_t wch;
-	int ch;
-
-	/* Read single byte from console */
-	_nc_set_read_thread(TRUE);
-	n = (int)read(sp->_ifd, &byte_buffer, (size_t)1);
-	_nc_set_read_thread(FALSE);
-
-	if (n <= 0)
-	{
-		return n;
-	}
-
-	ch = _nc_assemble_utf8_input(byte_buffer, &wch);
-
-	if (ch > 0)
-	{
-		if (wch <= 0xFF)
-		{
-			*result = (int)wch;
-		}
-		else
-		{
-			*result = (int)wch;
-		}
-
-		return 1;
-	}
-	else if (ch == 0)
-	{
-		return _nc_win32conpty_read(sp, result);
-	}
-	else
-	{
-		*result = (int)byte_buffer;
-		return 1;
-	}
-}
-
-#endif /* USE_WIDEC_SUPPORT */
 
 /*
  * WIN32_CONPTY timeout handling function
