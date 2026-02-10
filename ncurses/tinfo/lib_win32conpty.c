@@ -331,28 +331,9 @@ _nc_console_checkinit()
 	returnBool(res);
 }
 
-/*   Our replacement for the systems _isatty to include also
-	 a test for mintty. This is called from the NC_ISATTY macro
-	 defined in curses.priv.h
-
-	 Return codes:
-	 - 0 : Not a TTY
-	 - 1 : A Windows character device detected by _isatty
-	 - 2 : A future implementation may return 2 for mintty
- */
-NCURSES_EXPORT(int)
-_nc_console_isatty(int fd)
-{
-	int result = 0;
-
-	T((T_CALLED("lib_win32conpty::_nc_console_isatty(%d"), fd));
-
-	if (isatty(fd))
-		result = 1;
-	returnCode(result);
-}
 
 // Handle UNIX-like signal characters in ConPTY mode
+// for future use with input processing and signal generation
 static void handle_signal_chars(wint_t ch)
 {
 	if (_nc_stdout_is_conpty())
@@ -382,8 +363,9 @@ static void handle_signal_chars(wint_t ch)
 	}
 }
 
-NCURSES_EXPORT(int)
-_nc_console_process_input(wint_t *ch)
+// for future use with input processing and signal generation
+static int
+process_input(wint_t *ch)
 {
 	TTY ttyflags;
 	_nc_win32_tcgetattr(stdin, &ttyflags);
