@@ -533,7 +533,7 @@ _nc_wgetch(WINDOW *win,
 	ch = fifo_pull(sp);
     }
 
-#if USE_WIN32_CONPTY
+#if defined(USE_WIN32_CONPTY)
     /* Check for console resize events after getting input */
     if (_nc_console_check_resize()) {
 	/* Resize detected - preserve the triggering character */
@@ -561,7 +561,7 @@ _nc_wgetch(WINDOW *win,
 
     if (ch == ERR) {
       check_sigwinch:
-#if USE_WIN32_CONPTY
+#if defined(USE_WIN32_CONPTY)
 	/* Check for console resize events before SIGWINCH handling */
 	_nc_console_check_resize();
 #endif

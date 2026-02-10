@@ -32,15 +32,16 @@
  *     and: Thomas E. Dickey                                                *
  ****************************************************************************/
 
-#if defined(USE_WIN32_CONPTY)
 #include <curses.priv.h>
-#include <nc_win32.h>
+
+#if defined(_NC_WINDOWS_NATIVE)
 #include <locale.h>
 #include <stdio.h>
 #include <wchar.h>  /* For wide character functions */
 #include <string.h> /* For memset */
+#include <winternl.h>
 
-#define CONTROL_PRESSED (LEFT_CTRL_PRESSED | RIGHT_CTRL_PRESSED)
+MODULE_ID("$Id$")
 
 /*   A process can only have a single console, so it is safe
 	 to maintain all the information about it in a single
@@ -192,10 +193,63 @@ encoding_init(void)
 	_nc_setmode(_fileno(stdout), false);
 }
 
+#define REQUIRED_MAJOR_V (DWORD)10
+#define REQUIRED_MINOR_V (DWORD)0
+#define REQUIRED_BUILD (DWORD)17763
+/*
+  This function returns 0 if the Windows version has no support for
+  the modern Console interface, otherwise it returns 1
+ */
+
+typedef NTSTATUS (WINAPI *RtlGetVersionPtr)(PRTL_OSVERSIONINFOW);
+
+static bool get_real_windows_version(DWORD* major, DWORD* minor, DWORD* build) {
+    HMODULE ntdll = GetModuleHandle(TEXT("ntdll.dll"));
+    if (ntdll) {
+        RtlGetVersionPtr RtlGetVersion = (RtlGetVersionPtr)GetProcAddress(ntdll, "RtlGetVersion");
+        if (RtlGetVersion) {
+            RTL_OSVERSIONINFOW osvi = {0};
+            osvi.dwOSVersionInfoSize = sizeof(osvi);
+            if (RtlGetVersion(&osvi) == 0) {
+                *major = osvi.dwMajorVersion;
+                *minor = osvi.dwMinorVersion; 
+                *build = osvi.dwBuildNumber;
+                return true;
+            }
+        }
+    }
+    return false;
+}
+static BOOL
+conpty_supported(void)
+ {
+        int res = FALSE;
+	DWORD major, minor, build;
+
+        T((T_CALLED("lib_win32conpty::conpty_supported")));
+ 
+ 	if (!get_real_windows_version(&major, &minor, &build)) {
+		T(("GetVersionEx failed"));
+	    	returnBool(FALSE);
+	}	
+        if (major >= REQUIRED_MAJOR_V)
+        {
+                if (major == REQUIRED_MAJOR_V)
+                {
+                        if (((minor == REQUIRED_MINOR_V) &&
+                             (build >= REQUIRED_BUILD)) ||
+                            ((minor > REQUIRED_MINOR_V)))
+                                res = TRUE;
+                }
+                else
+                        res = TRUE;
+        }
+        returnBool(res);
+}
 
 static bool console_initialized = FALSE;
 
-NCURSES_EXPORT(bool)
+NCURSES_EXPORT(BOOL)
 _nc_console_checkinit()
 {
 	bool res = FALSE;
@@ -205,6 +259,13 @@ _nc_console_checkinit()
 	/* initialize once, or not at all */
 	if (!console_initialized)
 	{
+		if (!conpty_supported())	
+		{
+			T(("Windows version does not support ConPTY"));
+			fprintf(stderr,"ncurses: Windows version does not support ConPTY\n");
+			exit(1);
+		}
+		
 		int i;
 		DWORD num_buttons;
 		WORD a;
@@ -268,43 +329,6 @@ _nc_console_checkinit()
 	   console_initialized,
 	   check));
 	returnBool(res);
-}
-
-#define REQUIRED_MAX_V (DWORD)10
-#define REQUIRED_MIN_V (DWORD)0
-#define REQUIRED_BUILD (DWORD)17763
-/*
-  This function returns 0 if the Windows version has no support for
-  the modern Console interface, otherwise it returns 1
- */
-NCURSES_EXPORT(int)
-_nc_console_vt_supported(void)
-{
-	OSVERSIONINFO osvi;
-	int res = 0;
-
-	T((T_CALLED("lib_win32con::_nc_console_vt_supported")));
-	ZeroMemory(&osvi, sizeof(OSVERSIONINFO));
-	osvi.dwOSVersionInfoSize = sizeof(OSVERSIONINFO);
-
-	GetVersionEx(&osvi);
-	T(("GetVersionEx returnedMajor=%lu, Minor=%lu, Build=%lu",
-	   (unsigned long)osvi.dwMajorVersion,
-	   (unsigned long)osvi.dwMinorVersion,
-	   (unsigned long)osvi.dwBuildNumber));
-	if (osvi.dwMajorVersion >= REQUIRED_MAX_V)
-	{
-		if (osvi.dwMajorVersion == REQUIRED_MAX_V)
-		{
-			if (((osvi.dwMinorVersion == REQUIRED_MIN_V) &&
-			     (osvi.dwBuildNumber >= REQUIRED_BUILD)) ||
-			    ((osvi.dwMinorVersion > REQUIRED_MIN_V)))
-				res = 1;
-		}
-		else
-			res = 1;
-	}
-	returnCode(res);
 }
 
 /*   Our replacement for the systems _isatty to include also
@@ -394,7 +418,7 @@ static int last_console_cols = -1;
  * This provides SIGWINCH-like functionality for Windows ConPTY.
  * Returns TRUE if a resize was detected.
  */
-NCURSES_EXPORT(bool)
+NCURSES_EXPORT(BOOL)
 _nc_console_check_resize(void)
 {
 	int current_lines, current_cols;
@@ -464,7 +488,7 @@ _nc_console_size(int *Lines, int *Cols)
 }
 
 NCURSES_EXPORT(WORD)
-_nc_console_MapColor(bool fore, int color)
+_nc_console_MapColor(BOOL fore, int color)
 {
 	static const int _cmap[] =
 	    {0, 4, 2, 6, 1, 5, 3, 7};
@@ -485,7 +509,7 @@ _nc_console_MapColor(bool fore, int color)
  *   true  - stdout is in ConPTY mode (virtual terminal processing enabled)
  *   false - stdout is in legacy console mode or not a console at all
  */
-NCURSES_EXPORT(bool)
+NCURSES_EXPORT(BOOL)
 _nc_stdout_is_conpty(void)
 {
 	HANDLE stdout_handle;
@@ -541,7 +565,7 @@ _nc_stdout_is_conpty(void)
 #define MIN_WIDE 80
 #define MIN_HIGH 24
 
-NCURSES_EXPORT(bool)
+NCURSES_EXPORT(BOOL)
 _nc_console_get_SBI(void)
 {
 	bool rc = FALSE;

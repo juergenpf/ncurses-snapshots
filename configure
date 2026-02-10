@@ -28234,7 +28234,6 @@ if test "x$with_named_pipes" = xyes ; then
 	case "$cf_cv_system_name" in
 	(*mingw32*|*mingw64*)
 		LIB_SUBSETS="${LIB_SUBSETS}+port_win32"
-		CPPFLAGS="$CPPFLAGS -DUSE_WIN32_CONPTY"
 		;;
 	(*)
 		;;
@@ -28244,7 +28243,7 @@ fi
 test "x$with_widec"     = xyes && LIB_SUBSETS="${LIB_SUBSETS}+widechar"
 test "x$with_ext_funcs" = xyes && LIB_SUBSETS="${LIB_SUBSETS}+ext_funcs"
 
-echo "$as_me:28247: result: $LIB_SUBSETS" >&5
+echo "$as_me:28246: result: $LIB_SUBSETS" >&5
 echo "${ECHO_T}$LIB_SUBSETS" >&6
 
 ### Construct the list of include-directories to be generated
@@ -28275,7 +28274,7 @@ elif test "$includedir" != "/usr/include"; then
 fi
 
 ### Build up pieces for makefile rules
-echo "$as_me:28278: checking default library suffix" >&5
+echo "$as_me:28277: checking default library suffix" >&5
 echo $ECHO_N "checking default library suffix... $ECHO_C" >&6
 
 	case $DFT_LWR_MODEL in
@@ -28286,10 +28285,10 @@ echo $ECHO_N "checking default library suffix... $ECHO_C" >&6
 	(shared)  DFT_ARG_SUFFIX=''   ;;
 	esac
 	test -n "$LIB_SUFFIX" && DFT_ARG_SUFFIX="${LIB_SUFFIX}${DFT_ARG_SUFFIX}"
-echo "$as_me:28289: result: $DFT_ARG_SUFFIX" >&5
+echo "$as_me:28288: result: $DFT_ARG_SUFFIX" >&5
 echo "${ECHO_T}$DFT_ARG_SUFFIX" >&6
 
-echo "$as_me:28292: checking default library-dependency suffix" >&5
+echo "$as_me:28291: checking default library-dependency suffix" >&5
 echo $ECHO_N "checking default library-dependency suffix... $ECHO_C" >&6
 
 	case X$DFT_LWR_MODEL in
@@ -28372,10 +28371,10 @@ echo $ECHO_N "checking default library-dependency suffix... $ECHO_C" >&6
 		DFT_LIB_SUFFIX="${LIB_SUFFIX}${EXTRA_SUFFIX}${DFT_LIB_SUFFIX}"
 		DFT_DEP_SUFFIX="${LIB_SUFFIX}${EXTRA_SUFFIX}${DFT_DEP_SUFFIX}"
 	fi
-echo "$as_me:28375: result: $DFT_DEP_SUFFIX" >&5
+echo "$as_me:28374: result: $DFT_DEP_SUFFIX" >&5
 echo "${ECHO_T}$DFT_DEP_SUFFIX" >&6
 
-echo "$as_me:28378: checking default object directory" >&5
+echo "$as_me:28377: checking default object directory" >&5
 echo $ECHO_N "checking default object directory... $ECHO_C" >&6
 
 	case $DFT_LWR_MODEL in
@@ -28391,11 +28390,11 @@ echo $ECHO_N "checking default object directory... $ECHO_C" >&6
 			DFT_OBJ_SUBDIR='obj_s' ;;
 		esac
 	esac
-echo "$as_me:28394: result: $DFT_OBJ_SUBDIR" >&5
+echo "$as_me:28393: result: $DFT_OBJ_SUBDIR" >&5
 echo "${ECHO_T}$DFT_OBJ_SUBDIR" >&6
 
 if test "x$cf_with_cxx" = xyes ; then
-echo "$as_me:28398: checking c++ library-dependency suffix" >&5
+echo "$as_me:28397: checking c++ library-dependency suffix" >&5
 echo $ECHO_N "checking c++ library-dependency suffix... $ECHO_C" >&6
 if test "$with_libtool" != "no"; then
 	# libtool thinks it can make c++ shared libraries (perhaps only g++)
@@ -28488,7 +28487,7 @@ else
 	fi
 
 fi
-echo "$as_me:28491: result: $CXX_LIB_SUFFIX" >&5
+echo "$as_me:28490: result: $CXX_LIB_SUFFIX" >&5
 echo "${ECHO_T}$CXX_LIB_SUFFIX" >&6
 
 fi
@@ -28658,19 +28657,19 @@ fi
 
 if test -n "$LDFLAGS_STATIC" && test -n "$LDFLAGS_SHARED"
 then
-	echo "$as_me:28661: checking if linker supports switching between static/dynamic" >&5
+	echo "$as_me:28660: checking if linker supports switching between static/dynamic" >&5
 echo $ECHO_N "checking if linker supports switching between static/dynamic... $ECHO_C" >&6
 
 	rm -f libconftest.a
 	cat >conftest.$ac_ext <<EOF
-#line 28666 "configure"
+#line 28665 "configure"
 #include <stdio.h>
 int cf_ldflags_static(FILE *fp) { return fflush(fp); }
 EOF
-	if { (eval echo "$as_me:28670: \"$ac_compile\"") >&5
+	if { (eval echo "$as_me:28669: \"$ac_compile\"") >&5
   (eval $ac_compile) 2>&5
   ac_status=$?
-  echo "$as_me:28673: \$? = $ac_status" >&5
+  echo "$as_me:28672: \$? = $ac_status" >&5
   (exit "$ac_status"); } ; then
 		( $AR $ARFLAGS libconftest.a conftest.$OBJEXT ) 2>&5 1>/dev/null
 		( eval $RANLIB libconftest.a ) 2>&5 >/dev/null
@@ -28681,10 +28680,10 @@ EOF
 
 	LIBS="$LDFLAGS_STATIC -L`pwd` -lconftest $LDFLAGS_DYNAMIC $LIBS"
 	cat >"conftest.$ac_ext" <<_ACEOF
-#line 28684 "configure"
+#line 28683 "configure"
 #include "confdefs.h"
 
-#line 28687 "configure"
+#line 28686 "configure"
 #include <stdio.h>
 int cf_ldflags_static(FILE *fp);
 
@@ -28699,16 +28698,16 @@ main (void)
 }
 _ACEOF
 rm -f "conftest.$ac_objext" "conftest$ac_exeext"
-if { (eval echo "$as_me:28702: \"$ac_link\"") >&5
+if { (eval echo "$as_me:28701: \"$ac_link\"") >&5
   (eval $ac_link) 2>&5
   ac_status=$?
-  echo "$as_me:28705: \$? = $ac_status" >&5
+  echo "$as_me:28704: \$? = $ac_status" >&5
   (exit "$ac_status"); } &&
          { ac_try='test -s "conftest$ac_exeext"'
-  { (eval echo "$as_me:28708: \"$ac_try\"") >&5
+  { (eval echo "$as_me:28707: \"$ac_try\"") >&5
   (eval $ac_try) 2>&5
   ac_status=$?
-  echo "$as_me:28711: \$? = $ac_status" >&5
+  echo "$as_me:28710: \$? = $ac_status" >&5
   (exit "$ac_status"); }; }; then
 
 	# some linkers simply ignore the -dynamic
@@ -28731,7 +28730,7 @@ rm -f "conftest.$ac_objext" "conftest$ac_exeext" "conftest.$ac_ext"
 	rm -f libconftest.*
 	LIBS="$cf_save_LIBS"
 
-	echo "$as_me:28734: result: $cf_ldflags_static" >&5
+	echo "$as_me:28733: result: $cf_ldflags_static" >&5
 echo "${ECHO_T}$cf_ldflags_static" >&6
 
 	if test "$cf_ldflags_static" != yes
@@ -28747,7 +28746,7 @@ fi
 	;;
 esac
 
-echo "$as_me:28750: checking where we will install curses.h" >&5
+echo "$as_me:28749: checking where we will install curses.h" >&5
 echo $ECHO_N "checking where we will install curses.h... $ECHO_C" >&6
 
 includesubdir=
@@ -28757,7 +28756,7 @@ if test "$with_overwrite" = no && \
 then
 	includesubdir="/ncurses${ABI_SUFFIX}"
 fi
-echo "$as_me:28760: result: ${includedir}${includesubdir}" >&5
+echo "$as_me:28759: result: ${includedir}${includesubdir}" >&5
 echo "${ECHO_T}${includedir}${includesubdir}" >&6
 
 ### Resolve a conflict between normal and wide-curses by forcing applications
@@ -28765,7 +28764,7 @@ echo "${ECHO_T}${includedir}${includesubdir}" >&6
 if test "$with_overwrite" != no ; then
 if test "$NCURSES_LIBUTF8" = 1 ; then
 	NCURSES_LIBUTF8='defined(HAVE_LIBUTF8_H)'
-	{ echo "$as_me:28768: WARNING: Wide-character applications must define HAVE_LIBUTF8_H to include curses.h" >&5
+	{ echo "$as_me:28767: WARNING: Wide-character applications must define HAVE_LIBUTF8_H to include curses.h" >&5
 echo "$as_me: WARNING: Wide-character applications must define HAVE_LIBUTF8_H to include curses.h" >&2;}
 fi
 fi
@@ -28790,7 +28789,7 @@ EOF
 
 # pkgsrc uses these
 
-echo "$as_me:28793: checking for desired basename for form library" >&5
+echo "$as_me:28792: checking for desired basename for form library" >&5
 echo $ECHO_N "checking for desired basename for form library... $ECHO_C" >&6
 
 # Check whether --with-form-libname or --without-form-libname was given.
@@ -28810,10 +28809,10 @@ case "x$FORM_NAME" in
 	;;
 esac
 
-echo "$as_me:28813: result: $FORM_NAME" >&5
+echo "$as_me:28812: result: $FORM_NAME" >&5
 echo "${ECHO_T}$FORM_NAME" >&6
 
-echo "$as_me:28816: checking for desired basename for menu library" >&5
+echo "$as_me:28815: checking for desired basename for menu library" >&5
 echo $ECHO_N "checking for desired basename for menu library... $ECHO_C" >&6
 
 # Check whether --with-menu-libname or --without-menu-libname was given.
@@ -28833,10 +28832,10 @@ case "x$MENU_NAME" in
 	;;
 esac
 
-echo "$as_me:28836: result: $MENU_NAME" >&5
+echo "$as_me:28835: result: $MENU_NAME" >&5
 echo "${ECHO_T}$MENU_NAME" >&6
 
-echo "$as_me:28839: checking for desired basename for panel library" >&5
+echo "$as_me:28838: checking for desired basename for panel library" >&5
 echo $ECHO_N "checking for desired basename for panel library... $ECHO_C" >&6
 
 # Check whether --with-panel-libname or --without-panel-libname was given.
@@ -28856,10 +28855,10 @@ case "x$PANEL_NAME" in
 	;;
 esac
 
-echo "$as_me:28859: result: $PANEL_NAME" >&5
+echo "$as_me:28858: result: $PANEL_NAME" >&5
 echo "${ECHO_T}$PANEL_NAME" >&6
 
-echo "$as_me:28862: checking for desired basename for cxx library" >&5
+echo "$as_me:28861: checking for desired basename for cxx library" >&5
 echo $ECHO_N "checking for desired basename for cxx library... $ECHO_C" >&6
 
 # Check whether --with-cxx-libname or --without-cxx-libname was given.
@@ -28879,13 +28878,13 @@ case "x$CXX_NAME" in
 	;;
 esac
 
-echo "$as_me:28882: result: $CXX_NAME" >&5
+echo "$as_me:28881: result: $CXX_NAME" >&5
 echo "${ECHO_T}$CXX_NAME" >&6
 
 ### Construct the list of subdirectories for which we'll customize makefiles
 ### with the appropriate compile-rules.
 
-echo "$as_me:28888: checking for src modules" >&5
+echo "$as_me:28887: checking for src modules" >&5
 echo $ECHO_N "checking for src modules... $ECHO_C" >&6
 
 # dependencies and linker-arguments for test-programs
@@ -28944,7 +28943,7 @@ eval TEST_ROOT="\$${cf_map_lib_basename}_NAME"
 		fi
 	fi
 done
-echo "$as_me:28947: result: $cf_cv_src_modules" >&5
+echo "$as_me:28946: result: $cf_cv_src_modules" >&5
 echo "${ECHO_T}$cf_cv_src_modules" >&6
 
 TEST_ARGS="-L${LIB_DIR} $TEST_ARGS"
@@ -29083,7 +29082,7 @@ case "x${ac_cv_header_termios_h}${ac_cv_header_termio_h}${ac_cv_header_sgtty_h}$
 	(*mingw32*|*mingw64*|*-msvc*)
 		;;
 	(*)
-		{ { echo "$as_me:29086: error: No termio/termios/sgtty found" >&5
+		{ { echo "$as_me:29085: error: No termio/termios/sgtty found" >&5
 echo "$as_me: error: No termio/termios/sgtty found" >&2;}
    { (exit 1); exit 1; }; }
 		;;
@@ -29095,7 +29094,7 @@ esac
 
 # Extract the first word of "tbl", so it can be a program name with args.
 set dummy tbl; ac_word=$2
-echo "$as_me:29098: checking for $ac_word" >&5
+echo "$as_me:29097: checking for $ac_word" >&5
 echo $ECHO_N "checking for $ac_word... $ECHO_C" >&6
 if test "${ac_cv_path_NROFF_TBL+set}" = set; then
   echo $ECHO_N "(cached) $ECHO_C" >&6
@@ -29112,7 +29111,7 @@ for ac_dir in $ac_dummy; do
   test -z "$ac_dir" && ac_dir=.
   if $as_executable_p "$ac_dir/$ac_word"; then
    ac_cv_path_NROFF_TBL="$ac_dir/$ac_word"
-   echo "$as_me:29115: found $ac_dir/$ac_word" >&5
+   echo "$as_me:29114: found $ac_dir/$ac_word" >&5
    break
 fi
 done
@@ -29123,14 +29122,14 @@ fi
 NROFF_TBL=$ac_cv_path_NROFF_TBL
 
 if test -n "$NROFF_TBL"; then
-  echo "$as_me:29126: result: $NROFF_TBL" >&5
+  echo "$as_me:29125: result: $NROFF_TBL" >&5
 echo "${ECHO_T}$NROFF_TBL" >&6
 else
-  echo "$as_me:29129: result: no" >&5
+  echo "$as_me:29128: result: no" >&5
 echo "${ECHO_T}no" >&6
 fi
 
-echo "$as_me:29133: checking if $NROFF_TBL supports 'x' column modifier" >&5
+echo "$as_me:29132: checking if $NROFF_TBL supports 'x' column modifier" >&5
 echo $ECHO_N "checking if $NROFF_TBL supports 'x' column modifier... $ECHO_C" >&6
 if test "${cf_cv_tbl_x_option_okay+set}" = set; then
   echo $ECHO_N "(cached) $ECHO_C" >&6
@@ -29159,7 +29158,7 @@ else
 				cf_cv_tbl_x_option_okay=yes
 			fi
 		else
-			{ { echo "$as_me:29162: error: $NROFF_TBL not available." >&5
+			{ { echo "$as_me:29161: error: $NROFF_TBL not available." >&5
 echo "$as_me: error: $NROFF_TBL not available." >&2;}
    { (exit 1); exit 1; }; }
 		fi
@@ -29167,12 +29166,12 @@ echo "$as_me: error: $NROFF_TBL not available." >&2;}
 	fi
 
 fi
-echo "$as_me:29170: result: $cf_cv_tbl_x_option_okay" >&5
+echo "$as_me:29169: result: $cf_cv_tbl_x_option_okay" >&5
 echo "${ECHO_T}$cf_cv_tbl_x_option_okay" >&6
 
 TBL_X_OPTION=$cf_cv_tbl_x_option_okay
 
-echo "$as_me:29175: checking format of man pages" >&5
+echo "$as_me:29174: checking format of man pages" >&5
 echo $ECHO_N "checking format of man pages... $ECHO_C" >&6
 
 # Check whether --with-manpage-format or --without-manpage-format was given.
@@ -29263,10 +29262,10 @@ case "$MANPAGE_FORMAT" in
 	;;
 esac
 
-echo "$as_me:29266: result: $MANPAGE_FORMAT" >&5
+echo "$as_me:29265: result: $MANPAGE_FORMAT" >&5
 echo "${ECHO_T}$MANPAGE_FORMAT" >&6
 if test -n "$cf_unknown" ; then
-	{ echo "$as_me:29269: WARNING: Unexpected man page format $cf_unknown" >&5
+	{ echo "$as_me:29268: WARNING: Unexpected man page format $cf_unknown" >&5
 echo "$as_me: WARNING: Unexpected man page format $cf_unknown" >&2;}
 fi
 
@@ -29307,7 +29306,7 @@ case "$cf_item" in
 esac
 done
 
-echo "$as_me:29310: checking for man page renaming" >&5
+echo "$as_me:29309: checking for man page renaming" >&5
 echo $ECHO_N "checking for man page renaming... $ECHO_C" >&6
 
 # Check whether --with-manpage-renames or --without-manpage-renames was given.
@@ -29336,15 +29335,15 @@ if test "$MANPAGE_RENAMES" = man/man_db.renames ; then
 elif test "$MANPAGE_RENAMES" = no ; then
 	:
 elif test ! -f "$MANPAGE_RENAMES" ; then
-	{ { echo "$as_me:29339: error: not a filename: $MANPAGE_RENAMES" >&5
+	{ { echo "$as_me:29338: error: not a filename: $MANPAGE_RENAMES" >&5
 echo "$as_me: error: not a filename: $MANPAGE_RENAMES" >&2;}
    { (exit 1); exit 1; }; }
 fi
 
-echo "$as_me:29344: result: $MANPAGE_RENAMES" >&5
+echo "$as_me:29343: result: $MANPAGE_RENAMES" >&5
 echo "${ECHO_T}$MANPAGE_RENAMES" >&6
 
-echo "$as_me:29347: checking if man page aliases will be installed" >&5
+echo "$as_me:29346: checking if man page aliases will be installed" >&5
 echo $ECHO_N "checking if man page aliases will be installed... $ECHO_C" >&6
 
 # Check whether --with-manpage-aliases or --without-manpage-aliases was given.
@@ -29355,7 +29354,7 @@ else
   MANPAGE_ALIASES=yes
 fi;
 
-echo "$as_me:29358: result: $MANPAGE_ALIASES" >&5
+echo "$as_me:29357: result: $MANPAGE_ALIASES" >&5
 echo "${ECHO_T}$MANPAGE_ALIASES" >&6
 
 case "x$LN_S" in
@@ -29369,7 +29368,7 @@ esac
 
 MANPAGE_SYMLINKS=no
 if test "$MANPAGE_ALIASES" = yes ; then
-echo "$as_me:29372: checking if man page symlinks should be used" >&5
+echo "$as_me:29371: checking if man page symlinks should be used" >&5
 echo $ECHO_N "checking if man page symlinks should be used... $ECHO_C" >&6
 
 # Check whether --with-manpage-symlinks or --without-manpage-symlinks was given.
@@ -29382,17 +29381,17 @@ fi;
 
 if test "$cf_use_symlinks" = no; then
 if test "$MANPAGE_SYMLINKS" = yes ; then
-	{ echo "$as_me:29385: WARNING: cannot make symlinks" >&5
+	{ echo "$as_me:29384: WARNING: cannot make symlinks" >&5
 echo "$as_me: WARNING: cannot make symlinks" >&2;}
 	MANPAGE_SYMLINKS=no
 fi
 fi
 
-echo "$as_me:29391: result: $MANPAGE_SYMLINKS" >&5
+echo "$as_me:29390: result: $MANPAGE_SYMLINKS" >&5
 echo "${ECHO_T}$MANPAGE_SYMLINKS" >&6
 fi
 
-echo "$as_me:29395: checking for man page tbl" >&5
+echo "$as_me:29394: checking for man page tbl" >&5
 echo $ECHO_N "checking for man page tbl... $ECHO_C" >&6
 
 # Check whether --with-manpage-tbl or --without-manpage-tbl was given.
@@ -29403,7 +29402,7 @@ else
   MANPAGE_TBL=no
 fi;
 
-echo "$as_me:29406: result: $MANPAGE_TBL" >&5
+echo "$as_me:29405: result: $MANPAGE_TBL" >&5
 echo "${ECHO_T}$MANPAGE_TBL" >&6
 
 if test "$prefix" = "NONE" ; then
@@ -29770,7 +29769,7 @@ case "$cf_cv_system_name" in
 	(*-D_XOPEN_SOURCE_EXTENDED*)
 		test -n "$verbose" && echo "	moving _XOPEN_SOURCE_EXTENDED to work around g++ problem" 1>&6
 
-echo "${as_me:-configure}:29773: testing moving _XOPEN_SOURCE_EXTENDED to work around g++ problem ..." 1>&5
+echo "${as_me:-configure}:29772: testing moving _XOPEN_SOURCE_EXTENDED to work around g++ problem ..." 1>&5
 
 		CFLAGS="$CFLAGS -D_XOPEN_SOURCE_EXTENDED"
 		CPPFLAGS=`echo "x$CPPFLAGS" | sed -e  's/^.//' -e 's/-D_XOPEN_SOURCE_EXTENDED//'`
@@ -29781,7 +29780,7 @@ esac
 
 # Help to automatically enable the extended curses features when using either
 # the *-config or the ".pc" files by adding defines.
-echo "$as_me:29784: checking for defines to add to ncurses${USE_CFG_SUFFIX}${cf_config_suffix}-config script" >&5
+echo "$as_me:29783: checking for defines to add to ncurses${USE_CFG_SUFFIX}${cf_config_suffix}-config script" >&5
 echo $ECHO_N "checking for defines to add to ncurses${USE_CFG_SUFFIX}${cf_config_suffix}-config script... $ECHO_C" >&6
 PKG_CFLAGS=
 for cf_loop1 in $CPPFLAGS_after_XOPEN
@@ -29797,7 +29796,7 @@ do
 	done
 	test "$cf_found" = no && PKG_CFLAGS="$PKG_CFLAGS $cf_loop1"
 done
-echo "$as_me:29800: result: $PKG_CFLAGS" >&5
+echo "$as_me:29799: result: $PKG_CFLAGS" >&5
 echo "${ECHO_T}$PKG_CFLAGS" >&6
 
 case "$cf_cv_system_name" in
@@ -29869,7 +29868,7 @@ then
 	cf_filter_syms=$cf_dft_filter_syms
 	test -n "$verbose" && echo "	will map symbols to ABI=$cf_cv_abi_default" 1>&6
 
-echo "${as_me:-configure}:29872: testing will map symbols to ABI=$cf_cv_abi_default ..." 1>&5
+echo "${as_me:-configure}:29871: testing will map symbols to ABI=$cf_cv_abi_default ..." 1>&5
 
 fi
 
@@ -29904,7 +29903,7 @@ fi
 
 # This is used for the *-config script and *.pc data files.
 
-echo "$as_me:29907: checking for linker search path" >&5
+echo "$as_me:29906: checking for linker search path" >&5
 echo $ECHO_N "checking for linker search path... $ECHO_C" >&6
 if test "${cf_cv_ld_searchpath+set}" = set; then
   echo $ECHO_N "(cached) $ECHO_C" >&6
@@ -29952,7 +29951,7 @@ then
 			cf_pathlist="$cf_pathlist /lib /usr/lib"
 			;;
 		(*)
-			{ echo "$as_me:29955: WARNING: problem with Solaris architecture" >&5
+			{ echo "$as_me:29954: WARNING: problem with Solaris architecture" >&5
 echo "$as_me: WARNING: problem with Solaris architecture" >&2;}
 			;;
 		esac
@@ -29993,12 +29992,12 @@ done
 test -z "$cf_cv_ld_searchpath" && cf_cv_ld_searchpath=/usr/lib
 
 fi
-echo "$as_me:29996: result: $cf_cv_ld_searchpath" >&5
+echo "$as_me:29995: result: $cf_cv_ld_searchpath" >&5
 echo "${ECHO_T}$cf_cv_ld_searchpath" >&6
 
 LD_SEARCHPATH=`echo "$cf_cv_ld_searchpath"|sed -e 's/ /|/g'`
 
-ac_config_files="$ac_config_files include/MKterm.h.awk include/curses.head:include/curses.h.in include/ncurses_dll.h include/termcap.h include/unctrl.h man/MKterminfo.tmp:man/MKterminfo.sh man/man_db.renames $SUB_MAKEFILES Makefile"
+ac_config_files="$ac_config_files include/MKterm.h.awk include/curses.head:include/curses.h.in include/nc_win32.h:include/nc_win32.h.in include/ncurses_dll.h include/termcap.h include/unctrl.h man/MKterminfo.tmp:man/MKterminfo.sh man/man_db.renames $SUB_MAKEFILES Makefile"
 
 ac_config_commands="$ac_config_commands default"
 
@@ -30083,7 +30082,7 @@ DEFS=-DHAVE_CONFIG_H
 : "${CONFIG_STATUS=./config.status}"
 ac_clean_files_save=$ac_clean_files
 ac_clean_files="$ac_clean_files $CONFIG_STATUS"
-{ echo "$as_me:30086: creating $CONFIG_STATUS" >&5
+{ echo "$as_me:30085: creating $CONFIG_STATUS" >&5
 echo "$as_me: creating $CONFIG_STATUS" >&6;}
 cat >"$CONFIG_STATUS" <<_ACEOF
 #! $SHELL
@@ -30264,7 +30263,7 @@ cat >>"$CONFIG_STATUS" <<\EOF
     echo "$ac_cs_version"; exit 0 ;;
   --he | --h)
     # Conflict between --help and --header
-    { { echo "$as_me:30267: error: ambiguous option: $1
+    { { echo "$as_me:30266: error: ambiguous option: $1
 Try \`$0 --help' for more information." >&5
 echo "$as_me: error: ambiguous option: $1
 Try \`$0 --help' for more information." >&2;}
@@ -30283,7 +30282,7 @@ Try \`$0 --help' for more information." >&2;}
     ac_need_defaults=false;;
 
   # This is an error.
-  -*) { { echo "$as_me:30286: error: unrecognized option: $1
+  -*) { { echo "$as_me:30285: error: unrecognized option: $1
 Try \`$0 --help' for more information." >&5
 echo "$as_me: error: unrecognized option: $1
 Try \`$0 --help' for more information." >&2;}
@@ -30406,6 +30405,7 @@ do
   # Handling of arguments.
   "include/MKterm.h.awk" ) CONFIG_FILES="$CONFIG_FILES include/MKterm.h.awk" ;;
   "include/curses.head" ) CONFIG_FILES="$CONFIG_FILES include/curses.head:include/curses.h.in" ;;
+  "include/nc_win32.h" ) CONFIG_FILES="$CONFIG_FILES include/nc_win32.h:include/nc_win32.h.in" ;;
   "include/ncurses_dll.h" ) CONFIG_FILES="$CONFIG_FILES include/ncurses_dll.h" ;;
   "include/termcap.h" ) CONFIG_FILES="$CONFIG_FILES include/termcap.h" ;;
   "include/unctrl.h" ) CONFIG_FILES="$CONFIG_FILES include/unctrl.h" ;;
