@@ -54,6 +54,12 @@ NCURSES_SP_NAME(echo) (NCURSES_SP_DCL0)
     if (NULL == SP_PARM)
 	returnCode(ERR);
     IsEcho(SP_PARM) = TRUE;
+    
+#if defined(_NC_WINDOWS_NATIVE) || defined(USE_WIN32_CONPTY)
+    // Immediately sync Windows console mode with ncurses echo state
+    NCURSES_SP_NAME(_nc_conpty_echo_sync)();
+#endif
+    
     returnCode(OK);
 }
 
@@ -72,6 +78,11 @@ NCURSES_SP_NAME(noecho) (NCURSES_SP_DCL0)
     if (NULL == SP_PARM)
 	returnCode(ERR);
     IsEcho(SP_PARM) = FALSE;
+    
+#if defined(_NC_WINDOWS_NATIVE) || defined(USE_WIN32_CONPTY)
+    // Immediately sync Windows console mode with ncurses echo state
+    NCURSES_SP_NAME(_nc_conpty_echo_sync)();
+#endif
     returnCode(OK);
 }
 

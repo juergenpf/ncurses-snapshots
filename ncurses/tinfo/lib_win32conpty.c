@@ -40,6 +40,7 @@
 #include <wchar.h>  /* For wide character functions */
 #include <string.h> /* For memset */
 #include <winternl.h>
+#include <io.h>     /* For _fileno, _get_osfhandle */
 
 MODULE_ID("$Id$")
 
@@ -809,5 +810,115 @@ _nc_win32conpty_read(SCREEN *sp, int *result)
 }
 
 #endif /* USE_WIDEC_SUPPORT */
+
+/*
+ * WIN32_CONPTY timeout handling function
+ */
+NCURSES_EXPORT(int)
+_nc_win32conpty_twait(const SCREEN *sp GCC_UNUSED, 
+                      int mode GCC_UNUSED, 
+                      int milliseconds, 
+                      int *timeleft,
+                      long (*gettime_func)(TimeType *, int)
+                      EVENTLIST_2nd(_nc_eventlist *evl))
+{
+    int result = TW_NONE;
+    TimeType t0;
+    
+    /* Helper macro for min */
+    #define min(a, b) ((a) < (b) ? (a) : (b))
+    
+    long starttime = gettime_func(&t0, TRUE);
+    
+    TR(TRACE_IEVENT, ("start WIN32_CONPTY twait: %d milliseconds, mode: %d",
+		      milliseconds, mode));
+
+    if (mode & (TW_INPUT | TW_MOUSE)) {
+        HANDLE stdin_handle = (HANDLE)_get_osfhandle(_fileno(stdin));
+        DWORD wait_result;
+        
+        if (milliseconds < 0) {
+            /* Infinite wait - but check periodically to be interruptible */
+            while (TRUE) {
+                wait_result = WaitForSingleObject(stdin_handle, 100);
+                if (wait_result == WAIT_OBJECT_0) {
+                    result = TW_INPUT;
+                    /* For ConPTY, mouse events come through input stream */
+                    if (mode & TW_MOUSE) result |= TW_MOUSE;
+                    break;
+                } else if (wait_result == WAIT_TIMEOUT) {
+                    continue; /* Keep waiting */
+                } else {
+                    break; /* Error */
+                }
+            }
+        } else if (milliseconds == 0) {
+            /* Non-blocking check - use different approach for ConPTY */
+            DWORD events_available = 0;
+            
+            /* First try to get number of console input events */
+            if (GetNumberOfConsoleInputEvents(stdin_handle, &events_available)) {
+                if (events_available > 0) {
+                    /* Check if there are actual input events (not just mouse/resize) */
+                    INPUT_RECORD input_buffer[16];
+                    DWORD events_read = 0;
+                    
+                    if (PeekConsoleInput(stdin_handle, input_buffer, 
+                                       min(events_available, 16), &events_read)) {
+                        for (DWORD i = 0; i < events_read; i++) {
+                            if (input_buffer[i].EventType == KEY_EVENT && 
+                                input_buffer[i].Event.KeyEvent.bKeyDown) {
+                                result = TW_INPUT;
+                                if (mode & TW_MOUSE) result |= TW_MOUSE;
+                                break;
+                            } else if (input_buffer[i].EventType == MOUSE_EVENT) {
+                                if (mode & TW_MOUSE) result |= TW_MOUSE;
+                            }
+                        }
+                    } else {
+                        /* Fallback to WaitForSingleObject if PeekConsoleInput fails */
+                        wait_result = WaitForSingleObject(stdin_handle, 0);
+                        if (wait_result == WAIT_OBJECT_0) {
+                            result = TW_INPUT;
+                            if (mode & TW_MOUSE) result |= TW_MOUSE;
+                        }
+                    }
+                } else {
+                    /* No events available - return immediately */
+                    result = TW_NONE;
+                }
+            } else {
+                /* Fallback to WaitForSingleObject if GetNumberOfConsoleInputEvents fails */
+                wait_result = WaitForSingleObject(stdin_handle, 0);
+                if (wait_result == WAIT_OBJECT_0) {
+                    result = TW_INPUT;
+                    if (mode & TW_MOUSE) result |= TW_MOUSE;
+                }
+            }
+        } else {
+            /* Timed wait */
+            wait_result = WaitForSingleObject(stdin_handle, (DWORD)milliseconds);
+            if (wait_result == WAIT_OBJECT_0) {
+                result = TW_INPUT;
+                if (mode & TW_MOUSE) result |= TW_MOUSE;
+            }
+        }
+    } else if (milliseconds > 0) {
+        /* Just sleep for the specified time */
+        Sleep((DWORD)milliseconds);
+    }
+    
+    /* Calculate remaining time */
+    long elapsed = gettime_func(&t0, FALSE) - starttime;
+    if (timeleft) {
+        *timeleft = (milliseconds >= 0) ? Max(0, milliseconds - (int)elapsed) : milliseconds;
+    }
+    
+    TR(TRACE_IEVENT, ("end WIN32_CONPTY twait: returned %d, elapsed %ld msec",
+		      result, elapsed));
+    
+    #undef min
+    return result;
+}
 
 #endif /* defined(USE_WIN32_CONPTY)) */

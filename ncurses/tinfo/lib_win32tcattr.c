@@ -471,6 +471,34 @@ _nc_win32_tcgetattr(int fd, TTY *arg)
 	return OK;
 }
 
+NCURSES_EXPORT(void)
+NCURSES_SP_NAME(_nc_conpty_echo_sync) (NCURSES_SP_DCL0)
+{
+	if (SP_PARM != NULL) {
+        	TERMINAL *termp = TerminalOf(SP_PARM);
+        	if (termp != NULL) {
+            		TTY current_tty;
+            		memset(&current_tty, 0, sizeof(current_tty));
+            
+            		// Build TTY structure from current ncurses state
+            		if (IsRaw(SP_PARM)) {
+                		current_tty.c_lflag |= RAW;
+            		} else if (IsCbreak(SP_PARM)) {
+                		current_tty.c_lflag |= (CBREAK | ISIG);
+            		} else {
+                		current_tty.c_lflag |= (ICANON | ISIG | ONLCR);
+            		}
+            
+            		if (IsEcho(SP_PARM)) {
+                		current_tty.c_lflag |= ECHO;
+            		}
+            
+            		// Apply the updated mode to console
+            		_nc_win32_tcsetattr(termp->Filedes, &current_tty);
+	        }	
+	}
+}
+
 #if defined(TRACE) || 1
 /* JPF
 For testing and debugging, we want to be able to print the current console modes in a human-readable form.

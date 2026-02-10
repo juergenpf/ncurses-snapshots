@@ -183,62 +183,10 @@ _nc_timed_wait(const SCREEN *sp MAYBE_UNUSED,
     int result = TW_NONE;
     TimeType t0;
 
-#if defined(USE_WIN32_CONPTY)
-    /* WIN32_CONPTY specific timeout handling */
-    long starttime = _nc_gettime(&t0, TRUE);
+#if defined(_NC_WINDOWS_NATIVE) || defined(USE_WIN32_CONPTY)
+    /* WIN32_CONPTY specific timeout handling - delegate to specialized function */
+    return _nc_win32conpty_twait(sp, mode, milliseconds, timeleft, _nc_gettime EVENTLIST_2nd(evl));
     
-    TR(TRACE_IEVENT, ("start WIN32_CONPTY twait: %d milliseconds, mode: %d",
-		      milliseconds, mode));
-
-    if (mode & (TW_INPUT | TW_MOUSE)) {
-        HANDLE stdin_handle = (HANDLE)_get_osfhandle(_fileno(stdin));
-        DWORD wait_result;
-        
-        if (milliseconds < 0) {
-            /* Infinite wait - but check periodically to be interruptible */
-            while (TRUE) {
-                wait_result = WaitForSingleObject(stdin_handle, 100);
-                if (wait_result == WAIT_OBJECT_0) {
-                    result = TW_INPUT;
-                    /* For ConPTY, mouse events come through input stream */
-                    if (mode & TW_MOUSE) result |= TW_MOUSE;
-                    break;
-                } else if (wait_result == WAIT_TIMEOUT) {
-                    continue; /* Keep waiting */
-                } else {
-                    break; /* Error */
-                }
-            }
-        } else if (milliseconds == 0) {
-            /* Non-blocking check */
-            wait_result = WaitForSingleObject(stdin_handle, 0);
-            if (wait_result == WAIT_OBJECT_0) {
-                result = TW_INPUT;
-                if (mode & TW_MOUSE) result |= TW_MOUSE;
-            }
-        } else {
-            /* Timed wait */
-            wait_result = WaitForSingleObject(stdin_handle, (DWORD)milliseconds);
-            if (wait_result == WAIT_OBJECT_0) {
-                result = TW_INPUT;
-                if (mode & TW_MOUSE) result |= TW_MOUSE;
-            }
-        }
-    } else if (milliseconds > 0) {
-        /* Just sleep for the specified time */
-        Sleep((DWORD)milliseconds);
-    }
-    
-    /* Calculate remaining time */
-    long elapsed = _nc_gettime(&t0, FALSE) - starttime;
-    if (timeleft) {
-        *timeleft = (milliseconds >= 0) ? Max(0, milliseconds - (int)elapsed) : milliseconds;
-    }
-    
-    TR(TRACE_IEVENT, ("end WIN32_CONPTY twait: returned %d, elapsed %ld msec",
-		      result, elapsed));
-    return result;
-
 #else /* Unix/Linux implementation */
 
 #if (USE_FUNC_POLL || HAVE_SELECT)

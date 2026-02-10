@@ -2456,6 +2456,8 @@ extern NCURSES_EXPORT(BOOL)  _nc_stdout_is_conpty(void);
 extern NCURSES_EXPORT(DWORD) _nc_unix_to_win32_output_flags(DWORD dwFlags, const TTY *ttyflags);
 extern NCURSES_EXPORT(DWORD) _nc_unix_to_win32_input_flags(DWORD dwFlags, const TTY *ttyflags);
 extern NCURSES_EXPORT(int)   _nc_win32conpty_read(SCREEN *sp, int *result);
+extern NCURSES_EXPORT(int)   _nc_win32conpty_twait(const SCREEN *sp, int mode, int milliseconds, int *timeleft, long (*gettime_func)(TimeType *, int) EVENTLIST_2nd(_nc_eventlist *evl));
+extern NCURSES_EXPORT(void) NCURSES_SP_NAME(_nc_conpty_echo_sync) (NCURSES_SP_DCL0);
 #ifdef TRACE
 extern NCURSES_EXPORT(void)  _nc_console_DumpModes(const char* title);
 extern NCURSES_EXPORT(void)  _nc_console_DumpTitle(const char* title);
