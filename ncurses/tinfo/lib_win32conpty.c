@@ -39,6 +39,7 @@
 #include <stdio.h>
 #include <wchar.h>  /* For wide character functions */
 #include <string.h> /* For memset */
+#include <winternl.h>
 
 MODULE_ID("$Id$")
 
@@ -192,36 +193,58 @@ encoding_init(void)
 	_nc_setmode(_fileno(stdout), false);
 }
 
-
-#define REQUIRED_MAX_V (DWORD)10
-#define REQUIRED_MIN_V (DWORD)0
+#define REQUIRED_MAJOR_V (DWORD)10
+#define REQUIRED_MINOR_V (DWORD)0
 #define REQUIRED_BUILD (DWORD)17763
 /*
   This function returns 0 if the Windows version has no support for
   the modern Console interface, otherwise it returns 1
  */
-static bool
+
+typedef NTSTATUS (WINAPI *RtlGetVersionPtr)(PRTL_OSVERSIONINFOW);
+
+static bool get_real_windows_version(DWORD* major, DWORD* minor, DWORD* build) {
+    HMODULE ntdll = GetModuleHandle(TEXT("ntdll.dll"));
+    if (ntdll) {
+        RtlGetVersionPtr RtlGetVersion = (RtlGetVersionPtr)GetProcAddress(ntdll, "RtlGetVersion");
+        if (RtlGetVersion) {
+            RTL_OSVERSIONINFOW osvi = {0};
+            osvi.dwOSVersionInfoSize = sizeof(osvi);
+            if (RtlGetVersion(&osvi) == 0) {
+                *major = osvi.dwMajorVersion;
+                *minor = osvi.dwMinorVersion; 
+                *build = osvi.dwBuildNumber;
+                return true;
+            }
+        }
+    }
+    return false;
+}
+static BOOL
 conpty_supported(void)
-{
-	OSVERSIONINFOEX osvi = {0};
-	bool res = true;
+ {
+        int res = FALSE;
+	DWORD major, minor, build;
 
-	T((T_CALLED("lib_win32conpty::_nc_console_vt_supported")));
-
-	osvi.dwOSVersionInfoSize = sizeof(osvi);
-    	osvi.dwMajorVersion = 10;
-    	osvi.dwMinorVersion = 0;
-    	osvi.dwBuildNumber = 17763; // Windows 10 version 1809
-    
-    	ULONGLONG conditionMask = 0;
-    	VER_SET_CONDITION(conditionMask, VER_MAJORVERSION, VER_GREATER_EQUAL);
-    	VER_SET_CONDITION(conditionMask, VER_MINORVERSION, VER_GREATER_EQUAL);
-    	VER_SET_CONDITION(conditionMask, VER_BUILDNUMBER, VER_GREATER_EQUAL);
-    
-    	res = VerifyVersionInfo(&osvi, 
-                        VER_MAJORVERSION | VER_MINORVERSION | VER_BUILDNUMBER,
-                        conditionMask);
-	returnBool(res);
+        T((T_CALLED("lib_win32conpty::conpty_supported")));
+ 
+ 	if (!get_real_windows_version(&major, &minor, &build)) {
+		T(("GetVersionEx failed"));
+	    	returnBool(FALSE);
+	}	
+        if (major >= REQUIRED_MAJOR_V)
+        {
+                if (major == REQUIRED_MAJOR_V)
+                {
+                        if (((minor == REQUIRED_MINOR_V) &&
+                             (build >= REQUIRED_BUILD)) ||
+                            ((minor > REQUIRED_MINOR_V)))
+                                res = TRUE;
+                }
+                else
+                        res = TRUE;
+        }
+        returnBool(res);
 }
 
 static bool console_initialized = FALSE;
@@ -236,12 +259,13 @@ _nc_console_checkinit()
 	/* initialize once, or not at all */
 	if (!console_initialized)
 	{
-		if (!conpty_supported())
+		if (!conpty_supported())	
 		{
-			T(("... Windows version does not support ConPTY"));
-			fprintf(stderr, "ncurses: Windows version does not support ConPTY\n");
-			abort;
+			T(("Windows version does not support ConPTY"));
+			fprintf(stderr,"ncurses: Windows version does not support ConPTY\n");
+			exit(1);
 		}
+		
 		int i;
 		DWORD num_buttons;
 		WORD a;
