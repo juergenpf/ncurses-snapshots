@@ -2456,6 +2456,10 @@ extern NCURSES_EXPORT(BOOL)  _nc_stdout_is_conpty(void);
 extern NCURSES_EXPORT(DWORD) _nc_unix_to_win32_output_flags(DWORD dwFlags, const TTY *ttyflags);
 extern NCURSES_EXPORT(DWORD) _nc_unix_to_win32_input_flags(DWORD dwFlags, const TTY *ttyflags);
 extern NCURSES_EXPORT(int)   _nc_win32conpty_read(SCREEN *sp, int *result);
+#ifdef TRACE
+extern NCURSES_EXPORT(void)  _nc_console_DumpModes(const char* title);
+extern NCURSES_EXPORT(void)  _nc_console_DumpTitle(const char* title);
+#endif
 #endif /* USE_WIN32_CONPTY */
 
 #define NC_ISATTY(fd) isatty(fd)
