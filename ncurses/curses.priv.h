@@ -2440,21 +2440,24 @@ extern NCURSES_EXPORT(void)   _nc_get_screensize(SCREEN *, int *, int *);
 	_nc_setupterm(name, fd, err, reuse)
 
 
-#if defined(USE_WIN32_CONPTY)
-extern NCURSES_EXPORT(void)  _nc_setmode(int fd, bool isCurses);
-extern NCURSES_EXPORT(int)   _nc_win32_tcsetattr(int fd, const TTY* arg);
-extern NCURSES_EXPORT(int)   _nc_win32_tcgetattr(int fd, TTY*  arg);
-extern NCURSES_EXPORT(void)  _nc_console_size(int *Lines, int *Cols);
-extern NCURSES_EXPORT(BOOL)  _nc_console_check_resize(void);
-extern NCURSES_EXPORT(BOOL)  _nc_console_checkinit(void);
-extern NCURSES_EXPORT(WORD)  _nc_console_MapColor(BOOL fore, int color);
-extern NCURSES_EXPORT(int)   _nc_console_flush(int fd);
-extern NCURSES_EXPORT(BOOL)  _nc_console_get_SBI(void);
-extern NCURSES_EXPORT(BOOL)  _nc_stdout_is_conpty(void);
-extern NCURSES_EXPORT(DWORD) _nc_unix_to_win32_output_flags(DWORD dwFlags, const TTY *ttyflags);
-extern NCURSES_EXPORT(DWORD) _nc_unix_to_win32_input_flags(DWORD dwFlags, const TTY *ttyflags);
-extern NCURSES_EXPORT(int)   _nc_win32conpty_read(SCREEN *sp, int *result);
-extern NCURSES_EXPORT(int)   _nc_win32conpty_twait(const SCREEN *sp, int mode, int milliseconds, int *timeleft, long (*gettime_func)(TimeType *, int) EVENTLIST_2nd(_nc_eventlist *evl));
+#if defined(_NC_WINDOWS_NATIVE) || defined(USE_WIN32_CONPTY)
+#ifndef UTF8_MAX_BYTES
+#define UTF8_MAX_BYTES 4 /* Maximum bytes in UTF-8 sequence */
+#endif
+extern NCURSES_EXPORT(int)    _nc_win32_tcsetattr(int fd, const TTY* arg);
+extern NCURSES_EXPORT(int)    _nc_win32_tcgetattr(int fd, TTY*  arg);
+extern NCURSES_EXPORT(void)   _nc_console_size(int *Lines, int *Cols);
+extern NCURSES_EXPORT(BOOL)   _nc_console_check_resize(void);
+extern NCURSES_EXPORT(BOOL)   _nc_console_checkinit(void);
+extern NCURSES_EXPORT(WORD)   _nc_console_MapColor(BOOL fore, int color);
+extern NCURSES_EXPORT(int)    _nc_console_flush(int fd);
+extern NCURSES_EXPORT(BOOL)   _nc_console_get_SBI(void);
+extern NCURSES_EXPORT(BOOL)   _nc_stdout_is_conpty(void);
+extern NCURSES_EXPORT(DWORD)  _nc_unix_to_win32_output_flags(DWORD dwFlags, const TTY *ttyflags);
+extern NCURSES_EXPORT(DWORD)  _nc_unix_to_win32_input_flags(DWORD dwFlags, const TTY *ttyflags);
+extern NCURSES_EXPORT(size_t) _nc_wchar_to_utf8(wchar_t wc, char utf8[UTF8_MAX_BYTES]);
+extern NCURSES_EXPORT(int)    _nc_win32conpty_read(SCREEN *sp, int *result);
+extern NCURSES_EXPORT(int)    _nc_win32conpty_twait(const SCREEN *sp, int mode, int milliseconds, int *timeleft, long (*gettime_func)(TimeType *, int) EVENTLIST_2nd(_nc_eventlist *evl));
 extern NCURSES_EXPORT(void) NCURSES_SP_NAME(_nc_conpty_echo_sync) (NCURSES_SP_DCL0);
 #ifdef TRACE
 extern NCURSES_EXPORT(void)  _nc_console_DumpModes(const char* title);

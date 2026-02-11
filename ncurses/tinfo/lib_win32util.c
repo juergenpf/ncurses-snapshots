@@ -33,32 +33,10 @@
  ****************************************************************************/
 
 #include <curses.priv.h>
-#include <tchar.h>
-#include <fcntl.h>
 
 MODULE_ID("$Id: lib_win32util.c,v 1.7 2025/06/28 16:58:13 tom Exp $")
 
 #ifdef _NC_WINDOWS_NATIVE
-
-/*
-   We keep it that way although all the branches do the same at the moment,
-   because in future we may want to have different handling for wide/narrow
-   character modes.
-*/
-NCURSES_EXPORT(void)
-_nc_setmode(int fd, bool isCurses)
-{
-	bool isInput = (fd == _fileno(stdin));
-	T((T_CALLED("lib_win32util::_nc_setmode(%d,%d)"), fd,isCurses));
-	if (!isatty(fd))
-		return;
-
-#if USE_WIDEC_SUPPORT
-	setmode(fd, isInput ? _O_BINARY : (isCurses ? _O_BINARY : _O_BINARY));
-#else
-	setmode(fd, isInput ? _O_BINARY : (isCurses ? _O_BINARY : _O_BINARY));
-#endif
-}
 
 #if HAVE_GETTIMEOFDAY == 2
 #define JAN1970 116444736000000000LL /* the value for 01/01/1970 00:00 */

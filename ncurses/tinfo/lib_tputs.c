@@ -231,21 +231,7 @@ NCURSES_SP_NAME(_nc_outch)(NCURSES_SP_DCLx int ch)
 	return rc;
 }
 
-#if defined(USE_WIN32_CONPTY) && USE_WIDEC_SUPPORT
-// Helper function to adress the issue, that for pragmatic reasons we have 
-// to output UTF-8 encoded data to the Windows Console in _O_BINARY mode.
-static size_t 
-wchar_to_utf8_win(wchar_t wc, char utf8[4]) {
-    wchar_t wstr[2] = {wc, L'\0'};
-    int result;
-    
-    result = WideCharToMultiByte(CP_UTF8,0,wstr,1,utf8,4,NULL,NULL);
-    if (result > 0)
-        return (size_t)result;
-	else
-    	return 0; // signals error
-}
-
+#if (defined(_NC_WINDOWS_NATIVE) || defined(USE_WIN32_CONPTY)) && USE_WIDEC_SUPPORT
 /*
 We have to operate the Windows Console Output stream in _O_BINARY mode, so no UTF-8
 translation is performed by the OS. Therefore we have to encode UTF-8 characters
@@ -259,7 +245,7 @@ NCURSES_SP_NAME(_nc_outch_ex)(NCURSES_SP_DCLx int ch)
 	int rc = OK;
 	int len;
 	int i;
-	char utf8[4];
+	char utf8[UTF8_MAX_BYTES];
 
 	COUNT_OUTCHARS(1);
 
@@ -271,7 +257,7 @@ NCURSES_SP_NAME(_nc_outch_ex)(NCURSES_SP_DCLx int ch)
 	*/
 	if (ch < 0) ch &= 0xFF;
 	
-	len = wchar_to_utf8_win((wchar_t)ch, utf8);
+	len = _nc_wchar_to_utf8((wchar_t)ch, utf8);
 	if (len == 0)
 		return ERR; // conversion error
 

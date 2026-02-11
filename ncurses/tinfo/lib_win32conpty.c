@@ -38,9 +38,10 @@
 #include <locale.h>
 #include <stdio.h>
 #include <wchar.h>  /* For wide character functions */
-#include <string.h> /* For memset */
+#include <string.h>
 #include <winternl.h>
-#include <io.h>     /* For _fileno, _get_osfhandle */
+#include <io.h>    
+#include <fcntl.h>
 
 MODULE_ID("$Id$")
 
@@ -189,9 +190,14 @@ encoding_init(void)
 		setlocale(LC_CTYPE, default_ctype);
 #endif
 	}
-
-	_nc_setmode(_fileno(stdin), false);
-	_nc_setmode(_fileno(stdout), false);
+	// the most conservative mode is to run in binary mode, and let us handle any necessary translations
+	// we have _nc_assemble_utf8_input (see below) to handle UTF-8 decoding, and we want to ensure that 
+	// we get the raw bytes as they come in without any interference from the C runtime.
+	// For output we have the helper _nc_wchar_to_utf8 to encode UTF-8 characters, and we want to ensure 
+	// that the C runtime does not attempt to translate line endings or perform any other transformations 
+	// on the output data.
+	setmode(_fileno(stdin),  _O_BINARY);
+	setmode(_fileno(stdout), _O_BINARY);
 }
 
 #define REQUIRED_MAJOR_V (DWORD)10
@@ -766,6 +772,21 @@ _nc_assemble_utf8_input(unsigned char byte, wchar_t *wch)
 		memset(&_nc_utf8_buffer, 0, sizeof(_nc_utf8_buffer));
 		return -1; /* Invalid sequence */
 	}
+}
+
+// Helper function to adress the issue, that for pragmatic reasons we have
+// to output UTF-8 encoded data to the Windows Console in _O_BINARY mode.
+NCURSES_EXPORT(size_t)
+_nc_wchar_to_utf8(wchar_t wc, char utf8[UTF8_MAX_BYTES])
+{
+	wchar_t wstr[2] = {wc, L'\0'};
+	int result;
+
+	result = WideCharToMultiByte(CP_UTF8, 0, wstr, 1, utf8, 4, NULL, NULL);
+	if (result > 0)
+		return (size_t)result;
+	else
+		return 0; // signals error
 }
 
 /*
