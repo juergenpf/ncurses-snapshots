@@ -263,9 +263,9 @@ fifo_push(SCREEN *sp EVENTLIST_2nd(_nc_eventlist * evl))
     } else
 #endif
     {				/* Can block... */
-#if defined(USE_WIN32_CONPTY)
+#if defined(_NC_WINDOWS_NATIVE) || defined(USE_WIN32_CONPTY)
 	/* Use UTF-8 assembly for WIN32_CONPTY */
-	n = _nc_win32conpty_read(sp, &ch);
+	n = _nc_conpty_read(sp, &ch);
 #else
 	unsigned char c2 = 0;
 

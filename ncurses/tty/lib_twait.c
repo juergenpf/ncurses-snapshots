@@ -185,7 +185,7 @@ _nc_timed_wait(const SCREEN *sp MAYBE_UNUSED,
 
 #if defined(_NC_WINDOWS_NATIVE) || defined(USE_WIN32_CONPTY)
     /* WIN32_CONPTY specific timeout handling - delegate to specialized function */
-    return _nc_win32conpty_twait(sp, mode, milliseconds, timeleft, _nc_gettime EVENTLIST_2nd(evl));
+    return _nc_conpty_twait(sp, mode, milliseconds, timeleft, _nc_gettime EVENTLIST_2nd(evl));
     
 #else /* Unix/Linux implementation */
 

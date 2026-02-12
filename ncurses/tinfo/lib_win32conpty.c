@@ -196,8 +196,8 @@ encoding_init(void)
 	// For output we have the helper _nc_wchar_to_utf8 to encode UTF-8 characters, and we want to ensure 
 	// that the C runtime does not attempt to translate line endings or perform any other transformations 
 	// on the output data.
-	setmode(_fileno(stdin),  _O_BINARY);
-	setmode(_fileno(stdout), _O_BINARY);
+	setmode(_fileno(stdin),  O_BINARY);
+	setmode(_fileno(stdout), O_BINARY);
 }
 
 #define REQUIRED_MAJOR_V (DWORD)10
@@ -227,6 +227,7 @@ static bool get_real_windows_version(DWORD* major, DWORD* minor, DWORD* build) {
     }
     return false;
 }
+
 static BOOL
 conpty_supported(void)
  {
@@ -315,7 +316,7 @@ _nc_console_checkinit()
 		WINCONSOLE.last_input_mode = dwFlagIn;
 		SetConsoleMode(GetStdHandle(STD_OUTPUT_HANDLE), dwFlagOut);
 		WINCONSOLE.last_output_mode = dwFlagOut;
-		_nc_win32_tcgetattr(_fileno(stdin), &WINCONSOLE.ttyflags);
+		_nc_conpty_tcgetattr(_fileno(stdin), &WINCONSOLE.ttyflags);
 
 		if (GetStdHandle(STD_OUTPUT_HANDLE) != INVALID_HANDLE_VALUE)
 		{
@@ -346,7 +347,7 @@ static void handle_signal_chars(wint_t ch)
 	if (_nc_stdout_is_conpty())
 	{
 		TTY ttyflags;
-		if (_nc_win32_tcgetattr(stdin, &ttyflags) != OK)
+		if (_nc_conpty_tcgetattr(stdin, &ttyflags) != OK)
 		{
 			return;
 		}
@@ -375,7 +376,7 @@ static int
 process_input(wint_t *ch)
 {
 	TTY ttyflags;
-	_nc_win32_tcgetattr(stdin, &ttyflags);
+	_nc_conpty_tcgetattr(stdin, &ttyflags);
 
 	// Handle special characters
 	if (*ch == ttyflags.erase_char && !(ttyflags.c_lflag & RAW))
@@ -586,19 +587,30 @@ _nc_console_get_SBI(void)
 	return rc;
 }
 
-/* UTF-8 input assembly for ConPTY binary mode (used by both widec and non-widec) */
-#define UTF8_MAX_BYTES 4 /* Maximum bytes in UTF-8 sequence */
+// Helper function to adress the issue, that for pragmatic reasons we have
+// to output UTF-8 encoded data to the Windows Console in O_BINARY mode.
+NCURSES_EXPORT(size_t)
+_nc_wchar_to_utf8(wchar_t wc, char utf8[UTF8_MAX_BYTES])
+{
+	wchar_t wstr[2] = {wc, L'\0'};
+	int result;
 
+	result = WideCharToMultiByte(CP_UTF8, 0, wstr, 1, utf8, 4, NULL, NULL);
+	if (result > 0)
+		return (size_t)result;
+	else
+		return 0; // signals error
+}
+
+#if USE_WIDEC_SUPPORT
 typedef struct
 {
 	unsigned char buffer[UTF8_MAX_BYTES]; /* Buffer for incomplete UTF-8 sequence */
 	size_t length;			      /* Current length of buffer */
-#if USE_WIDEC_SUPPORT
-	mbstate_t state; /* Multibyte conversion state */
-#endif
+	mbstate_t state;                      /* Multibyte conversion state */
 } utf8_input_buffer_t;
 
-static utf8_input_buffer_t _nc_utf8_buffer = {0};
+static utf8_input_buffer_t utf8_buffer = {0};
 
 /*
  * Convert Unicode codepoint to Windows wchar_t (UTF-16)
@@ -606,7 +618,7 @@ static utf8_input_buffer_t _nc_utf8_buffer = {0};
  * Returns: 1 for BMP characters, 2 for surrogate pairs, -1 for invalid
  */
 static int
-_nc_codepoint_to_wchar(uint32_t codepoint, wchar_t *wch)
+codepoint_to_wchar(uint32_t codepoint, wchar_t *wch)
 {
 	if (codepoint <= 0xFFFF)
 	{
@@ -640,7 +652,7 @@ _nc_codepoint_to_wchar(uint32_t codepoint, wchar_t *wch)
  * Returns Unicode codepoint or -1 for invalid sequences
  */
 static int
-_nc_decode_utf8_simple(const unsigned char *bytes, size_t length, uint32_t *codepoint)
+decode_utf8_simple(const unsigned char *bytes, size_t length, uint32_t *codepoint)
 {
 	if (length == 0)
 		return 0;
@@ -727,25 +739,25 @@ _nc_decode_utf8_simple(const unsigned char *bytes, size_t length, uint32_t *code
  * -2:   Surrogate pair needed but wch buffer too small (use extended function)
  */
 static int
-_nc_assemble_utf8_input(unsigned char byte, wchar_t *wch)
+assemble_utf8_input(unsigned char byte, wchar_t *wch)
 {
-	if (_nc_utf8_buffer.length >= UTF8_MAX_BYTES)
+	if (utf8_buffer.length >= UTF8_MAX_BYTES)
 	{
-		memset(&_nc_utf8_buffer, 0, sizeof(_nc_utf8_buffer));
+		memset(&utf8_buffer, 0, sizeof(utf8_buffer));
 		return -1;
 	}
 
-	_nc_utf8_buffer.buffer[_nc_utf8_buffer.length++] = byte;
+	utf8_buffer.buffer[utf8_buffer.length++] = byte;
 
 	/* Unified UTF-8 decoding for both widec and non-widec builds */
 	uint32_t codepoint;
-	int consumed = _nc_decode_utf8_simple(_nc_utf8_buffer.buffer,
-					      _nc_utf8_buffer.length,
+	int consumed = decode_utf8_simple(utf8_buffer.buffer,
+					      utf8_buffer.length,
 					      &codepoint);
 	if (consumed > 0)
 	{
-		memset(&_nc_utf8_buffer, 0, sizeof(_nc_utf8_buffer));
-		
+		memset(&utf8_buffer, 0, sizeof(utf8_buffer));
+		codepoint_to_wchar(codepoint, wch);
 		/* For Windows, handle potential surrogate pairs */
 		if (codepoint <= 0xFFFF)
 		{
@@ -769,37 +781,22 @@ _nc_assemble_utf8_input(unsigned char byte, wchar_t *wch)
 	}
 	else
 	{
-		memset(&_nc_utf8_buffer, 0, sizeof(_nc_utf8_buffer));
+		memset(&utf8_buffer, 0, sizeof(utf8_buffer));
 		return -1; /* Invalid sequence */
 	}
 }
-
-// Helper function to adress the issue, that for pragmatic reasons we have
-// to output UTF-8 encoded data to the Windows Console in _O_BINARY mode.
-NCURSES_EXPORT(size_t)
-_nc_wchar_to_utf8(wchar_t wc, char utf8[UTF8_MAX_BYTES])
-{
-	wchar_t wstr[2] = {wc, L'\0'};
-	int result;
-
-	result = WideCharToMultiByte(CP_UTF8, 0, wstr, 1, utf8, 4, NULL, NULL);
-	if (result > 0)
-		return (size_t)result;
-	else
-		return 0; // signals error
-}
+#endif /* USE_WIDEC_SUPPORT */
 
 /*
- * WIN32_CONPTY UTF-8 aware input function (unified for widec and non-widec)
- * Assembles UTF-8 byte sequences into Unicode codepoints
+ * WIN32_CONPTY input function (handles both widec and non-widec builds)
+ * In wide mode: Assembles UTF-8 byte sequences into Unicode codepoints
+ * In non-wide mode: Returns raw bytes directly (for single-byte encodings like CP1252)
  */
 NCURSES_EXPORT(int)
-_nc_win32conpty_read(SCREEN *sp, int *result)
+_nc_conpty_read(SCREEN *sp, int *result)
 {
 	unsigned char byte_buffer;
 	int n;
-	wchar_t wch;
-	int ch;
 
 	_nc_set_read_thread(TRUE);
 	n = (int)read(sp->_ifd, &byte_buffer, (size_t)1);
@@ -810,18 +807,23 @@ _nc_win32conpty_read(SCREEN *sp, int *result)
 		return n;
 	}
 
-	ch = _nc_assemble_utf8_input(byte_buffer, &wch);
+#if USE_WIDEC_SUPPORT
+	/* Wide mode: decode UTF-8 sequences */
+	wchar_t wch;
+	int ch;
+
+	ch = assemble_utf8_input(byte_buffer, &wch);
 
 	if (ch > 0)
 	{
-		/* Both widec and non-widec can use the assembled codepoint directly */
+		/* Complete UTF-8 character assembled */
 		*result = ch;
 		return 1;
 	}
 	else if (ch == 0)
 	{
 		/* Need more bytes - recursively read next byte */
-		return _nc_win32conpty_read(sp, result);
+		return _nc_conpty_read(sp, result);
 	}
 	else
 	{
@@ -829,13 +831,18 @@ _nc_win32conpty_read(SCREEN *sp, int *result)
 		*result = (int)byte_buffer;
 		return 1;
 	}
+#else
+	/* Non-wide mode: return raw bytes directly (single-byte encoding like CP1252) */
+	*result = (int)byte_buffer;
+	return 1;
+#endif
 }
 
 /*
  * WIN32_CONPTY timeout handling function
  */
 NCURSES_EXPORT(int)
-_nc_win32conpty_twait(const SCREEN *sp GCC_UNUSED, 
+_nc_conpty_twait(const SCREEN *sp GCC_UNUSED, 
                       int mode GCC_UNUSED, 
                       int milliseconds, 
                       int *timeleft,

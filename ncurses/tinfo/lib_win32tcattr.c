@@ -235,7 +235,7 @@ static void win32_to_unix_input_flags(DWORD dwFlags, TTY *ttyflags)
 }
 
 NCURSES_EXPORT(DWORD) 
-_nc_unix_to_win32_output_flags(DWORD dwFlags, const TTY *ttyflags)
+_nc_unix_to_conpty_output_flags(DWORD dwFlags, const TTY *ttyflags)
 {
     /* Windows VT processing requires both flags to work properly */
     DWORD flags = ENABLE_VIRTUAL_TERMINAL_PROCESSING | ENABLE_PROCESSED_OUTPUT;
@@ -257,7 +257,7 @@ static void win32_to_unix_output_flags(DWORD dwFlags, TTY *ttyflags)
 }
  
 NCURSES_EXPORT(int)
-_nc_win32_tcsetattr(int fd, const TTY *arg)
+_nc_conpty_tcsetattr(int fd, const TTY *arg)
 {
 	if (!arg) return ERR;
 	
@@ -285,7 +285,7 @@ _nc_win32_tcsetattr(int fd, const TTY *arg)
 	
 	// Convert Unix flags to Windows console modes
 	DWORD input_flags = _nc_unix_to_win32_input_flags(0, &enhanced_tty);
-	DWORD output_flags = _nc_unix_to_win32_output_flags(0, &enhanced_tty);
+	DWORD output_flags = _nc_unix_to_conpty_output_flags(0, &enhanced_tty);
 	
 	// Determine which handles to use based on classification
 	HANDLE input_target = INVALID_HANDLE_VALUE;
@@ -360,7 +360,7 @@ _nc_win32_tcsetattr(int fd, const TTY *arg)
 }
 
 NCURSES_EXPORT(int)
-_nc_win32_tcgetattr(int fd, TTY *arg)
+_nc_conpty_tcgetattr(int fd, TTY *arg)
 {
 	if (!arg) return ERR;
 	
@@ -494,7 +494,7 @@ NCURSES_SP_NAME(_nc_conpty_echo_sync) (NCURSES_SP_DCL0)
             		}
             
             		// Apply the updated mode to console
-            		_nc_win32_tcsetattr(termp->Filedes, &current_tty);
+            		_nc_conpty_tcsetattr(termp->Filedes, &current_tty);
 	        }	
 	}
 }
