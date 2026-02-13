@@ -57,7 +57,7 @@ NCURSES_SP_NAME(echo) (NCURSES_SP_DCL0)
     
 #if defined(_NC_WINDOWS_NATIVE) || defined(USE_WIN32_CONPTY)
     // Immediately sync Windows console mode with ncurses echo state
-    NCURSES_SP_NAME(_nc_conpty_echo_sync)();
+    NCURSES_SP_NAME(_nc_conpty_modesync)(NCURSES_SP_ARGx TRUE, ENABLE_ECHO_INPUT);
 #endif
     
     returnCode(OK);
@@ -81,7 +81,7 @@ NCURSES_SP_NAME(noecho) (NCURSES_SP_DCL0)
     
 #if defined(_NC_WINDOWS_NATIVE) || defined(USE_WIN32_CONPTY)
     // Immediately sync Windows console mode with ncurses echo state
-    NCURSES_SP_NAME(_nc_conpty_echo_sync)();
+    NCURSES_SP_NAME(_nc_conpty_modesync)(NCURSES_SP_ARGx FALSE, ENABLE_ECHO_INPUT);
 #endif
     returnCode(OK);
 }

@@ -2454,12 +2454,10 @@ extern NCURSES_EXPORT(BOOL)   _nc_stdout_is_conpty(void);
 extern NCURSES_EXPORT(int)    _nc_conpty_read(SCREEN *sp, int *result);
 extern NCURSES_EXPORT(int)    _nc_conpty_twait(const SCREEN *sp, int mode, int milliseconds, int *timeleft, long (*gettime_func)(TimeType *, int) EVENTLIST_2nd(_nc_eventlist *evl));
 // termios emulation related functions
-extern NCURSES_EXPORT(int)    _nc_conpty_tcsetattr(int fd, const TTY* arg);
-extern NCURSES_EXPORT(int)    _nc_conpty_tcgetattr(int fd, TTY*  arg);
-extern NCURSES_EXPORT(DWORD)  _nc_unix_to_conpty_output_flags(DWORD dwFlags, const TTY *ttyflags);
-extern NCURSES_EXPORT(DWORD)  _nc_unix_to_conpty_input_flags(DWORD dwFlags, const TTY *ttyflags);
+extern NCURSES_EXPORT(int)    _nc_conpty_setmode(int fd, const TTY* arg);
+extern NCURSES_EXPORT(int)    _nc_conpty_getmode(int fd, TTY*  arg);
 extern NCURSES_EXPORT(size_t) _nc_wchar_to_utf8(wchar_t wc, char utf8[UTF8_MAX_BYTES]);
-extern NCURSES_EXPORT(void)   NCURSES_SP_NAME(_nc_conpty_echo_sync) (NCURSES_SP_DCL0);
+extern NCURSES_EXPORT(void)   NCURSES_SP_NAME(_nc_conpty_modesync) (NCURSES_SP_DCLx BOOL on, DWORD dwFlagIn);
 #ifdef TRACE // temporary stuff during development JPF
 extern NCURSES_EXPORT(void)  _nc_console_DumpModes(const char* title);
 extern NCURSES_EXPORT(void)  _nc_console_DumpTitle(const char* title);

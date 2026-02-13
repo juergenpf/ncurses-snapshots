@@ -214,7 +214,7 @@ _nc_trace_ttymode(const TTY * tty)
 	if (tty->c_lflag & ALLLOCAL)
 	    lookup_bits(buf, lflags, "lflags", tty->c_lflag);
     }
-#elif defined(USE_WIN32_CONPTY)
+#elif defined(_NC_WINDOWS_NATIVE) || defined(USE_WIN32_CONPTY)
 #define DATA(name)        { name, { #name } }
     static const BITNAMES dwFlagsOut[] =
     {
@@ -236,19 +236,15 @@ _nc_trace_ttymode(const TTY * tty)
 	DATA(ENABLE_AUTO_POSITION),
 	DATA(ENABLE_VIRTUAL_TERMINAL_INPUT)
     };
-
+	
     buf = _nc_trace_buf(0,
-			8 + sizeof(dwFlagsOut) +
-			8 + sizeof(dwFlagsIn));
+                        8 + sizeof(dwFlagsOut) +
+                        8 + sizeof(dwFlagsIn));
     if (buf != NULL) {
-	DWORD dwFlagIn = 0;
-	DWORD dwFlagOut = 0;
-	dwFlagIn = _nc_unix_to_win32_input_flags(dwFlagIn, tty);
-	dwFlagOut = _nc_unix_to_conpty_output_flags(dwFlagOut, tty);
-	lookup_bits(buf, dwFlagsIn, "dwIn", dwFlagIn);
-	lookup_bits(buf, dwFlagsOut, "dwOut", dwFlagOut);
+        lookup_bits(buf, dwFlagsIn, "dwIn", tty->dwFlagIn);
+        lookup_bits(buf, dwFlagsOut, "dwOut", tty->dwFlagOut);
     }
-#else
+ #else
     /* reference: ttcompat(4M) on SunOS 4.1 */
 #ifndef EVENP
 #define EVENP 0

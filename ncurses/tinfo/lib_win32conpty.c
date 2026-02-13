@@ -278,9 +278,9 @@ _nc_console_checkinit()
 		DWORD num_buttons;
 		WORD a;
 		BOOL b;
-		DWORD dwFlagIn = CONMODE_IN_DEFAULT;
+		DWORD dwFlagIn  = CONMODE_IN_DEFAULT;
 		DWORD dwFlagOut = CONMODE_OUT_DEFAULT;
-
+		
 		START_TRACE();
 
 		encoding_init();
@@ -311,12 +311,12 @@ _nc_console_checkinit()
 		for (i = 0; i < CON_NUMPAIRS; i++)
 			WINCONSOLE.pairs[i] = a;
 
-		WINCONSOLE.ttyflags.c_lflag = 0;
-		SetConsoleMode(GetStdHandle(STD_INPUT_HANDLE), dwFlagIn);
-		WINCONSOLE.last_input_mode = dwFlagIn;
-		SetConsoleMode(GetStdHandle(STD_OUTPUT_HANDLE), dwFlagOut);
-		WINCONSOLE.last_output_mode = dwFlagOut;
-		_nc_conpty_tcgetattr(_fileno(stdin), &WINCONSOLE.ttyflags);
+		GetConsoleMode(GetStdHandle(STD_INPUT_HANDLE), &WINCONSOLE.saved_ttyflags.dwFlagIn);
+		GetConsoleMode(GetStdHandle(STD_OUTPUT_HANDLE), &WINCONSOLE.saved_ttyflags.dwFlagOut);
+		WINCONSOLE.ttyflags.dwFlagIn = dwFlagIn;
+		WINCONSOLE.ttyflags.dwFlagOut = dwFlagOut;
+		SetConsoleMode(GetStdHandle(STD_INPUT_HANDLE), WINCONSOLE.ttyflags.dwFlagIn);
+		SetConsoleMode(GetStdHandle(STD_OUTPUT_HANDLE), WINCONSOLE.ttyflags.dwFlagOut);
 
 		if (GetStdHandle(STD_OUTPUT_HANDLE) != INVALID_HANDLE_VALUE)
 		{
@@ -337,66 +337,6 @@ _nc_console_checkinit()
 	   console_initialized,
 	   check));
 	returnBool(res);
-}
-
-
-// Handle UNIX-like signal characters in ConPTY mode
-// for future use with input processing and signal generation
-static void handle_signal_chars(wint_t ch)
-{
-	if (_nc_stdout_is_conpty())
-	{
-		TTY ttyflags;
-		if (_nc_conpty_tcgetattr(stdin, &ttyflags) != OK)
-		{
-			return;
-		}
-
-		switch (ch)
-		{
-		case 3: // Ctrl+C (SIGINT)
-			if (ttyflags.c_lflag & ISIG)
-			{
-				// Raise SIGINT equivalent
-				GenerateConsoleCtrlEvent(CTRL_C_EVENT, 0);
-			}
-			break;
-		case 28: // Ctrl+\ (SIGQUIT)
-			if (ttyflags.c_lflag & ISIG)
-			{
-				// Handle quit signal
-			}
-			break;
-		}
-	}
-}
-
-// for future use with input processing and signal generation
-static int
-process_input(wint_t *ch)
-{
-	TTY ttyflags;
-	_nc_conpty_tcgetattr(stdin, &ttyflags);
-
-	// Handle special characters
-	if (*ch == ttyflags.erase_char && !(ttyflags.c_lflag & RAW))
-	{
-		// Process backspace - return actual control character
-		return 8; // Backspace (Ctrl+H)
-	}
-	if (*ch == ttyflags.kill_char && !(ttyflags.c_lflag & RAW))
-	{
-		// Process kill line - return actual control character
-		return 21; // Kill line (Ctrl+U)
-	}
-	if (*ch == ttyflags.eof_char && !(ttyflags.c_lflag & RAW))
-	{
-		// Process EOF
-		return EOF;
-	}
-
-	handle_signal_chars(*ch);
-	return *ch;
 }
 
 /* Windows Console resize detection */

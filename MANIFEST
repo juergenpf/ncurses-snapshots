@@ -949,7 +949,7 @@
 ./ncurses/tinfo/lib_tputs.c
 ./ncurses/tinfo/lib_ttyflags.c
 ./ncurses/tinfo/lib_win32conpty.c
-./ncurses/tinfo/lib_win32tcattr.c
+./ncurses/tinfo/lib_win32conmod.c
 ./ncurses/tinfo/lib_win32util.c
 ./ncurses/tinfo/make_hash.c
 ./ncurses/tinfo/make_keys.c

@@ -84,10 +84,9 @@ _nc_initscr(NCURSES_SP_DCL0)
 	buf.c_oflag &= (unsigned) ~(ONLCR);
 #elif HAVE_SGTTY_H
 	buf.sg_flags &= ~(ECHO | CRMOD);
-#elif defined(USE_WIN32_CONPTY)
-	buf.c_lflag &= (unsigned) ~(ECHO | ONLCR);
-	buf.c_lflag &= (unsigned) ~(ICANON | RAW | CBREAK);
-	buf.c_lflag |= ISIG;
+#elif defined(_NC_WINDOWS_NATIVE) || defined(USE_WIN32_CONPTY)
+        buf.dwFlagIn  = CONMODE_IN_DEFAULT  | VT_FLAG_IN;
+        buf.dwFlagOut = CONMODE_OUT_DEFAULT | VT_FLAG_OUT;
 #else
 	memset(&buf, 0, sizeof(buf));
 #endif
