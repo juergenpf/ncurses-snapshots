@@ -495,7 +495,7 @@ _nc_get_screensize(SCREEN *sp, int *linep, int *colp)
 	/* If we are here, then Windows console is used in terminfo mode.
 	   We need to figure out the size using the console API
 	 */
-	_nc_console_size(linep, colp);
+	_nc_conpty_size(linep, colp);
 	T(("screen size: winconsole lines = %d columns = %d", *linep, *colp));
 #else
 	/* figure out the size of the screen */
@@ -1022,7 +1022,7 @@ TINFO_SETUP_TERM(TERMINAL **tp,
 
 	sp = SP;
 #if defined(USE_WIN32_CONPTY) || defined(_NC_WINDOWS_NATIVE)
-		_nc_console_checkinit();
+		_nc_conpty_checkinit();
 #endif
 
 	/*

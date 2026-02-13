@@ -258,7 +258,7 @@ conpty_supported(void)
 static bool console_initialized = FALSE;
 
 NCURSES_EXPORT(BOOL)
-_nc_console_checkinit()
+_nc_conpty_checkinit()
 {
 	bool res = FALSE;
 
@@ -306,8 +306,8 @@ _nc_console_checkinit()
 			WINCONSOLE.numButtons = 1;
 		}
 
-		a = _nc_console_MapColor(true, COLOR_WHITE) |
-		    _nc_console_MapColor(false, COLOR_BLACK);
+		a = _nc_conpty_MapColor(true, COLOR_WHITE) |
+		    _nc_conpty_MapColor(false, COLOR_BLACK);
 		for (i = 0; i < CON_NUMPAIRS; i++)
 			WINCONSOLE.pairs[i] = a;
 
@@ -320,7 +320,7 @@ _nc_console_checkinit()
 
 		if (GetStdHandle(STD_OUTPUT_HANDLE) != INVALID_HANDLE_VALUE)
 		{
-			_nc_console_get_SBI();
+			_nc_conpty_get_SBI();
 			WINCONSOLE.save_SBI = WINCONSOLE.SBI;
 			GetConsoleCursorInfo(GetStdHandle(STD_OUTPUT_HANDLE), &WINCONSOLE.save_CI);
 			T(("... initial cursor is %svisible, %d%%",
@@ -349,13 +349,13 @@ static int last_console_cols = -1;
  * Returns TRUE if a resize was detected.
  */
 NCURSES_EXPORT(BOOL)
-_nc_console_check_resize(void)
+_nc_conpty_check_resize(void)
 {
 	int current_lines, current_cols;
 	bool resized = FALSE;
 
 	/* Get current console size */
-	_nc_console_size(&current_lines, &current_cols);
+	_nc_conpty_size(&current_lines, &current_cols);
 
 	/* Check if this is the first call - initialize stored size */
 	if (last_console_lines == -1 || last_console_cols == -1)
@@ -384,7 +384,7 @@ _nc_console_check_resize(void)
 }
 
 NCURSES_EXPORT(void)
-_nc_console_size(int *Lines, int *Cols)
+_nc_conpty_size(int *Lines, int *Cols)
 {
 	if (Lines != NULL && Cols != NULL)
 	{
@@ -418,7 +418,7 @@ _nc_console_size(int *Lines, int *Cols)
 }
 
 NCURSES_EXPORT(WORD)
-_nc_console_MapColor(BOOL fore, int color)
+_nc_conpty_MapColor(BOOL fore, int color)
 {
 	static const int _cmap[] =
 	    {0, 4, 2, 6, 1, 5, 3, 7};
@@ -496,7 +496,7 @@ _nc_stdout_is_conpty(void)
 #define MIN_HIGH 24
 
 NCURSES_EXPORT(BOOL)
-_nc_console_get_SBI(void)
+_nc_conpty_get_SBI(void)
 {
 	bool rc = FALSE;
 	if (GetConsoleScreenBufferInfo(GetStdHandle(STD_OUTPUT_HANDLE), &(WINCONSOLE.SBI)))

@@ -535,7 +535,7 @@ _nc_wgetch(WINDOW *win,
 
 #if defined(USE_WIN32_CONPTY)
     /* Check for console resize events after getting input */
-    if (_nc_console_check_resize()) {
+    if (_nc_conpty_check_resize()) {
 	/* Resize detected - preserve the triggering character */
 	safe_ungetch(sp, ch);
     }
@@ -563,7 +563,7 @@ _nc_wgetch(WINDOW *win,
       check_sigwinch:
 #if defined(USE_WIN32_CONPTY)
 	/* Check for console resize events before SIGWINCH handling */
-	_nc_console_check_resize();
+	_nc_conpty_check_resize();
 #endif
 #if USE_SIZECHANGE
 	if (_nc_handle_sigwinch(sp)) {
