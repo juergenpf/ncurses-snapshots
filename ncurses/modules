@@ -231,30 +231,11 @@ keybound	lib		$(base)		$(HEADER_DEPS)
 keyok		lib		$(base)		$(HEADER_DEPS)
 version		lib		$(base)		$(HEADER_DEPS)
 
-# MSYS2, using termios
-@ port_msys2
-gettimeofday	lib		$(win32con)	$(HEADER_DEPS)
-lib_win32util	lib		$(tinfo)	$(HEADER_DEPS)
-wcwidth		lib             $(win32con)	$(HEADER_DEPS)
-widechars	lib             $(wide)		$(HEADER_DEPS)
 
-# MinGW, using Console API
-@ port_win32con
-gettimeofday	lib		$(win32con)	$(HEADER_DEPS)
-#lib_win32con	lib		$(tinfo)	$(HEADER_DEPS)
-lib_win32conpty	lib		$(tinfo)	$(HEADER_DEPS)
-lib_win32util	lib		$(tinfo)	$(HEADER_DEPS)
-wcwidth		lib             $(win32con)	$(HEADER_DEPS)
-widechars	lib             $(wide)		$(HEADER_DEPS)
-
-# MinGW-W64, using Console API and named pipes
+# MinGW-W64 or Windows native, using ConPTY
 @ port_win32
-gettimeofday	lib		$(win32con)	$(HEADER_DEPS)
-#lib_win32con	lib		$(tinfo)	$(HEADER_DEPS)
 lib_win32conpty	lib		$(tinfo)	$(HEADER_DEPS)
-lib_win32conmod	lib		$(tinfo)	$(HEADER_DEPS)
 lib_win32util	lib		$(tinfo)	$(HEADER_DEPS)
-wcwidth		lib             $(win32con)	$(HEADER_DEPS)
 
 @ port_tinfo
 

@@ -379,7 +379,7 @@ handle_sysmouse(int sig GCC_UNUSED)
 }
 #endif /* USE_SYSMOUSE */
 
-#if 1 || !defined(_NC_WINDOWS_NATIVE) || defined(USE_WIN32_CONPTY) // JPF 
+#if 1 /* USE_XTERM_MOUSE */
 #define xterm_kmous "\033[M"
 
 static void
@@ -436,7 +436,7 @@ init_xterm_mouse(SCREEN *sp)
 	}
     }
 }
-#endif
+#endif /* USE_XTERM_MOUSE */
 
 static void
 enable_xterm_mouse(SCREEN *sp, bool enable)

@@ -57,4 +57,35 @@ _nc_gettimeofday(struct timeval *tv, void *tz GCC_UNUSED)
 }
 #endif // HAVE_GETTIMEOFDAY == 2
 
+#if USE_WIDEC_SUPPORT
+#define mk_wcwidth(ucs)          _nc_wcwidth(ucs)
+#define mk_wcswidth(pwcs, n)     _nc_wcswidth(pwcs, n)
+#define mk_wcwidth_cjk(ucs)      _nc_wcwidth_cjk(ucs)
+#define mk_wcswidth_cjk(pwcs, n) _nc_wcswidth_cjk(pwcs, n)
+
+#include <stddef.h>
+
+typedef enum {
+    WcUnknown = 0
+    ,WcSoftHyphen = 1		/* soft-hyphen is spacing, e.g., Latin-1 */
+    ,WcPrivateFullwidth = 2	/* private-use codes can be fullwidth in CJK */
+    ,WcEmojiFullwidth = 4	/* Emojis are fullwidth */
+} WcModes;
+
+NCURSES_EXPORT(int) mk_wcwidth_init(int);
+NCURSES_EXPORT(int) mk_wcwidth(uint32_t);
+NCURSES_EXPORT(int) mk_wcswidth(const uint32_t *, size_t);
+NCURSES_EXPORT(int) mk_wcwidth_cjk(uint32_t);
+NCURSES_EXPORT(int) mk_wcswidth_cjk(const uint32_t *, size_t);
+NCURSES_EXPORT(int) mk_is_emoji(wchar_t ucs);
+
+#include <wcwidth.h>
+#else
+void _nc_empty_wcwidth(void);
+void
+_nc_empty_wcwidth(void)
+{
+}
+#endif // USE_WIDEC_SUPPORT
+
 #endif // _NC_WINDOWS_NATIVE

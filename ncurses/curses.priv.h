@@ -2449,8 +2449,6 @@ extern NCURSES_EXPORT(BOOL)   _nc_conpty_check_resize(void);
 extern NCURSES_EXPORT(BOOL)   _nc_conpty_checkinit(int fdOut, int fdIn);  
 extern NCURSES_EXPORT(WORD)   _nc_conpty_MapColor(BOOL fore, int color);
 extern NCURSES_EXPORT(int)    _nc_conpty_flush(int fd);
-extern NCURSES_EXPORT(BOOL)   _nc_conpty_get_SBI(void);
-extern NCURSES_EXPORT(BOOL)   _nc_output_is_conpty(void);
 extern NCURSES_EXPORT(int)    _nc_conpty_read(SCREEN *sp, int *result);
 extern NCURSES_EXPORT(int)    _nc_conpty_twait(const SCREEN *sp, int mode, int milliseconds, int *timeleft, long (*gettime_func)(TimeType *, int) EVENTLIST_2nd(_nc_eventlist *evl));
 extern NCURSES_EXPORT(int)    _nc_conpty_setmode(int fd, const TTY* arg);
