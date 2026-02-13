@@ -96,7 +96,8 @@ NCURSES_SP_NAME(raw) (NCURSES_SP_DCL0)
 	buf.c_iflag &= (unsigned) ~(COOKED_INPUT);
 	buf.c_cc[VMIN] = 1;
 	buf.c_cc[VTIME] = 0;
-#elif defined(USE_WIN32_CONPTY)
+#elif defined(_NC_WINDOWS_NATIVE)
+ 	buf.dwFlagIn |= CONMODE_NORAW;
 	buf.dwFlagIn &= (unsigned long) ~CONMODE_NORAW;
 #else
 	buf.sg_flags |= RAW;
@@ -152,7 +153,7 @@ NCURSES_SP_NAME(cbreak) (NCURSES_SP_DCL0)
 	buf.c_iflag &= (unsigned) ~ICRNL;
 	buf.c_cc[VMIN] = 1;
 	buf.c_cc[VTIME] = 0;
-#elif defined(_NC_WINDOWS_NATIVE) || defined(USE_WIN32_CONPTY)
+#elif defined(_NC_WINDOWS_NATIVE)
  	buf.dwFlagIn |= CONMODE_NORAW;
 	buf.dwFlagIn &= (unsigned long) ~CONMODE_NOCBREAK;
 #else
@@ -230,7 +231,7 @@ NCURSES_SP_NAME(noraw) (NCURSES_SP_DCL0)
 	buf.c_lflag |= ISIG | ICANON |
 	    (termp->Ottyb.c_lflag & IEXTEN);
 	buf.c_iflag |= COOKED_INPUT;
-#elif defined(USE_WIN32_CONPTY)
+#elif defined(_NC_WINDOWS_NATIVE)
 	buf.dwFlagIn |= CONMODE_NORAW;
 #else
 	buf.sg_flags &= ~(RAW | CBREAK);
@@ -284,7 +285,7 @@ NCURSES_SP_NAME(nocbreak) (NCURSES_SP_DCL0)
 #ifdef TERMIOS
 	buf.c_lflag |= ICANON;
 	buf.c_iflag |= ICRNL;
-#elif defined(USE_WIN32_CONPTY)
+#elif defined(_NC_WINDOWS_NATIVE)
 	buf.dwFlagIn |= (CONMODE_NOCBREAK | CONMODE_NORAW);
 #else
 	buf.sg_flags &= ~CBREAK;

@@ -231,7 +231,7 @@ NCURSES_SP_NAME(_nc_outch)(NCURSES_SP_DCLx int ch)
 	return rc;
 }
 
-#if (defined(_NC_WINDOWS_NATIVE) || defined(USE_WIN32_CONPTY)) && USE_WIDEC_SUPPORT
+#if defined(_NC_WINDOWS_NATIVE) && USE_WIDEC_SUPPORT
 /*
 We have to operate the Windows Console Output stream in _O_BINARY mode, so no UTF-8
 translation is performed by the OS. Therefore we have to encode UTF-8 characters
@@ -291,7 +291,7 @@ _nc_outch(int ch)
 	return NCURSES_SP_NAME(_nc_outch)(CURRENT_SCREEN, ch);
 }
 
-#if defined(USE_WIN32_CONPTY) && USE_WIDEC_SUPPORT
+#if defined(_NC_WINDOWS_NATIVE) && USE_WIDEC_SUPPORT
 NCURSES_EXPORT(int)
 _nc_outch_ex(int ch)
 {

@@ -193,7 +193,7 @@ extern int errno;
 #define HAVE_SIZECHANGE 0
 #endif
 
-#if (HAVE_SIZECHANGE && USE_SIGWINCH && defined(SIGWINCH)) || defined(_NC_WINDOWS_NATIVE) || defined(USE_WIN32_CONPTY)
+#if (HAVE_SIZECHANGE && USE_SIGWINCH && defined(SIGWINCH)) || defined(_NC_WINDOWS_NATIVE)
 #define USE_SIZECHANGE 1
 #else
 #define USE_SIZECHANGE 0
@@ -592,7 +592,7 @@ typedef union {
 #define NCURSES_PUTP2(name,value)    NCURSES_SP_NAME(_nc_putp)(NCURSES_SP_ARGx name, value)
 #define NCURSES_PUTP2_FLUSH(name,value)    NCURSES_SP_NAME(_nc_putp_flush)(NCURSES_SP_ARGx name, value)
 
-#if USE_WIDEC_SUPPORT && (defined(USE_WIN32_CONPTY)||defined(_NC_WINDOWS_NATIVE))
+#if USE_WIDEC_SUPPORT && defined(_NC_WINDOWS_NATIVE)
 #define NCURSES_OUTC_FUNC_EX    NCURSES_SP_NAME(_nc_outch_ex)
 // #define NCURSES_OUTC_FUNC_EX    NCURSES_SP_NAME(_nc_outch)
 #else
@@ -2207,7 +2207,7 @@ extern NCURSES_EXPORT(void) _nc_signal_handler (int);
 extern NCURSES_EXPORT(void) _nc_synchook (WINDOW *);
 extern NCURSES_EXPORT(void) _nc_trace_tries (TRIES *);
 
-#if USE_WIDEC_SUPPORT && (defined(USE_WIN32_CONPTY)||defined(_NC_WINDOWS_NATIVE))
+#if USE_WIDEC_SUPPORT && defined(_NC_WINDOWS_NATIVE)
 extern NCURSES_EXPORT(int) _nc_outch_ex(int);
 #endif
 
@@ -2440,7 +2440,7 @@ extern NCURSES_EXPORT(void)   _nc_get_screensize(SCREEN *, int *, int *);
 	_nc_setupterm(name, fd, err, reuse)
 
 
-#if defined(_NC_WINDOWS_NATIVE) || defined(USE_WIN32_CONPTY)
+#if defined(_NC_WINDOWS_NATIVE)
 #ifndef UTF8_MAX_BYTES
 #define UTF8_MAX_BYTES 4 /* Maximum bytes in UTF-8 sequence */
 #endif
@@ -2454,7 +2454,7 @@ extern NCURSES_EXPORT(int)    _nc_conpty_twait(const SCREEN *sp, int mode, int m
 extern NCURSES_EXPORT(int)    _nc_conpty_setmode(int fd, const TTY* arg);
 extern NCURSES_EXPORT(int)    _nc_conpty_getmode(int fd, TTY*  arg);
 extern NCURSES_EXPORT(size_t) _nc_wchar_to_utf8(wchar_t wc, char utf8[UTF8_MAX_BYTES]);
-#endif /* USE_WIN32_CONPTY */
+#endif /* _NC_WINDOWS_NATIVE */
 
 #define NC_ISATTY(fd) isatty(fd)
 
@@ -2535,7 +2535,7 @@ extern NCURSES_EXPORT(void)     NCURSES_SP_NAME(_nc_linedump)(SCREEN*);
 
 #if USE_WIDEC_SUPPORT
 extern NCURSES_EXPORT(wchar_t *) NCURSES_SP_NAME(_nc_wunctrl)(SCREEN*, cchar_t *);
-#if defined(USE_WIN32_CONPTY)
+#if defined(_NC_WINDOWS_NATIVE)
 extern NCURSES_EXPORT(int)      NCURSES_SP_NAME(_nc_outch_ex)(SCREEN*, int);
 #endif
 #endif

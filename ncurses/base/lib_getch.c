@@ -48,7 +48,7 @@ MODULE_ID("$Id: lib_getch.c,v 1.154 2025/12/27 12:28:45 tom Exp $")
 
 #include <fifo_defs.h>
 
-#ifdef USE_WIN32_CONPTY
+#if defined(_NC_WINDOWS_NATIVE)
 #include <windows.h>
 #endif
 
@@ -263,7 +263,7 @@ fifo_push(SCREEN *sp EVENTLIST_2nd(_nc_eventlist * evl))
     } else
 #endif
     {				/* Can block... */
-#if defined(_NC_WINDOWS_NATIVE) || defined(USE_WIN32_CONPTY)
+#if defined(_NC_WINDOWS_NATIVE)
 	/* Use UTF-8 assembly for WIN32_CONPTY */
 	n = _nc_conpty_read(sp, &ch);
 #else
@@ -533,7 +533,7 @@ _nc_wgetch(WINDOW *win,
 	ch = fifo_pull(sp);
     }
 
-#if defined(USE_WIN32_CONPTY)
+#if defined(_NC_WINDOWS_NATIVE)
     /* Check for console resize events after getting input */
     if (_nc_conpty_check_resize()) {
 	/* Resize detected - preserve the triggering character */
@@ -561,7 +561,7 @@ _nc_wgetch(WINDOW *win,
 
     if (ch == ERR) {
       check_sigwinch:
-#if defined(USE_WIN32_CONPTY)
+#if defined(_NC_WINDOWS_NATIVE)
 	/* Check for console resize events before SIGWINCH handling */
 	_nc_conpty_check_resize();
 #endif

@@ -37,11 +37,13 @@
 #if defined(_NC_WINDOWS_NATIVE)
 #include <locale.h>
 #include <stdio.h>
-#include <wchar.h>  /* For wide character functions */
 #include <string.h>
 #include <winternl.h>
 #include <io.h>    
 #include <fcntl.h>
+#if USE_WIDEC_SUPPORT
+#include <wchar.h>
+#endif
 
 MODULE_ID("$Id$")
 
@@ -52,61 +54,59 @@ MODULE_ID("$Id$")
 NCURSES_EXPORT_VAR(ConsoleInfo)
 _nc_CONSOLE;
 
-#define NOT_IMPLEMENTED                                                          \
-	{                                                                        \
-		fprintf(stderr, "NOT IMPLEMENTED: %s:%d\n", __FILE__, __LINE__); \
-		abort();                                                         \
-	}
+#define UTF8_CP 65001
+#define DEFAULT_UTF8_CTYPE_ENV "C.UTF-8"
 
-static int
-locale_is_utf8(const char *loc)
+#define DEFAULT_ASCII_CP 1252
+#define DEFAULT_ASCII_CTYPE_ENV "English_United States.1252"
+
+static BOOL
+locale_is_utf8()
 {
-	if (!loc)
-		return 0;
-	return strstr(loc, "UTF-8") ||
-	       strstr(loc, "utf8") ||
-	       strstr(loc, "utf-8");
+	return GetACP() == UTF8_CP;
 }
 
-static int
-locale_compatible_with_ncurses(const char *loc)
+static BOOL
+locale_compatible_with_ncurses()
 {
 #if USE_WIDEC_SUPPORT
-	return locale_is_utf8(loc);
+	return locale_is_utf8();
 #else
-	return !locale_is_utf8(loc);
+	return !locale_is_utf8();
 #endif
 }
 
-static int
+static BOOL
 codepage_compatible_with_ncurses(UINT cp)
 {
 #if USE_WIDEC_SUPPORT
-	return cp == 65001; /* only UTF-8 */
+	return cp == UTF8_CP; /* only UTF-8 */
 #else
-	return cp != 65001; /* all but UTF-8 */
+	return cp != UTF8_CP; /* all but UTF-8 */
 #endif
 }
 
 /* Check Codepage exists */
-static int valid_codepage(UINT cp)
+static BOOL 
+valid_codepage(UINT cp)
 {
 	CPINFOEX info;
 	return GetCPInfoEx(cp, 0, &info) != 0;
 }
 
 /* Check Windows Locale is valid */
-static int valid_locale(const char *loc)
+static BOOL
+valid_locale(const char *loc)
 {
 	if (!loc || !*loc)
-		return 0;
+		return FALSE;
 
 	if (!setlocale(LC_CTYPE, loc))
-		return 0;
+		return FALSE;
 
 	/* Reset to previous value */
 	setlocale(LC_CTYPE, "");
-	return 1;
+	return TRUE;
 }
 
 /* Encoding setup for Windows */
@@ -114,13 +114,12 @@ static void
 encoding_init(void)
 {
 #if USE_WIDEC_SUPPORT
-	UINT default_cp = CP_UTF8;
-	const char *default_ctype = "C.UTF-8";
+	UINT default_cp = UTF8_CP;
+	const char *default_ctype = DEFAULT_UTF8_CTYPE_ENV;
 #else
-	UINT default_cp = 1252;
-	const char *default_ctype = "English_United States.1252";
+	UINT default_cp = DEFAULT_ASCII_CP;
+	const char *default_ctype = DEFAULT_ASCII_CTYPE_ENV;
 #endif
-
 	const char *env_cp = getenv("NC_WINCP");
 	const char *env_ctype = getenv("NC_WIN_CTYPE");
 
@@ -167,11 +166,13 @@ encoding_init(void)
 	{
 		SetConsoleCP(cp);
 		SetConsoleOutputCP(cp);
+		SetConsoleCP(cp);
 	}
 	else
 	{
 		SetConsoleCP(default_cp);
 		SetConsoleOutputCP(default_cp);
+		SetConsoleCP(default_cp);
 	}
 
 	if (!setlocale(LC_CTYPE, ctype))
@@ -195,10 +196,6 @@ encoding_init(void)
 #define REQUIRED_MAJOR_V (DWORD)10
 #define REQUIRED_MINOR_V (DWORD)0
 #define REQUIRED_BUILD (DWORD)17763
-/*
-  This function returns 0 if the Windows version has no support for
-  the modern Console interface, otherwise it returns 1
- */
 
 typedef NTSTATUS (WINAPI *RtlGetVersionPtr)(PRTL_OSVERSIONINFOW);
 
@@ -220,6 +217,10 @@ static bool get_real_windows_version(DWORD* major, DWORD* minor, DWORD* build) {
     return false;
 }
 
+/* Check if the current Windows version supports ConPTY, which is a requirement for the Windows Console backend of ncurses. 
+   This is because without ConPTY, the Windows Console does not provide the necessary capabilities for ncurses and
+   escpecially the terminfo layer to function properly.
+*/
 static BOOL
 conpty_supported(void)
  {
@@ -245,6 +246,51 @@ conpty_supported(void)
                         res = TRUE;
         }
         returnBool(res);
+}
+
+/*
+ * Reliably validate that stdout is in ConPTY mode and not in console mode.
+ *
+ * Returns:
+ *   true  - stdout is in ConPTY mode (virtual terminal processing enabled)
+ *   false - stdout is in legacy console mode or not a console at all
+ */
+static BOOL
+output_is_conpty(void)
+{
+	HANDLE out_handle;
+	DWORD console_mode = 0;
+	CONSOLE_SCREEN_BUFFER_INFO csbi;
+	bool result = false;
+
+	T((T_CALLED("lib_win32conpty::_nc_output_is_conpty()")));
+
+	out_handle = WINCONSOLE.used_output_handle;
+	if (GetConsoleMode(out_handle, &console_mode) == 0)
+	{
+		T(("GetConsoleMode() failed"));
+		returnCode(false);
+	}
+
+	if (console_mode & ENABLE_VIRTUAL_TERMINAL_PROCESSING)
+	{
+		if (GetConsoleScreenBufferInfo(out_handle, &csbi))
+		{
+			result = true;
+			T(("Console mode has ENABLE_VIRTUAL_TERMINAL_PROCESSING - ConPTY detected"));
+		}
+		else
+		{
+			result = true;
+			T(("Console mode has ENABLE_VIRTUAL_TERMINAL_PROCESSING (no CSBI) - ConPTY detected"));
+		}
+	}
+	else
+	{
+		T(("Console mode lacks ENABLE_VIRTUAL_TERMINAL_PROCESSING - legacy console mode"));
+	}
+
+	returnCode(result);
 }
 
 /*
@@ -352,8 +398,32 @@ _nc_conpty_checkinit(int fdOut, int fdIn)
 		setmode(_fileno(stdin),  O_BINARY);
 		setmode(fdOut, O_BINARY);
 
-		_nc_conpty_get_SBI();
+		if (!GetConsoleScreenBufferInfo(out_hdl, &WINCONSOLE.SBI))
+		{
+			T(("GetConsoleScreenBufferInfo failed"));
+			returnBool(FALSE);
+		} else {
+			T(("GetConsoleScreenBufferInfo"));
+			T(("... buffer(X:%d Y:%d)",
+		   		WINCONSOLE.SBI.dwSize.X,
+		   		WINCONSOLE.SBI.dwSize.Y));
+			T(("... window(X:%d Y:%d)",
+		   		WINCONSOLE.SBI.dwMaximumWindowSize.X,
+		   		WINCONSOLE.SBI.dwMaximumWindowSize.Y));
+			T(("... cursor(X:%d Y:%d)",
+		   		WINCONSOLE.SBI.dwCursorPosition.X,
+		   		WINCONSOLE.SBI.dwCursorPosition.Y));
+			T(("... display(Top:%d Bottom:%d Left:%d Right:%d)",
+		   		WINCONSOLE.SBI.srWindow.Top,
+		   		WINCONSOLE.SBI.srWindow.Bottom,
+		   		WINCONSOLE.SBI.srWindow.Left,
+		   		WINCONSOLE.SBI.srWindow.Right));
+			
+			WINCONSOLE.origin.X = WINCONSOLE.SBI.srWindow.Left;
+			WINCONSOLE.origin.Y = WINCONSOLE.SBI.srWindow.Top;
+		}
 		WINCONSOLE.save_SBI = WINCONSOLE.SBI;
+		
 		GetConsoleCursorInfo(out_hdl, &WINCONSOLE.save_CI);
 		T(("... initial cursor is %svisible, %d%%",
 		   (WINCONSOLE.save_CI.bVisible ? "" : "not-"),
@@ -386,7 +456,7 @@ _nc_conpty_checkinit(int fdOut, int fdIn)
 		setmode(fdOut, O_BINARY);	
 		res = TRUE;
 	}
-	BOOL check = _nc_output_is_conpty();
+	BOOL check = output_is_conpty();
 	T(("... console initialized=%d, isConpty=%d",
 	   WINCONSOLE.initialized,
 	   check));
@@ -408,27 +478,20 @@ _nc_conpty_check_resize(void)
 	int current_lines, current_cols;
 	bool resized = FALSE;
 
-	/* Get current console size */
 	_nc_conpty_size(&current_lines, &current_cols);
 
-	/* Check if this is the first call - initialize stored size */
 	if (last_console_lines == -1 || last_console_cols == -1)
 	{
 		last_console_lines = current_lines;
 		last_console_cols = current_cols;
-		return FALSE; /* Don't report resize on first call */
+		return FALSE;
 	}
 
-	/* Compare with stored size */
 	if (current_lines != last_console_lines || current_cols != last_console_cols)
 	{
-		/* Console was resized */
-
-		/* Update stored size */
 		last_console_lines = current_lines;
 		last_console_cols = current_cols;
 
-		/* Set the global SIGWINCH flag (like Unix version) */
 		_nc_globals.have_sigwinch = 1;
 
 		resized = TRUE;
@@ -445,7 +508,6 @@ _nc_conpty_size(int *Lines, int *Cols)
 		CONSOLE_SCREEN_BUFFER_INFO csbi;
 		HANDLE hdl_out = WINCONSOLE.used_output_handle;
 
-		/* Get current console buffer information using GetStdHandle for Wine compatibility */
 		if (hdl_out != INVALID_HANDLE_VALUE && GetConsoleScreenBufferInfo(hdl_out, &csbi))
 		{
 			*Lines = (int)(csbi.srWindow.Bottom + 1 - csbi.srWindow.Top);
@@ -453,7 +515,6 @@ _nc_conpty_size(int *Lines, int *Cols)
 		}
 		else
 		{
-			/* Try the original CON_STDOUT_HANDLE as fallback */
 			if (GetConsoleScreenBufferInfo(GetStdHandle(STD_OUTPUT_HANDLE), &csbi))
 			{
 				*Lines = (int)(csbi.srWindow.Bottom + 1 - csbi.srWindow.Top);
@@ -461,7 +522,6 @@ _nc_conpty_size(int *Lines, int *Cols)
 			}
 			else
 			{
-				/* Final fallback to cached values */
 				*Lines = (int)(WINCONSOLE.SBI.srWindow.Bottom + 1 -
 					       WINCONSOLE.SBI.srWindow.Top);
 				*Cols = (int)(WINCONSOLE.SBI.srWindow.Right + 1 -
@@ -484,94 +544,6 @@ _nc_conpty_MapColor(BOOL fore, int color)
 	if (!fore)
 		a = a << 4;
 	return (WORD)a;
-}
-
-/*
- * Reliably validate that stdout is in ConPTY mode and not in console mode.
- *
- * Returns:
- *   true  - stdout is in ConPTY mode (virtual terminal processing enabled)
- *   false - stdout is in legacy console mode or not a console at all
- */
-NCURSES_EXPORT(BOOL)
-_nc_output_is_conpty(void)
-{
-	HANDLE out_handle;
-	DWORD console_mode = 0;
-	CONSOLE_SCREEN_BUFFER_INFO csbi;
-	bool result = false;
-
-	T((T_CALLED("lib_win32conpty::_nc_output_is_conpty()")));
-
-	// Get stdout handle
-	out_handle = WINCONSOLE.used_output_handle;
-	if (GetConsoleMode(out_handle, &console_mode) == 0)
-	{
-		T(("GetConsoleMode() failed"));
-		returnCode(false);
-	}
-
-	// Check if virtual terminal processing is enabled (ConPTY mode)
-	if (console_mode & ENABLE_VIRTUAL_TERMINAL_PROCESSING)
-	{
-		// Additional validation: try to get console screen buffer info
-		// In ConPTY mode, this should succeed but behavior may differ
-		if (GetConsoleScreenBufferInfo(out_handle, &csbi))
-		{
-			// ConPTY typically has different characteristics
-			// We can be confident this is ConPTY mode if VT processing is enabled
-			result = true;
-			T(("Console mode has ENABLE_VIRTUAL_TERMINAL_PROCESSING - ConPTY detected"));
-		}
-		else
-		{
-			// Even if GetConsoleScreenBufferInfo fails, VT processing flag indicates ConPTY
-			result = true;
-			T(("Console mode has ENABLE_VIRTUAL_TERMINAL_PROCESSING (no CSBI) - ConPTY detected"));
-		}
-	}
-	else
-	{
-		T(("Console mode lacks ENABLE_VIRTUAL_TERMINAL_PROCESSING - legacy console mode"));
-	}
-
-	returnCode(result);
-}
-
-
-#define MIN_WIDE 80
-#define MIN_HIGH 24
-
-NCURSES_EXPORT(BOOL)
-_nc_conpty_get_SBI(void)
-{
-	bool rc = FALSE;
-	if (GetConsoleScreenBufferInfo(WINCONSOLE.used_output_handle, &(WINCONSOLE.SBI)))
-	{
-		T(("GetConsoleScreenBufferInfo"));
-		T(("... buffer(X:%d Y:%d)",
-		   WINCONSOLE.SBI.dwSize.X,
-		   WINCONSOLE.SBI.dwSize.Y));
-		T(("... window(X:%d Y:%d)",
-		   WINCONSOLE.SBI.dwMaximumWindowSize.X,
-		   WINCONSOLE.SBI.dwMaximumWindowSize.Y));
-		T(("... cursor(X:%d Y:%d)",
-		   WINCONSOLE.SBI.dwCursorPosition.X,
-		   WINCONSOLE.SBI.dwCursorPosition.Y));
-		T(("... display(Top:%d Bottom:%d Left:%d Right:%d)",
-		   WINCONSOLE.SBI.srWindow.Top,
-		   WINCONSOLE.SBI.srWindow.Bottom,
-		   WINCONSOLE.SBI.srWindow.Left,
-		   WINCONSOLE.SBI.srWindow.Right));
-		WINCONSOLE.origin.X = WINCONSOLE.SBI.srWindow.Left;
-		WINCONSOLE.origin.Y = WINCONSOLE.SBI.srWindow.Top;
-		rc = TRUE;
-	}
-	else
-	{
-		T(("GetConsoleScreenBufferInfo ERR"));
-	}
-	return rc;
 }
 
 #if USE_WIDEC_SUPPORT
@@ -841,7 +813,6 @@ _nc_conpty_twait(const SCREEN *sp GCC_UNUSED,
     int result = TW_NONE;
     TimeType t0;
     
-    /* Helper macro for min */
     #define min(a, b) ((a) < (b) ? (a) : (b))
     
     long starttime = gettime_func(&t0, TRUE);
@@ -850,36 +821,31 @@ _nc_conpty_twait(const SCREEN *sp GCC_UNUSED,
 		      milliseconds, mode));
 
     if (mode & (TW_INPUT | TW_MOUSE)) {
-        HANDLE stdin_handle = (HANDLE)_get_osfhandle(_fileno(stdin));
+        HANDLE in_handle = WINCONSOLE.used_input_handle;
         DWORD wait_result;
         
         if (milliseconds < 0) {
-            /* Infinite wait - but check periodically to be interruptible */
             while (TRUE) {
-                wait_result = WaitForSingleObject(stdin_handle, 100);
+                wait_result = WaitForSingleObject(in_handle, 100);
                 if (wait_result == WAIT_OBJECT_0) {
                     result = TW_INPUT;
-                    /* For ConPTY, mouse events come through input stream */
                     if (mode & TW_MOUSE) result |= TW_MOUSE;
                     break;
                 } else if (wait_result == WAIT_TIMEOUT) {
-                    continue; /* Keep waiting */
+                    continue;
                 } else {
-                    break; /* Error */
+                    break;
                 }
             }
         } else if (milliseconds == 0) {
-            /* Non-blocking check - use different approach for ConPTY */
             DWORD events_available = 0;
             
-            /* First try to get number of console input events */
-            if (GetNumberOfConsoleInputEvents(stdin_handle, &events_available)) {
+            if (GetNumberOfConsoleInputEvents(in_handle, &events_available)) {
                 if (events_available > 0) {
-                    /* Check if there are actual input events (not just mouse/resize) */
                     INPUT_RECORD input_buffer[16];
                     DWORD events_read = 0;
                     
-                    if (PeekConsoleInput(stdin_handle, input_buffer, 
+                    if (PeekConsoleInput(in_handle, input_buffer, 
                                        min(events_available, 16), &events_read)) {
                         for (DWORD i = 0; i < events_read; i++) {
                             if (input_buffer[i].EventType == KEY_EVENT && 
@@ -892,39 +858,33 @@ _nc_conpty_twait(const SCREEN *sp GCC_UNUSED,
                             }
                         }
                     } else {
-                        /* Fallback to WaitForSingleObject if PeekConsoleInput fails */
-                        wait_result = WaitForSingleObject(stdin_handle, 0);
+                        wait_result = WaitForSingleObject(in_handle, 0);
                         if (wait_result == WAIT_OBJECT_0) {
                             result = TW_INPUT;
                             if (mode & TW_MOUSE) result |= TW_MOUSE;
                         }
                     }
                 } else {
-                    /* No events available - return immediately */
                     result = TW_NONE;
                 }
             } else {
-                /* Fallback to WaitForSingleObject if GetNumberOfConsoleInputEvents fails */
-                wait_result = WaitForSingleObject(stdin_handle, 0);
+                wait_result = WaitForSingleObject(in_handle, 0);
                 if (wait_result == WAIT_OBJECT_0) {
                     result = TW_INPUT;
                     if (mode & TW_MOUSE) result |= TW_MOUSE;
                 }
             }
         } else {
-            /* Timed wait */
-            wait_result = WaitForSingleObject(stdin_handle, (DWORD)milliseconds);
+            wait_result = WaitForSingleObject(in_handle, (DWORD)milliseconds);
             if (wait_result == WAIT_OBJECT_0) {
                 result = TW_INPUT;
                 if (mode & TW_MOUSE) result |= TW_MOUSE;
             }
         }
     } else if (milliseconds > 0) {
-        /* Just sleep for the specified time */
         Sleep((DWORD)milliseconds);
     }
     
-    /* Calculate remaining time */
     long elapsed = gettime_func(&t0, FALSE) - starttime;
     if (timeleft) {
         *timeleft = (milliseconds >= 0) ? Max(0, milliseconds - (int)elapsed) : milliseconds;
@@ -937,4 +897,139 @@ _nc_conpty_twait(const SCREEN *sp GCC_UNUSED,
     return result;
 }
 
-#endif /* defined(USE_WIN32_CONPTY)) */
+typedef enum { NotKnown, Input, Output } HandleType;
+
+static HandleType classify_handle(HANDLE hdl) {
+    HandleType type = NotKnown;
+    if (hdl!= INVALID_HANDLE_VALUE) {
+	if (hdl == WINCONSOLE.used_input_handle) {
+	    type = Input;
+	} else if (hdl == WINCONSOLE.used_output_handle) {
+	    type = Output;
+	}	
+    }
+    return type;
+}
+
+NCURSES_EXPORT(int)
+_nc_conpty_flush(int fd)
+{
+	int code = OK;
+	HANDLE hdl = _get_osfhandle(fd);
+	HandleType type = classify_handle(hdl);
+
+	T((T_CALLED("lib_win32conmod::_nc_conpty_flush(fd=%d)"), fd));
+
+	if (type == Input)
+	{
+		if (!FlushConsoleInputBuffer(hdl))
+			code = ERR;
+	}
+	else if (type == Output)
+	{
+		/* Flush output buffer - use FlushFileBuffers for proper VT processing */
+		if (!FlushFileBuffers(hdl))
+			code = ERR;
+	}
+	else
+	{
+		code = ERR;
+		T(("_nc_conpty_flush not requesting a handle owned by console."));
+	}
+	returnCode(code);
+}
+ 
+NCURSES_EXPORT(int)
+_nc_conpty_setmode(int fd, const TTY *arg)
+{
+	if (!arg) return ERR;
+	
+	HANDLE in_hdl = WINCONSOLE.used_input_handle;
+	HANDLE out_hdl = WINCONSOLE.used_output_handle;
+	HANDLE fd_hdl = INVALID_HANDLE_VALUE;
+	HandleType fd_type = NotKnown;
+	
+	// Get handle from fd
+	if (fd >= 0) {
+		fd_hdl = _get_osfhandle(fd);
+		fd_type = classify_handle(fd_hdl);
+	}
+	if (fd_type == NotKnown) {
+		T(("_nc_conpty_setmode: fd %d does not correspond to console input or output handle", fd));
+		return ERR;
+	}
+
+	// Determine which handles to use based on classification
+	HANDLE input_target  = INVALID_HANDLE_VALUE;
+	HANDLE output_target = INVALID_HANDLE_VALUE;
+	
+	if (fd_type == Input) {
+		input_target = fd_hdl;
+		output_target = out_hdl;
+	} else if (fd_type == Output) {
+		input_target = in_hdl;
+		output_target = fd_hdl;
+	} else {
+		input_target = in_hdl;
+		output_target = out_hdl;
+	}
+	
+	// Apply modes to appropriate handles
+	bool input_ok = false, output_ok = false;
+	
+	if (input_target != INVALID_HANDLE_VALUE) {
+        DWORD mode = arg->dwFlagIn;
+        
+        /* 
+           ENABLE_VIRTUAL_TERMINAL_INPUT (VT) requires ENABLE_PROCESSED_INPUT to be effective.
+           If we request VT, we must ensure PROCESSED is set, otherwise SetConsoleMode fails.
+	   We always allow mouse and window input events if VT input is requested, as these 
+	   are commonly used together and it simplifies the logic to just enable them when 
+	   VT is enabled.
+        */
+        if (mode & VT_FLAG_IN) {
+            mode |= ENABLE_PROCESSED_INPUT | ENABLE_MOUSE_INPUT | ENABLE_WINDOW_INPUT;
+        }
+
+        /* Sanitize: ENABLE_ECHO_INPUT requires ENABLE_LINE_INPUT */ 
+        if ((mode & ENABLE_ECHO_INPUT) && !(mode & ENABLE_LINE_INPUT)) {
+             mode &= ~ENABLE_ECHO_INPUT;
+        }
+
+	input_ok = SetConsoleMode(input_target, mode);
+	if (input_ok) {
+		WINCONSOLE.ttyflags.dwFlagIn = mode;	}
+	}
+	
+	if (output_target != INVALID_HANDLE_VALUE) {
+		output_ok = SetConsoleMode(output_target, VT_FLAG_OUT |arg->dwFlagOut);
+		if (output_ok) {
+			WINCONSOLE.ttyflags.dwFlagOut = VT_FLAG_OUT | arg->dwFlagOut;
+		}
+	}
+	
+	// Handle errors
+	if (!input_ok || !output_ok)
+	{
+		return ERR;
+	}
+		
+	return OK;
+}
+
+NCURSES_EXPORT(int)
+_nc_conpty_getmode(int fd, TTY *arg)
+{
+	if (NULL==arg) return ERR;
+
+	HANDLE hdl = _get_osfhandle(fd);
+	HandleType type = classify_handle(hdl);
+	if (type == NotKnown) {
+		T(("_nc_conpty_getmode: fd %d does not correspond to console input or output handle", fd));
+		return ERR;
+	}	
+	*arg = WINCONSOLE.ttyflags; 
+	return OK;
+}
+
+#endif /* defined(_NC_WINDOWS_NATIVE) */

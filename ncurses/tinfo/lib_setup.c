@@ -289,7 +289,6 @@ use_tioctl(bool f)
 }
 #endif
 
-#if 1 || !(defined(_NC_WINDOWS_NATIVE) || defined(USE_WIN32_CONPTY)) // JPF Check
 static void
 _nc_default_screensize(TERMINAL *termp, int *linep, int *colp)
 {
@@ -314,6 +313,7 @@ _nc_default_screensize(TERMINAL *termp, int *linep, int *colp)
 	}
 }
 
+#if !(defined(_NC_WINDOWS_NATIVE))
 #if defined(USE_CHECK_SIZE) && defined(user6) && defined(user7)
 static const char *
 skip_csi(const char *value)
@@ -434,7 +434,7 @@ _nc_check_screensize(SCREEN *sp, TERMINAL *termp, int *linep, int *colp)
 	int fd = termp->Filedes;
 	TTY saved;
 	const char *name = NULL;
-#if !(defined(_NC_WINDOWS_NATIVE) || defined(USE_WIN32_CONPTY)) // JPF Check
+
 	if (IsRealTty(fd, name) && VALID_STRING(cursor_address) && is_expected(user7, "6n") && (is_expected(user6, "%i%d;%dR") || is_expected(user6, "%i%p1%d;%p2%dR")) && GET_TTY(fd, &saved) == OK)
 	{
 		int current_y = -1, current_x = -1;
@@ -473,13 +473,13 @@ _nc_check_screensize(SCREEN *sp, TERMINAL *termp, int *linep, int *colp)
 		T(("NOT trying CPR with fd %d (%s): %s",
 		   fd, NonNull(name), NC_ISATTY(fd) ? "tty" : "not a tty"));
 	}
-#endif /* !defined(USE_WIN32_CONPTY) */
-	_nc_default_screensize(termp, linep, colp);
 }
 #else												 /* !USE_CHECK_SIZE */
 #define _nc_check_screensize(sp, termp, linep, colp) /* nothing */
-#endif
-#endif /* !defined(USE_WIN32_CONPTY) */
+#endif /* USE_CHECK_SIZE */
+#else /* _NC_WINDOWS_NATIVE */
+#define _nc_check_screensize(sp, termp, linep, colp) _nc_conpty_size
+#endif /* !(_NC_WINDOWS_NATIVE) */
 
 NCURSES_EXPORT(void)
 _nc_get_screensize(SCREEN *sp, int *linep, int *colp)
@@ -491,7 +491,7 @@ _nc_get_screensize(SCREEN *sp, int *linep, int *colp)
 	bool useTioctl = _nc_prescreen.use_tioctl;
 
 	T((T_CALLED("_nc_get_screensize (%p)"), (void *)sp));
-#if defined(_NC_WINDOWS_NATIVE) || defined(USE_WIN32_CONPTY)
+#if defined(_NC_WINDOWS_NATIVE)
 	/* If we are here, then Windows console is used in terminfo mode.
 	   We need to figure out the size using the console API
 	 */
@@ -650,7 +650,7 @@ _nc_update_screensize(SCREEN *sp)
 		 */
 		if (sp->_resize != NULL)
 		{
-#if defined(USE_WIN32_CONPTY)
+#if defined(_NC_WINDOWS_NATIVE)
 			/* On Windows ConPTY, always push KEY_RESIZE if SIGWINCH flag is set */
 			if (sp->_sig_winch && (sp->_ungetch != NULL)) {
 				sp->_ungetch(SP_PARM, KEY_RESIZE);
@@ -867,7 +867,7 @@ TINFO_SETUP_TERM(TERMINAL **tp,
 	if (tname == NULL)
 	{
 		tname = getenv("TERM");
-#if defined(USE_WIN32_CONPTY)
+#if defined(_NC_WINDOWS_NATIVE)
 		if (!VALID_TERM_ENV(tname, NO_TERMINAL))
 		{
 			T(("Failure with TERM=%s", NonNull(tname)));
@@ -1021,7 +1021,7 @@ TINFO_SETUP_TERM(TERMINAL **tp,
 	}
 
 	sp = SP;
-#if defined(USE_WIN32_CONPTY) || defined(_NC_WINDOWS_NATIVE)
+#if defined(_NC_WINDOWS_NATIVE)
 		if (!_nc_conpty_checkinit(Filedes,-1))
 			code = ERR;
 #endif

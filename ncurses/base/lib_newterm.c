@@ -84,7 +84,7 @@ _nc_initscr(NCURSES_SP_DCL0)
 	buf.c_oflag &= (unsigned) ~(ONLCR);
 #elif HAVE_SGTTY_H
 	buf.sg_flags &= ~(ECHO | CRMOD);
-#elif defined(_NC_WINDOWS_NATIVE) || defined(USE_WIN32_CONPTY)
+#elif defined(_NC_WINDOWS_NATIVE)
         buf.dwFlagIn  = (CONMODE_IN_DEFAULT | VT_FLAG_IN) & ~ENABLE_ECHO_INPUT;
         buf.dwFlagOut = (CONMODE_OUT_DEFAULT | VT_FLAG_OUT | DISABLE_NEWLINE_AUTO_RETURN);
 #else
@@ -229,7 +229,7 @@ NCURSES_SP_NAME(newterm) (NCURSES_SP_DCLx
 	} else {
 	    int value;
 	    int cols;
-#if defined(_NC_WINDOWS_NATIVE) || defined(USE_WIN32_CONPTY)
+#if defined(_NC_WINDOWS_NATIVE)
 	    if (!_nc_conpty_checkinit(fileno(_ofp), fileno(_ifp)))
 	    {
 		_nc_set_screen(current);
@@ -325,7 +325,7 @@ NCURSES_SP_NAME(newterm) (NCURSES_SP_DCLx
 
 	    _nc_signal_handler(TRUE);
 	    result = SP_PARM;
-#if defined(_NC_WINDOWS_NATIVE) || defined(USE_WIN32_CONPTY)
+#if defined(_NC_WINDOWS_NATIVE)
 	}
 #endif
 	}

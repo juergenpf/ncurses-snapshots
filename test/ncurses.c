@@ -7811,7 +7811,7 @@ main_menu(bool top)
 	command = 0;
 	for (;;) {
 #if USE_WIDEC_SUPPORT
-#if defined(_WIN32) || defined(USE_WIN32_CONPTY)
+#if defined(_WIN32) || defined(_NC_WINDOWS_NATIVE)
             /* Use fgetc for Windows - wide char input is problematic */
             int ch_int = fgetc(stdin);
             wint_t ch = (ch_int == EOF) ? WEOF : (wint_t)ch_int;

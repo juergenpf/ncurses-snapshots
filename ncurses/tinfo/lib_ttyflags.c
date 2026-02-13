@@ -141,7 +141,7 @@ NCURSES_SP_NAME(def_shell_mode) (NCURSES_SP_DCL0)
 #ifdef TERMIOS
 	    if (termp->Ottyb.c_oflag & OFLAGS_TABS)
 		tab = back_tab = NULL;
-#elif defined(USE_WIN32_CONPTY)
+#elif defined(_NC_WINDOWS_NATIVE)
 	    /* noop */
 #else
 	    if (termp->Ottyb.sg_flags & XTABS)
@@ -176,7 +176,7 @@ NCURSES_SP_NAME(def_prog_mode) (NCURSES_SP_DCL0)
 	if (_nc_get_tty_mode(&termp->Nttyb) == OK) {
 #ifdef TERMIOS
 	    termp->Nttyb.c_oflag &= (unsigned) (~OFLAGS_TABS);
-#elif defined(USE_WIN32_CONPTY)
+#elif defined(_NC_WINDOWS_NATIVE)
 	    /* noop */
 #else
 	    termp->Nttyb.sg_flags &= (unsigned) (~XTABS);

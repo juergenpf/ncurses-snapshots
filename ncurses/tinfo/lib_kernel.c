@@ -94,7 +94,7 @@ NCURSES_SP_NAME(erasechar) (NCURSES_SP_DCL0)
 	result = termp->Ottyb.c_cc[VERASE];
 	if (result == _nc_vdisable())
 	    result = ERR;
-#elif defined(USE_WIN32_CONPTY)
+#elif defined(_NC_WINDOWS_NATIVE)
 	result = ERR;
 #else
 	result = termp->Ottyb.sg_erase;
@@ -131,7 +131,7 @@ NCURSES_SP_NAME(killchar) (NCURSES_SP_DCL0)
 	result = termp->Ottyb.c_cc[VKILL];
 	if (result == _nc_vdisable())
 	    result = ERR;
-#elif defined(USE_WIN32_CONPTY)
+#elif defined(_NC_WINDOWS_NATIVE)
 	result = ERR;
 #else
 	result = termp->Ottyb.sg_kill;
@@ -156,7 +156,7 @@ flush_input(int fd)
 #else /* !TERMIOS */
     errno = 0;
     do {
-#if defined(USE_WIN32_CONPTY)
+#if defined(_NC_WINDOWS_NATIVE)
 	_nc_conpty_flush(fd);
 #else
 	ioctl(fd, TIOCFLUSH, 0);

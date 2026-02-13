@@ -59,7 +59,7 @@
 #include <os2.h>
 #endif
 
-#if defined(USE_WIN32_CONPTY)
+#if defined(_NC_WINDOWS_NATIVE)
 #include <windows.h>
 #include <io.h>
 #endif
@@ -183,7 +183,7 @@ _nc_timed_wait(const SCREEN *sp MAYBE_UNUSED,
     int result = TW_NONE;
     TimeType t0;
 
-#if defined(_NC_WINDOWS_NATIVE) || defined(USE_WIN32_CONPTY)
+#if defined(_NC_WINDOWS_NATIVE)
     /* WIN32_CONPTY specific timeout handling - delegate to specialized function */
     return _nc_conpty_twait(sp, mode, milliseconds, timeleft, _nc_gettime EVENTLIST_2nd(evl));
     
@@ -531,7 +531,7 @@ _nc_timed_wait(const SCREEN *sp MAYBE_UNUSED,
 #endif
 #endif
 
-#endif /* USE_WIN32_CONPTY */
+#endif /* _NC_WINDOWS_NATIVE */
 
     return (result);
 }

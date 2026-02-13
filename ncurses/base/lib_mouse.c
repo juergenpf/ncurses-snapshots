@@ -741,7 +741,6 @@ initialize_mousetype(SCREEN *sp)
     }
 #endif /* USE_SYSMOUSE */
 
-#if 1 || !defined(_NC_WINDOWS_NATIVE) || defined(USE_WIN32_CONPTY) // JPF
     /* we know how to recognize mouse events under "xterm" */
     if (NonEmpty(key_mouse)) {
 	init_xterm_mouse(sp);
@@ -750,7 +749,6 @@ initialize_mousetype(SCREEN *sp)
 	if (_nc_add_to_try(&(sp->_keytry), xterm_kmous, KEY_MOUSE) == OK)
 	    init_xterm_mouse(sp);
     }
-#endif
 
     returnVoid;
 }

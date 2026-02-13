@@ -40,10 +40,6 @@
 
 #if defined(_WIN32) || defined(_WIN64) 
 
-#ifndef USE_WIN32_CONPTY
-#define USE_WIN32_CONPTY
-#endif
-
 #ifndef _NC_WINDOWS_NATIVE
 #define _NC_WINDOWS_NATIVE
 #endif
