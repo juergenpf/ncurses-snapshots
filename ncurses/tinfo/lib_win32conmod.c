@@ -49,100 +49,44 @@ MODULE_ID("$Id$")
 typedef enum { NotKnown, Input, Output } HandleType;
 
 static HandleType classify_handle(HANDLE hdl) {
-    DWORD mode;
-    DWORD handle_type;
-    DWORD test_input;
-    DWORD test_output;
-    DWORD original_mode;
-
-    if (!GetConsoleMode(hdl, &mode)) {
-        return NotKnown;
+    HandleType type = NotKnown;
+    if (hdl!= INVALID_HANDLE_VALUE) {
+	if (hdl == WINCONSOLE.used_input_handle) {
+	    type = Input;
+	} else if (hdl == WINCONSOLE.used_output_handle) {
+	    type = Output;
+	}	
     }
-
-    handle_type = GetFileType(hdl);
-    if (handle_type != FILE_TYPE_CHAR) {
-        return NotKnown;
-    }
-
-    // Check against standard handles first (most reliable)
-    if (hdl == CON_STDIN_HANDLE) {
-        return Input;
-    }
-    if (hdl == CON_STDOUT_HANDLE || hdl == CON_STDERR_HANDLE) {
-        return Output;
-    }
-
-    // Try to determine by testing which mode types work
-    test_input = ENABLE_LINE_INPUT | ENABLE_ECHO_INPUT;
-    test_output = ENABLE_PROCESSED_OUTPUT | ENABLE_WRAP_AT_EOL_OUTPUT;
-
-    original_mode = mode;
-
-    // Try setting input-specific flags
-    if (SetConsoleMode(hdl, test_input)) {
-        SetConsoleMode(hdl, original_mode);  // Restore
-        return Input;
-    }
-
-    // Try setting output-specific flags
-    if (SetConsoleMode(hdl, test_output)) {
-        SetConsoleMode(hdl, original_mode);  // Restore
-        return Output;
-    }
-
-    return NotKnown;
-}
-
-static HANDLE
-fd2handle(int fd)
-{
-	HANDLE hdl = _get_osfhandle(fd);
-
-	if (fd == _fileno(stdin))
-	{
-		T(("lib_win32conpty:validateHandle %d -> stdin handle", fd));
-	}
-	else if (fd == _fileno(stdout))
-	{
-		T(("lib_win32conpty:validateHandle %d -> stdout handle", fd));
-	}
-	else
-	{
-		T(("lib_win32conpty:validateHandle %d maps to unknown fd", fd));
-	}
-	return hdl;
+    return type;
 }
 
 NCURSES_EXPORT(int)
 _nc_conpty_flush(int fd)
 {
 	int code = OK;
-	HANDLE hdl = fd2handle(fd);
+	HANDLE hdl = _get_osfhandle(fd);
+	HandleType type = classify_handle(hdl);
+	HANDLE hdlIn = WINCONSOLE.used_input_handle;
+	HANDLE hdlOut = WINCONSOLE.used_output_handle;
 
-	T((T_CALLED("lib_win32conpty::_nc_console_flush(hdl=%p"), hdl));
+	T((T_CALLED("lib_win32conmod::_nc_conpty_flush(fd=%d)"), fd));
 
-	if (hdl != INVALID_HANDLE_VALUE)
+	if (type == Input)
 	{
-		HANDLE hdlIn = GetStdHandle(STD_INPUT_HANDLE);
-		HANDLE hdlOut = GetStdHandle(STD_OUTPUT_HANDLE);
-		if (hdl == hdlIn)
-		{
-			if (!FlushConsoleInputBuffer(hdlIn))
-				code = ERR;
-		}
-		else if (hdl == hdlOut)
-		{
-			/* Flush output buffer - use FlushFileBuffers for proper VT processing */
-			if (!FlushFileBuffers(hdlOut))
-				code = ERR;
-		}
-		else
-		{
+		if (!FlushConsoleInputBuffer(hdlIn))
 			code = ERR;
-			T(("_nc_console_flush not requesting a handle owned by console."));
-		}
 	}
-	/* Note: This function works in both ConPTY and legacy console modes */
+	else if (type == Output)
+	{
+		/* Flush output buffer - use FlushFileBuffers for proper VT processing */
+		if (!FlushFileBuffers(hdlOut))
+			code = ERR;
+	}
+	else
+	{
+		code = ERR;
+		T(("_nc_conpty_flush not requesting a handle owned by console."));
+	}
 	returnCode(code);
 }
  
@@ -151,35 +95,34 @@ _nc_conpty_setmode(int fd, const TTY *arg)
 {
 	if (!arg) return ERR;
 	
-	HANDLE stdin_hdl = GetStdHandle(STD_INPUT_HANDLE);
-	HANDLE stdout_hdl = GetStdHandle(STD_OUTPUT_HANDLE);
+	HANDLE in_hdl = WINCONSOLE.used_input_handle;
+	HANDLE out_hdl = WINCONSOLE.used_output_handle;
 	HANDLE fd_hdl = INVALID_HANDLE_VALUE;
 	HandleType fd_type = NotKnown;
 	
 	// Get handle from fd
 	if (fd >= 0) {
-		fd_hdl = fd2handle(fd);
-		if (fd_hdl != INVALID_HANDLE_VALUE) {
-			DWORD test_mode;
-			if (GetConsoleMode(fd_hdl, &test_mode)) {
-				fd_type = classify_handle(fd_hdl);
-			}
-		}
+		fd_hdl = _get_osfhandle(fd);
+		fd_type = classify_handle(fd_hdl);
 	}
-		
+	if (fd_type == NotKnown) {
+		T(("_nc_conpty_setmode: fd %d does not correspond to console input or output handle", fd));
+		return ERR;
+	}
+
 	// Determine which handles to use based on classification
 	HANDLE input_target  = INVALID_HANDLE_VALUE;
 	HANDLE output_target = INVALID_HANDLE_VALUE;
 	
 	if (fd_type == Input) {
 		input_target = fd_hdl;
-		output_target = stdout_hdl;
+		output_target = out_hdl;
 	} else if (fd_type == Output) {
-		input_target = stdin_hdl;
+		input_target = in_hdl;
 		output_target = fd_hdl;
 	} else {
-		input_target = stdin_hdl;
-		output_target = stdout_hdl;
+		input_target = in_hdl;
+		output_target = out_hdl;
 	}
 	
 	// Apply modes to appropriate handles
@@ -191,20 +134,22 @@ _nc_conpty_setmode(int fd, const TTY *arg)
         /* 
            ENABLE_VIRTUAL_TERMINAL_INPUT (VT) requires ENABLE_PROCESSED_INPUT to be effective.
            If we request VT, we must ensure PROCESSED is set, otherwise SetConsoleMode fails.
+	   We always allow mouse and window input events if VT input is requested, as these 
+	   are commonly used together and it simplifies the logic to just enable them when 
+	   VT is enabled.
         */
         if (mode & VT_FLAG_IN) {
-            mode |= ENABLE_PROCESSED_INPUT;
+            mode |= ENABLE_PROCESSED_INPUT | ENABLE_MOUSE_INPUT | ENABLE_WINDOW_INPUT;
         }
 
-        /* Sanitize: ENABLE_ECHO_INPUT requires ENABLE_LINE_INPUT */
+        /* Sanitize: ENABLE_ECHO_INPUT requires ENABLE_LINE_INPUT */ 
         if ((mode & ENABLE_ECHO_INPUT) && !(mode & ENABLE_LINE_INPUT)) {
              mode &= ~ENABLE_ECHO_INPUT;
         }
 
-		input_ok = SetConsoleMode(input_target, mode);
-		if (input_ok) {
-			WINCONSOLE.ttyflags.dwFlagIn = mode;
-		}
+	input_ok = SetConsoleMode(input_target, mode);
+	if (input_ok) {
+		WINCONSOLE.ttyflags.dwFlagIn = mode;	}
 	}
 	
 	if (output_target != INVALID_HANDLE_VALUE) {
@@ -235,6 +180,12 @@ _nc_conpty_getmode(int fd, TTY *arg)
 {
 	if (NULL==arg) return ERR;
 
+	HANDLE hdl = _get_osfhandle(fd);
+	HandleType type = classify_handle(hdl);
+	if (type == NotKnown) {
+		T(("_nc_conpty_getmode: fd %d does not correspond to console input or output handle", fd));
+		return ERR;
+	}	
 	*arg = WINCONSOLE.ttyflags; 
 	return OK;
 }

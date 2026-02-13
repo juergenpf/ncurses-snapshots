@@ -229,7 +229,13 @@ NCURSES_SP_NAME(newterm) (NCURSES_SP_DCLx
 	} else {
 	    int value;
 	    int cols;
-
+#if defined(_NC_WINDOWS_NATIVE) || defined(USE_WIN32_CONPTY)
+	    if (!_nc_conpty_checkinit(fileno(_ofp), fileno(_ifp)))
+	    {
+		_nc_set_screen(current);
+		returnSP(NULL);
+	    } else {
+#endif
 #if !NCURSES_SP_FUNCS
 	    _nc_set_screen(CURRENT_SCREEN);
 #endif
@@ -319,6 +325,9 @@ NCURSES_SP_NAME(newterm) (NCURSES_SP_DCLx
 
 	    _nc_signal_handler(TRUE);
 	    result = SP_PARM;
+#if defined(_NC_WINDOWS_NATIVE) || defined(USE_WIN32_CONPTY)
+	}
+#endif
 	}
     }
     _nc_unlock_global(curses);

@@ -1022,9 +1022,9 @@ TINFO_SETUP_TERM(TERMINAL **tp,
 
 	sp = SP;
 #if defined(USE_WIN32_CONPTY) || defined(_NC_WINDOWS_NATIVE)
-		_nc_conpty_checkinit();
+		if (!_nc_conpty_checkinit(Filedes,-1))
+			code = ERR;
 #endif
-
 	/*
 	 * We should always check the screensize, just in case.
 	 */

@@ -190,14 +190,6 @@ encoding_init(void)
 		setlocale(LC_CTYPE, default_ctype);
 #endif
 	}
-	// the most conservative mode is to run in binary mode, and let us handle any necessary translations
-	// we have _nc_assemble_utf8_input (see below) to handle UTF-8 decoding, and we want to ensure that 
-	// we get the raw bytes as they come in without any interference from the C runtime.
-	// For output we have the helper _nc_wchar_to_utf8 to encode UTF-8 characters, and we want to ensure 
-	// that the C runtime does not attempt to translate line endings or perform any other transformations 
-	// on the output data.
-	setmode(_fileno(stdin),  O_BINARY);
-	setmode(_fileno(stdout), O_BINARY);
 }
 
 #define REQUIRED_MAJOR_V (DWORD)10
@@ -255,17 +247,31 @@ conpty_supported(void)
         returnBool(res);
 }
 
-static bool console_initialized = FALSE;
+/*
+This initializaton function can be called multiple time, and actually it is called from within
+setupterm() the first time and potentially if we enter ncurses from newterm() the next time.
+The main purpose is to initialize the WINCONSOLE structure when called the first time. The
+first call will alway have fdIn set to -1, as setupterm() only cares about output. Please note
+that setupterm() already handles redirection of stdout and assigns stderr for output if stdout
+is not a tty.
 
+The other purpose of this routine is to manage the assignment of console handles. If the
+assigned filedescriptors are NOT valid console handles, the call will return FALSE.
+
+The function will also return FALSE, if the Windows version we run on does not support ConPTY, 
+which is a requirement for the Windows Console backend of ncurses. This is because without 
+ConPTY, the Windows Console does not provide the necessary capabilities for ncurses and
+escpecially the terminfo layer to function properly.
+*/
 NCURSES_EXPORT(BOOL)
-_nc_conpty_checkinit()
+_nc_conpty_checkinit(int fdOut, int fdIn)
 {
 	bool res = FALSE;
 
-	T((T_CALLED("lib_win32conpty::_nc_console_checkinit()")));
+	T((T_CALLED("lib_win32conpty::_nc_console_checkinit(fdIn=%d, fdOut=%d)"), fdIn, fdOut));
 
 	/* initialize once, or not at all */
-	if (!console_initialized)
+	if (!WINCONSOLE.initialized)
 	{
 		if (!conpty_supported())	
 		{
@@ -281,7 +287,11 @@ _nc_conpty_checkinit()
 		DWORD dwFlagIn  = CONMODE_IN_DEFAULT | VT_FLAG_IN;
 		DWORD dwFlagOut = CONMODE_OUT_DEFAULT | VT_FLAG_OUT;
 		
-		START_TRACE();
+		if (fdIn != -1)
+		{
+			T(("In the first call fdIn is expected to be -1."));
+			returnBool(FALSE);
+		}
 
 		encoding_init();
 
@@ -311,30 +321,74 @@ _nc_conpty_checkinit()
 		for (i = 0; i < CON_NUMPAIRS; i++)
 			WINCONSOLE.pairs[i] = a;
 
-		GetConsoleMode(GetStdHandle(STD_INPUT_HANDLE), &WINCONSOLE.saved_ttyflags.dwFlagIn);
-		GetConsoleMode(GetStdHandle(STD_OUTPUT_HANDLE), &WINCONSOLE.saved_ttyflags.dwFlagOut);
-		WINCONSOLE.ttyflags.dwFlagIn = dwFlagIn;
-		WINCONSOLE.ttyflags.dwFlagOut = dwFlagOut;
-		SetConsoleMode(GetStdHandle(STD_INPUT_HANDLE), WINCONSOLE.ttyflags.dwFlagIn);
-		SetConsoleMode(GetStdHandle(STD_OUTPUT_HANDLE), WINCONSOLE.ttyflags.dwFlagOut);
+		HANDLE stdin_hdl = GetStdHandle(STD_INPUT_HANDLE);
+		HANDLE out_hdl   = fdOut >= 0 ? (HANDLE)_get_osfhandle(fdOut) : INVALID_HANDLE_VALUE;
 
-		if (GetStdHandle(STD_OUTPUT_HANDLE) != INVALID_HANDLE_VALUE)
+		if (out_hdl == INVALID_HANDLE_VALUE || GetConsoleMode(out_hdl, &dwFlagOut) == 0)
 		{
-			_nc_conpty_get_SBI();
-			WINCONSOLE.save_SBI = WINCONSOLE.SBI;
-			GetConsoleCursorInfo(GetStdHandle(STD_OUTPUT_HANDLE), &WINCONSOLE.save_CI);
-			T(("... initial cursor is %svisible, %d%%",
-			   (WINCONSOLE.save_CI.bVisible ? "" : "not-"),
-			   (int)WINCONSOLE.save_CI.dwSize));
+			T(("Output handle is not a console"));
+			returnBool(FALSE);
 		}
+		WINCONSOLE.used_output_handle = out_hdl;
+		WINCONSOLE.ttyflags.dwFlagOut = dwFlagOut;
+
+		if (stdin_hdl == INVALID_HANDLE_VALUE || GetConsoleMode(stdin_hdl, &dwFlagIn) == 0)
+		{
+			T(("StdIn handle is not a console"));
+			returnBool(FALSE);
+		}
+		WINCONSOLE.used_input_handle = stdin_hdl;
+		WINCONSOLE.ttyflags.dwFlagIn = dwFlagIn;
+
+		SetConsoleMode(stdin_hdl, WINCONSOLE.ttyflags.dwFlagIn);
+		SetConsoleMode(out_hdl,   WINCONSOLE.ttyflags.dwFlagOut);
+		
+		// the most conservative mode is to run in binary mode, and let us handle any necessary translations
+		// we have _nc_assemble_utf8_input (see below) to handle UTF-8 decoding, and we want to ensure that 
+		// we get the raw bytes as they come in without any interference from the C runtime.
+		// For output we have the helper _nc_wchar_to_utf8 to encode UTF-8 characters, and we want to ensure 
+		// that the C runtime does not attempt to translate line endings or perform any other transformations 
+		// on the output data.
+		setmode(_fileno(stdin),  O_BINARY);
+		setmode(fdOut, O_BINARY);
+
+		_nc_conpty_get_SBI();
+		WINCONSOLE.save_SBI = WINCONSOLE.SBI;
+		GetConsoleCursorInfo(out_hdl, &WINCONSOLE.save_CI);
+		T(("... initial cursor is %svisible, %d%%",
+		   (WINCONSOLE.save_CI.bVisible ? "" : "not-"),
+		   (int)WINCONSOLE.save_CI.dwSize));
 
 		WINCONSOLE.initialized = TRUE;
-		console_initialized = TRUE;
+		res = TRUE;
+	} else {
+		DWORD dwFlagOut;
+		DWORD dwFlagIn;
+		/* Already initialized - just check if stdout is still in ConPTY mode */
+		HANDLE in_hdl  = fdIn  >= 0 ? (HANDLE)_get_osfhandle(fdIn) : INVALID_HANDLE_VALUE;
+		HANDLE out_hdl = fdOut >= 0 ? (HANDLE)_get_osfhandle(fdOut) : INVALID_HANDLE_VALUE;
+
+		if (out_hdl == INVALID_HANDLE_VALUE || GetConsoleMode(out_hdl, &dwFlagOut) == 0)
+		{
+			T(("Output handle is not a console"));
+			returnBool(FALSE);
+		}
+		if (in_hdl == INVALID_HANDLE_VALUE || GetConsoleMode(in_hdl, &dwFlagIn) == 0)
+		{
+			T(("Input handle is not a console"));
+			returnBool(FALSE);
+		}
+		WINCONSOLE.used_output_handle = out_hdl;
+		WINCONSOLE.ttyflags.dwFlagOut = dwFlagOut;
+		WINCONSOLE.used_input_handle = in_hdl;
+		WINCONSOLE.ttyflags.dwFlagIn = dwFlagIn;
+		setmode(fdIn, O_BINARY);
+		setmode(fdOut, O_BINARY);	
+		res = TRUE;
 	}
-	res = (GetStdHandle(STD_OUTPUT_HANDLE) != INVALID_HANDLE_VALUE);
-	BOOL check = _nc_stdout_is_conpty();
+	BOOL check = _nc_output_is_conpty();
 	T(("... console initialized=%d, isConpty=%d",
-	   console_initialized,
+	   WINCONSOLE.initialized,
 	   check));
 	returnBool(res);
 }
@@ -389,10 +443,10 @@ _nc_conpty_size(int *Lines, int *Cols)
 	if (Lines != NULL && Cols != NULL)
 	{
 		CONSOLE_SCREEN_BUFFER_INFO csbi;
-		HANDLE hStdOut = GetStdHandle(STD_OUTPUT_HANDLE);
+		HANDLE hdl_out = WINCONSOLE.used_output_handle;
 
 		/* Get current console buffer information using GetStdHandle for Wine compatibility */
-		if (hStdOut != INVALID_HANDLE_VALUE && GetConsoleScreenBufferInfo(hStdOut, &csbi))
+		if (hdl_out != INVALID_HANDLE_VALUE && GetConsoleScreenBufferInfo(hdl_out, &csbi))
 		{
 			*Lines = (int)(csbi.srWindow.Bottom + 1 - csbi.srWindow.Top);
 			*Cols = (int)(csbi.srWindow.Right + 1 - csbi.srWindow.Left);
@@ -440,27 +494,20 @@ _nc_conpty_MapColor(BOOL fore, int color)
  *   false - stdout is in legacy console mode or not a console at all
  */
 NCURSES_EXPORT(BOOL)
-_nc_stdout_is_conpty(void)
+_nc_output_is_conpty(void)
 {
-	HANDLE stdout_handle;
+	HANDLE out_handle;
 	DWORD console_mode = 0;
 	CONSOLE_SCREEN_BUFFER_INFO csbi;
 	bool result = false;
 
-	T((T_CALLED("lib_win32conpty::_nc_stdout_is_conpty()")));
+	T((T_CALLED("lib_win32conpty::_nc_output_is_conpty()")));
 
 	// Get stdout handle
-	stdout_handle = GetStdHandle(STD_OUTPUT_HANDLE);
-	if (stdout_handle == INVALID_HANDLE_VALUE)
+	out_handle = WINCONSOLE.used_output_handle;
+	if (GetConsoleMode(out_handle, &console_mode) == 0)
 	{
-		T(("GetStdHandle(STD_OUTPUT_HANDLE) failed"));
-		returnCode(false);
-	}
-
-	// First check if we can get console mode at all
-	if (!GetConsoleMode(stdout_handle, &console_mode))
-	{
-		T(("GetConsoleMode failed - not a console"));
+		T(("GetConsoleMode() failed"));
 		returnCode(false);
 	}
 
@@ -469,7 +516,7 @@ _nc_stdout_is_conpty(void)
 	{
 		// Additional validation: try to get console screen buffer info
 		// In ConPTY mode, this should succeed but behavior may differ
-		if (GetConsoleScreenBufferInfo(stdout_handle, &csbi))
+		if (GetConsoleScreenBufferInfo(out_handle, &csbi))
 		{
 			// ConPTY typically has different characteristics
 			// We can be confident this is ConPTY mode if VT processing is enabled
@@ -499,7 +546,7 @@ NCURSES_EXPORT(BOOL)
 _nc_conpty_get_SBI(void)
 {
 	bool rc = FALSE;
-	if (GetConsoleScreenBufferInfo(GetStdHandle(STD_OUTPUT_HANDLE), &(WINCONSOLE.SBI)))
+	if (GetConsoleScreenBufferInfo(WINCONSOLE.used_output_handle, &(WINCONSOLE.SBI)))
 	{
 		T(("GetConsoleScreenBufferInfo"));
 		T(("... buffer(X:%d Y:%d)",
@@ -529,8 +576,9 @@ _nc_conpty_get_SBI(void)
 
 #if USE_WIDEC_SUPPORT
 
-// Helper function to adress the issue, that for pragmatic reasons we have
-// to output UTF-8 encoded data to the Windows Console in O_BINARY mode.
+// To avoid unpredictable interferences with the various C runtimes on Windows,
+// we use O_BINARY mode on the input and output file handles. This requires, that
+// we handle the UTF-8 encoding and decoding ourselves.
 NCURSES_EXPORT(size_t)
 _nc_wchar_to_utf8(wchar_t wc, char utf8[UTF8_MAX_BYTES])
 {
@@ -543,6 +591,7 @@ _nc_wchar_to_utf8(wchar_t wc, char utf8[UTF8_MAX_BYTES])
 	else
 		return 0; // signals error
 }
+
 typedef struct
 {
 	unsigned char buffer[UTF8_MAX_BYTES]; /* Buffer for incomplete UTF-8 sequence */
