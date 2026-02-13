@@ -271,15 +271,15 @@ _nc_console_checkinit()
 		{
 			T(("Windows version does not support ConPTY"));
 			fprintf(stderr,"ncurses: Windows version does not support ConPTY\n");
-			exit(1);
+			returnBool(FALSE);
 		}
 		
 		int i;
 		DWORD num_buttons;
 		WORD a;
 		BOOL b;
-		DWORD dwFlagIn  = CONMODE_IN_DEFAULT;
-		DWORD dwFlagOut = CONMODE_OUT_DEFAULT;
+		DWORD dwFlagIn  = CONMODE_IN_DEFAULT | VT_FLAG_IN;
+		DWORD dwFlagOut = CONMODE_OUT_DEFAULT | VT_FLAG_OUT;
 		
 		START_TRACE();
 
@@ -289,7 +289,7 @@ _nc_console_checkinit()
 		const char *env_flags = getenv("NC_CONHOST_FLAGS");
 		if (env_flags && *env_flags)
 		{
-			char *endptr;
+			char *endptr;			
 			long flags_val = strtol(env_flags, &endptr, 0);
 			if (*endptr == '\0' && flags_val >= 0)
 			{
@@ -527,6 +527,8 @@ _nc_console_get_SBI(void)
 	return rc;
 }
 
+#if USE_WIDEC_SUPPORT
+
 // Helper function to adress the issue, that for pragmatic reasons we have
 // to output UTF-8 encoded data to the Windows Console in O_BINARY mode.
 NCURSES_EXPORT(size_t)
@@ -541,8 +543,6 @@ _nc_wchar_to_utf8(wchar_t wc, char utf8[UTF8_MAX_BYTES])
 	else
 		return 0; // signals error
 }
-
-#if USE_WIDEC_SUPPORT
 typedef struct
 {
 	unsigned char buffer[UTF8_MAX_BYTES]; /* Buffer for incomplete UTF-8 sequence */

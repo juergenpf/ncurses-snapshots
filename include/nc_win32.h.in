@@ -139,6 +139,8 @@ typedef struct
     DWORD dwFlagOut;    // Output Handle Console mode flags
 } ConsoleMode;
 
+// This is for future use in an implementation that may make use of the Windows Console API 
+// in a more direct way, and is not intended to be a public documentation at the moment.
 #define NC_CONHOST_FLAG_SUPPORT_EVENTS 0x0001
 #define NC_CONHOST_FLAG_MASK (NC_CONHOST_FLAG_SUPPORT_EVENTS)
 

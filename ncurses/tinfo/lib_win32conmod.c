@@ -239,36 +239,6 @@ _nc_conpty_getmode(int fd, TTY *arg)
 	return OK;
 }
 
-NCURSES_EXPORT(void)
-NCURSES_SP_NAME(_nc_conpty_modesync) (NCURSES_SP_DCLx BOOL on, DWORD dwFlagIn)
-{
-	if (SP_PARM != NULL) {
-        	TERMINAL *termp = TerminalOf(SP_PARM);
-        	if (termp != NULL) {
-            		TTY current_tty;
-            		if (OK==_nc_conpty_getmode(termp->Filedes, &current_tty)) {
-				if (IsCbreak(SP_PARM)) {
-                			current_tty.dwFlagIn |= CONMODE_NORAW;
-					current_tty.dwFlagIn &= (unsigned long) ~CONMODE_NOCBREAK;
-				}
-            			else if (IsRaw(SP_PARM)) {
-                			current_tty.dwFlagIn &= (unsigned long) ~CONMODE_NORAW;
-            			} else {
-                			current_tty.dwFlagIn |= (CONMODE_NOCBREAK | CONMODE_NORAW);
-            			}
-                        	if (on) {
-			    		current_tty.dwFlagIn |= dwFlagIn;
-				} else {
-			    		current_tty.dwFlagIn &= (unsigned long) ~dwFlagIn;
-				}	
-                        
-            			// Apply the updated mode to console
-            			_nc_conpty_setmode(termp->Filedes, &current_tty);
-			} 
-	        } 	
-	} 
-}
-
 #if defined(TRACE) || 1
 /* JPF
 For testing and debugging, we want to be able to print the current console modes in a human-readable form.
