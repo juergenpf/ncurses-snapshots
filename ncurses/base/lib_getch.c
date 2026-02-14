@@ -265,7 +265,7 @@ fifo_push(SCREEN *sp EVENTLIST_2nd(_nc_eventlist * evl))
     {				/* Can block... */
 #if defined(_NC_WINDOWS_NATIVE)
 	/* Use UTF-8 assembly for WIN32_CONPTY */
-	n = _nc_conpty_read(sp, &ch);
+	n = WINCONSOLE.read(sp, &ch);
 #else
 	unsigned char c2 = 0;
 
@@ -535,7 +535,7 @@ _nc_wgetch(WINDOW *win,
 
 #if defined(_NC_WINDOWS_NATIVE)
     /* Check for console resize events after getting input */
-    if (_nc_conpty_check_resize()) {
+    if (WINCONSOLE.check_resize()) {
 	/* Resize detected - preserve the triggering character */
 	safe_ungetch(sp, ch);
     }
@@ -563,7 +563,7 @@ _nc_wgetch(WINDOW *win,
       check_sigwinch:
 #if defined(_NC_WINDOWS_NATIVE)
 	/* Check for console resize events before SIGWINCH handling */
-	_nc_conpty_check_resize();
+	WINCONSOLE.check_resize();
 #endif
 #if USE_SIZECHANGE
 	if (_nc_handle_sigwinch(sp)) {

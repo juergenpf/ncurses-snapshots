@@ -257,7 +257,7 @@ NCURSES_SP_NAME(_nc_outch_ex)(NCURSES_SP_DCLx int ch)
 	*/
 	if (ch < 0) ch &= 0xFF;
 	
-	len = _nc_wchar_to_utf8((wchar_t)ch, utf8);
+	len = WINCONSOLE.wchar_to_utf8((wchar_t)ch, utf8);
 	if (len == 0)
 		return ERR; // conversion error
 

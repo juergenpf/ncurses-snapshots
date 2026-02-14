@@ -47,12 +47,54 @@
 
 MODULE_ID("$Id$")
 
+// Prototypes of static function we want to use in initializers
+static BOOL pty_init(int fdOut, int fdIn);
+static void pty_size(int *Lines, int *Cols);
+static BOOL pty_check_resize(void);
+static int  pty_setmode(int fd, const TTY *arg);
+static int  pty_getmode(int fd, TTY *arg);
+static int  pty_flush(int fd);
+static int  pty_read(SCREEN *sp, int *result);
+static int  pty_twait(const SCREEN *sp GCC_UNUSED, 
+                      int mode GCC_UNUSED, 
+                      int milliseconds, 
+                      int *timeleft,
+                      long (*gettime_func)(TimeType *, int)
+                      EVENTLIST_2nd(_nc_eventlist *evl));
+#if USE_WIDEC_SUPPORT
+static size_t wchar_to_utf8(wchar_t wc, char utf8[UTF8_MAX_BYTES]);
+#endif	
+
 /*   A process can only have a single console, so it is safe
 	 to maintain all the information about it in a single
 	 static structure.
  */
 NCURSES_EXPORT_VAR(ConsoleInfo)
-_nc_CONSOLE;
+_nc_CONSOLE = {
+	.initialized = FALSE,
+	.conhost_flags = 0,
+	.ttyflags = {0, 0},
+	.saved_ttyflags = {0, 0},
+	.used_input_handle = INVALID_HANDLE_VALUE,
+	.used_output_handle = INVALID_HANDLE_VALUE,
+	.numButtons = 1,
+	.pairs = {0},
+	.origin = {0, 0},
+	.SBI = {0},
+	.save_SBI = {0},
+	.save_CI = {0},
+	.init = pty_init,
+	.size = pty_size,
+	.check_resize = pty_check_resize,
+	.setmode = pty_setmode,
+	.getmode = pty_getmode,
+	.flush = pty_flush,
+	.read = pty_read,
+	.twait = pty_twait
+#if USE_WIDEC_SUPPORT
+	, .wchar_to_utf8 = wchar_to_utf8
+#endif
+};
 
 #define UTF8_CP 65001
 #define DEFAULT_UTF8_CTYPE_ENV "C.UTF-8"
@@ -293,6 +335,21 @@ output_is_conpty(void)
 	returnCode(result);
 }
 
+static WORD
+MapColor(BOOL fore, int color)
+{
+	static const int _cmap[] =
+	    {0, 4, 2, 6, 1, 5, 3, 7};
+	int a;
+	if (color < 0 || color > 7)
+		a = fore ? 7 : 0;
+	else
+		a = _cmap[color];
+	if (!fore)
+		a = a << 4;
+	return (WORD)a;
+}
+
 /*
 This initializaton function can be called multiple time, and actually it is called from within
 setupterm() the first time and potentially if we enter ncurses from newterm() the next time.
@@ -309,8 +366,8 @@ which is a requirement for the Windows Console backend of ncurses. This is becau
 ConPTY, the Windows Console does not provide the necessary capabilities for ncurses and
 escpecially the terminfo layer to function properly.
 */
-NCURSES_EXPORT(BOOL)
-_nc_conpty_checkinit(int fdOut, int fdIn)
+static BOOL
+pty_init(int fdOut, int fdIn)
 {
 	bool res = FALSE;
 
@@ -362,8 +419,8 @@ _nc_conpty_checkinit(int fdOut, int fdIn)
 			WINCONSOLE.numButtons = 1;
 		}
 
-		a = _nc_conpty_MapColor(true, COLOR_WHITE) |
-		    _nc_conpty_MapColor(false, COLOR_BLACK);
+		a = MapColor(true, COLOR_WHITE) |
+		    MapColor(false, COLOR_BLACK);
 		for (i = 0; i < CON_NUMPAIRS; i++)
 			WINCONSOLE.pairs[i] = a;
 
@@ -472,13 +529,13 @@ static int last_console_cols = -1;
  * This provides SIGWINCH-like functionality for Windows ConPTY.
  * Returns TRUE if a resize was detected.
  */
-NCURSES_EXPORT(BOOL)
-_nc_conpty_check_resize(void)
+static BOOL
+pty_check_resize(void)
 {
 	int current_lines, current_cols;
 	bool resized = FALSE;
 
-	_nc_conpty_size(&current_lines, &current_cols);
+	pty_size(&current_lines, &current_cols);
 
 	if (last_console_lines == -1 || last_console_cols == -1)
 	{
@@ -500,8 +557,8 @@ _nc_conpty_check_resize(void)
 	return resized;
 }
 
-NCURSES_EXPORT(void)
-_nc_conpty_size(int *Lines, int *Cols)
+static void
+pty_size(int *Lines, int *Cols)
 {
 	if (Lines != NULL && Cols != NULL)
 	{
@@ -531,28 +588,14 @@ _nc_conpty_size(int *Lines, int *Cols)
 	}
 }
 
-NCURSES_EXPORT(WORD)
-_nc_conpty_MapColor(BOOL fore, int color)
-{
-	static const int _cmap[] =
-	    {0, 4, 2, 6, 1, 5, 3, 7};
-	int a;
-	if (color < 0 || color > 7)
-		a = fore ? 7 : 0;
-	else
-		a = _cmap[color];
-	if (!fore)
-		a = a << 4;
-	return (WORD)a;
-}
 
 #if USE_WIDEC_SUPPORT
 
 // To avoid unpredictable interferences with the various C runtimes on Windows,
 // we use O_BINARY mode on the input and output file handles. This requires, that
 // we handle the UTF-8 encoding and decoding ourselves.
-NCURSES_EXPORT(size_t)
-_nc_wchar_to_utf8(wchar_t wc, char utf8[UTF8_MAX_BYTES])
+static size_t
+wchar_to_utf8(wchar_t wc, char utf8[UTF8_MAX_BYTES])
 {
 	wchar_t wstr[2] = {wc, L'\0'};
 	int result;
@@ -753,8 +796,8 @@ assemble_utf8_input(unsigned char byte, wchar_t *wch)
  * In wide mode: Assembles UTF-8 byte sequences into Unicode codepoints
  * In non-wide mode: Returns raw bytes directly (for single-byte encodings like CP1252)
  */
-NCURSES_EXPORT(int)
-_nc_conpty_read(SCREEN *sp, int *result)
+static int
+pty_read(SCREEN *sp, int *result)
 {
 	unsigned char byte_buffer;
 	int n;
@@ -784,7 +827,7 @@ _nc_conpty_read(SCREEN *sp, int *result)
 	else if (ch == 0)
 	{
 		/* Need more bytes - recursively read next byte */
-		return _nc_conpty_read(sp, result);
+		return pty_read(sp, result);
 	}
 	else
 	{
@@ -802,8 +845,8 @@ _nc_conpty_read(SCREEN *sp, int *result)
 /*
  * WIN32_CONPTY timeout handling function
  */
-NCURSES_EXPORT(int)
-_nc_conpty_twait(const SCREEN *sp GCC_UNUSED, 
+static int
+pty_twait(const SCREEN *sp GCC_UNUSED, 
                       int mode GCC_UNUSED, 
                       int milliseconds, 
                       int *timeleft,
@@ -911,8 +954,8 @@ static HandleType classify_handle(HANDLE hdl) {
     return type;
 }
 
-NCURSES_EXPORT(int)
-_nc_conpty_flush(int fd)
+static int
+pty_flush(int fd)
 {
 	int code = OK;
 	HANDLE hdl = _get_osfhandle(fd);
@@ -939,8 +982,8 @@ _nc_conpty_flush(int fd)
 	returnCode(code);
 }
  
-NCURSES_EXPORT(int)
-_nc_conpty_setmode(int fd, const TTY *arg)
+static int
+pty_setmode(int fd, const TTY *arg)
 {
 	if (!arg) return ERR;
 	
@@ -1017,8 +1060,8 @@ _nc_conpty_setmode(int fd, const TTY *arg)
 	return OK;
 }
 
-NCURSES_EXPORT(int)
-_nc_conpty_getmode(int fd, TTY *arg)
+static int
+pty_getmode(int fd, TTY *arg)
 {
 	if (NULL==arg) return ERR;
 

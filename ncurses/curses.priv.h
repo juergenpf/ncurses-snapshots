@@ -2444,15 +2444,6 @@ extern NCURSES_EXPORT(void)   _nc_get_screensize(SCREEN *, int *, int *);
 #ifndef UTF8_MAX_BYTES
 #define UTF8_MAX_BYTES 4 /* Maximum bytes in UTF-8 sequence */
 #endif
-extern NCURSES_EXPORT(void)   _nc_conpty_size(int *Lines, int *Cols);
-extern NCURSES_EXPORT(BOOL)   _nc_conpty_check_resize(void);
-extern NCURSES_EXPORT(BOOL)   _nc_conpty_checkinit(int fdOut, int fdIn);  
-extern NCURSES_EXPORT(WORD)   _nc_conpty_MapColor(BOOL fore, int color);
-extern NCURSES_EXPORT(int)    _nc_conpty_flush(int fd);
-extern NCURSES_EXPORT(int)    _nc_conpty_read(SCREEN *sp, int *result);
-extern NCURSES_EXPORT(int)    _nc_conpty_twait(const SCREEN *sp, int mode, int milliseconds, int *timeleft, long (*gettime_func)(TimeType *, int) EVENTLIST_2nd(_nc_eventlist *evl));
-extern NCURSES_EXPORT(int)    _nc_conpty_setmode(int fd, const TTY* arg);
-extern NCURSES_EXPORT(int)    _nc_conpty_getmode(int fd, TTY*  arg);
 extern NCURSES_EXPORT(size_t) _nc_wchar_to_utf8(wchar_t wc, char utf8[UTF8_MAX_BYTES]);
 #endif /* _NC_WINDOWS_NATIVE */
 
