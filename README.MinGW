@@ -51,7 +51,7 @@ Windows versions with virtuale console and pseudo terminal support
 
 In the legacy Windows code for versions oölder than the above mentioned, there is
 no terminfo support. We have just support for the classical ncurses, panel, menu
-and form library. This is important to notice, because there a some programs whole
+and form library. This is important to notice, because there are some programs who
 use and link against ncurses, but actually are using terminfo functionality. these
 programs won't run like expected on legacy Windows.
 
@@ -65,8 +65,12 @@ to develop on Windows using WSL2 to host a Linux subsystem.
 The author is using Ubuntu under WSL2, not because it's a preference but it
 is the most common WSL2 distribution, well supported by the partners Canonical
 and Microsoft and most tips and tricks you'll find are using Ubuntu as an example.
+Please make sure that you set the default version of your WSL subsystem to 2.
+For all details how to install and start with WSL2, see this link:
 
-In Ubuntu just install the mingw-w64 package:
+	https://learn.microsoft.com/en-us/windows/wsl/install
+
+Ifyou have installed Ubuntu, just install the mingw-w64 package:
 
 $ sudo apt update
 $ sudo apt install mingw-w64 
@@ -75,7 +79,7 @@ It will install the whole suite of compilers, tools, and libraries you need to
 cross-build for the Windows MSVCRT environment, the classical - although 
 outdated - C runtime on Windows.
 
-You should enable Interop, so your WSL Ubuntu can call Windows programs. 
+You should enable Interop, so your WSL2 Ubuntu can call Windows programs. 
 Find the details how to configure WSL2 here:
 
 	https://learn.microsoft.com/en-us/windows/wsl/wsl-config
@@ -105,23 +109,23 @@ If you not yet have Windows Terminal installed, you can get it from the store:
 	https://apps.microsoft.com/detail/9n0dx20hk701
 
 In order to allow ncurses programs on Windows to ensure the correct locale and
-codepage, ncurses supports two environment variables
+codepage, ncurses on Windows supports two environment variables
 
 	- NC_WINCP      can be set to the desired codepage
 	- NC_WIN_CTYPE  can be set to a locale that will be used for LC_CTYPE
 
 Example for legacy 8-bit: 
-	NC_WINNCP="1252"
+	NC_WINNCP=1252
 	NC_WIN_CTYPE="German_Germany.1252"
 
 Example for Unicode: 
-	NC_WINNCP="65001"
+	NC_WINNCP=65001
 	NC_WIN_CTYPE="German_Germany.UTF-8"
 
 Of course you should set the country to your preference.
 
 This would allow running 8-bit ncurses programs using Latin-1 codepage with a 
-German  locale.
+German locale.
 
 Using cross-build is much faster than the rather slow MSYS2 environment, but comes
 with one potential drawback: all major Linux distros only support the MinGW target
@@ -231,7 +235,7 @@ I suggest this for your comfort (assuming you develop on Windows with WSL2):
 
 In the ncurses source directory in the misc folder you'll find the file
 
-	MinGW-WSL2-NCBind.ps1
+	MinGW-WSL2-Profile.ps1
 
 Include this file into your Powershell Profile. Just open Powershell in Windows
 Terminal and type
@@ -248,9 +252,9 @@ Now launch Windows Terminal with a Powershell tab and type this
 You're pushed into the test directory of your build, if it exists at all. You 
 can run tests and afterwards just do a popd. Please note, that if you've build 
 a non-widec version, this will spawn a new Terminal session that will be setup 
-for non-Unicode codepage and locale.
+for non-Unicode codepage.
 
-When it come to development, I suggest vscode. I've described above how to set it
+When it comes to development, I suggest vscode. I've described above how to set it
 up. Then just do this:
 
 $ cd $HOME/ncurses && code .
