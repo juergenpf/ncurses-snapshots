@@ -1005,6 +1005,11 @@ TINFO_SETUP_TERM(TERMINAL **tp,
 		if (VALID_STRING(command_character))
 			_nc_tinfo_cmdch(termp, UChar(*command_character));
 
+#if defined(_NC_WINDOWS_NATIVE)
+		if (!WINCONSOLE.init(Filedes,-1))
+			code = ERR;
+		else {
+#endif
 		/*
 		 * If an application calls setupterm() rather than initscr() or
 		 * newterm(), we will not have the def_prog_mode() call in
@@ -1018,13 +1023,12 @@ TINFO_SETUP_TERM(TERMINAL **tp,
 			NCURSES_SP_NAME(baudrate)(NCURSES_SP_ARG);
 		}
 		code = OK;
-	}
-
-	sp = SP;
 #if defined(_NC_WINDOWS_NATIVE)
-		if (!WINCONSOLE.init(Filedes,-1))
-			code = ERR;
-#endif
+		}
+#endif	
+	}
+	
+	sp = SP;
 	/*
 	 * We should always check the screensize, just in case.
 	 */
