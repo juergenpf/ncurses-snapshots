@@ -248,7 +248,7 @@ Now launch Windows Terminal with a Powershell tab and type this
 You're pushed into the test directory of your build, if it exists at all. You 
 can run tests and afterwards just do a popd. Please note, that if you've build 
 a non-widec version, this will spawn a new Terminal session that will be setup 
-for non-Unicode codepage and locale and use the CMD.EXE command processor.
+for non-Unicode codepage and locale.
 
 When it come to development, I suggest vscode. I've described above how to set it
 up. Then just do this:
