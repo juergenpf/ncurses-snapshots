@@ -7822,9 +7822,10 @@ main_menu(bool top)
             if ( (ch = fgetwc(stdin)) == WEOF) {
 #endif
 #else
-            char ch = '\0';
+            int ch_int = fgetc(stdin);
+            char ch = (ch_int == EOF) ? '\0' : (char) ch_int;
             errno = 0;  /* Clear any stale error */
-            if (read(fileno(stdin), &ch, (size_t) 1) <= 0) {
+            if (ch_int == EOF) {
 #endif
 		int save_err = errno;
 		perror("\nOOPS");
