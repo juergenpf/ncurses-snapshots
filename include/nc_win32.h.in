@@ -86,25 +86,6 @@
 		      : DEFAULT_TERM_ENV), \
 	 NonEmpty(term_env))
 
-  /*
-   * Various Console mode definitions
-   */
-/*
-   * Various Console mode definitions
-   */
-
-  /* Flags to enable virtual Terminal processing */
-#define VT_FLAG_OUT ENABLE_VIRTUAL_TERMINAL_PROCESSING
-#define VT_FLAG_IN  ENABLE_VIRTUAL_TERMINAL_INPUT
-
-  /* Default flags for input/output modes */
-#define CONMODE_IN_DEFAULT (ENABLE_LINE_INPUT | ENABLE_PROCESSED_INPUT | ENABLE_ECHO_INPUT | ENABLE_WINDOW_INPUT | ENABLE_MOUSE_INPUT | ENABLE_QUICK_EDIT_MODE | ENABLE_EXTENDED_FLAGS)
-#define CONMODE_OUT_DEFAULT (ENABLE_VIRTUAL_TERMINAL_PROCESSING | ENABLE_PROCESSED_OUTPUT | ENABLE_WRAP_AT_EOL_OUTPUT)
-
-  /* Flags to reset from RAW/CBREAK */
-#define CONMODE_NORAW    (ENABLE_PROCESSED_INPUT|ENABLE_LINE_INPUT)
-#define CONMODE_NOCBREAK (ENABLE_LINE_INPUT)
-
 #include <ncurses_dll.h>
 
 #ifdef __cplusplus
@@ -185,8 +166,9 @@ typedef struct {
   #endif  
   } ConsoleInfo;
 
-extern NCURSES_EXPORT_VAR(ConsoleInfo) _nc_CONSOLE;
-#define WINCONSOLE _nc_CONSOLE
+// Guaranteed to be initialzed by the runtime.
+extern NCURSES_EXPORT_VAR(ConsoleInfo*) _nc_currentCONSOLE;
+#define WINCONSOLE (*_nc_currentCONSOLE)
 
 #ifdef __cplusplus
 }

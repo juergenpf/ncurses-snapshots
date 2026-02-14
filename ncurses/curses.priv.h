@@ -2439,14 +2439,6 @@ extern NCURSES_EXPORT(void)   _nc_get_screensize(SCREEN *, int *, int *);
 #define TINFO_SETUP_TERM(tpp, name, fd, err, reuse) \
 	_nc_setupterm(name, fd, err, reuse)
 
-
-#if defined(_NC_WINDOWS_NATIVE)
-#ifndef UTF8_MAX_BYTES
-#define UTF8_MAX_BYTES 4 /* Maximum bytes in UTF-8 sequence */
-#endif
-extern NCURSES_EXPORT(size_t) _nc_wchar_to_utf8(wchar_t wc, char utf8[UTF8_MAX_BYTES]);
-#endif /* _NC_WINDOWS_NATIVE */
-
 #define NC_ISATTY(fd) isatty(fd)
 
 /*

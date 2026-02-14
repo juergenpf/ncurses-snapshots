@@ -39,7 +39,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <winternl.h>
-#include <io.h>    
+#include <io.h>
 #include <fcntl.h>
 #if USE_WIDEC_SUPPORT
 #include <wchar.h>
@@ -51,50 +51,61 @@ MODULE_ID("$Id$")
 static BOOL pty_init(int fdOut, int fdIn);
 static void pty_size(int *Lines, int *Cols);
 static BOOL pty_check_resize(void);
-static int  pty_setmode(int fd, const TTY *arg);
-static int  pty_getmode(int fd, TTY *arg);
-static int  pty_flush(int fd);
-static int  pty_read(SCREEN *sp, int *result);
-static int  pty_twait(const SCREEN *sp GCC_UNUSED, 
-                      int mode GCC_UNUSED, 
-                      int milliseconds, 
-                      int *timeleft,
-                      long (*gettime_func)(TimeType *, int)
-                      EVENTLIST_2nd(_nc_eventlist *evl));
+static int pty_setmode(int fd, const TTY *arg);
+static int pty_getmode(int fd, TTY *arg);
+static int pty_flush(int fd);
+static int pty_read(SCREEN *sp, int *result);
+static int pty_twait(const SCREEN *sp GCC_UNUSED,
+		     int mode GCC_UNUSED,
+		     int milliseconds,
+		     int *timeleft,
+		     long (*gettime_func)(TimeType *, int)
+			 EVENTLIST_2nd(_nc_eventlist *evl));
 #if USE_WIDEC_SUPPORT
 static size_t wchar_to_utf8(wchar_t wc, char utf8[UTF8_MAX_BYTES]);
-#endif	
+#endif
 
 /*   A process can only have a single console, so it is safe
 	 to maintain all the information about it in a single
 	 static structure.
  */
-NCURSES_EXPORT_VAR(ConsoleInfo)
-_nc_CONSOLE = {
-	.initialized = FALSE,
-	.conhost_flags = 0,
-	.ttyflags = {0, 0},
-	.saved_ttyflags = {0, 0},
-	.used_input_handle = INVALID_HANDLE_VALUE,
-	.used_output_handle = INVALID_HANDLE_VALUE,
-	.numButtons = 1,
-	.pairs = {0},
-	.origin = {0, 0},
-	.SBI = {0},
-	.save_SBI = {0},
-	.save_CI = {0},
-	.init = pty_init,
-	.size = pty_size,
-	.check_resize = pty_check_resize,
-	.setmode = pty_setmode,
-	.getmode = pty_getmode,
-	.flush = pty_flush,
-	.read = pty_read,
-	.twait = pty_twait
+static ConsoleInfo defaultCONSOLE = {
+    .initialized = FALSE,
+    .conhost_flags = 0,
+    .ttyflags = {0, 0},
+    .saved_ttyflags = {0, 0},
+    .used_input_handle = INVALID_HANDLE_VALUE,
+    .used_output_handle = INVALID_HANDLE_VALUE,
+    .numButtons = 1,
+    .pairs = {0},
+    .origin = {0, 0},
+    .SBI = {0},
+    .save_SBI = {0},
+    .save_CI = {0},
+    .init = pty_init,
+    .size = pty_size,
+    .check_resize = pty_check_resize,
+    .setmode = pty_setmode,
+    .getmode = pty_getmode,
+    .flush = pty_flush,
+    .read = pty_read,
+    .twait = pty_twait
 #if USE_WIDEC_SUPPORT
-	, .wchar_to_utf8 = wchar_to_utf8
+    ,
+    .wchar_to_utf8 = wchar_to_utf8
 #endif
 };
+
+/*
+* Poor man's dependency injection - we maintain a pointer to the current console information,
+* which is initialized to point to our default implementation. If in the future we want to 
+* support other types of consoles or terminal backends on Windows, we can create additional 
+* ConsoleInfo structures with different implementations of the methods, and switch the
+* _nc_currentCONSOLE pointer to point to the appropriate one based on runtime detection 
+* or configuration.
+*/
+NCURSES_EXPORT_VAR(ConsoleInfo *)
+_nc_currentCONSOLE = &defaultCONSOLE;
 
 #define UTF8_CP 65001
 #define DEFAULT_UTF8_CTYPE_ENV "C.UTF-8"
@@ -129,7 +140,7 @@ codepage_compatible_with_ncurses(UINT cp)
 }
 
 /* Check Codepage exists */
-static BOOL 
+static BOOL
 valid_codepage(UINT cp)
 {
 	CPINFOEX info;
@@ -239,55 +250,60 @@ encoding_init(void)
 #define REQUIRED_MINOR_V (DWORD)0
 #define REQUIRED_BUILD (DWORD)17763
 
-typedef NTSTATUS (WINAPI *RtlGetVersionPtr)(PRTL_OSVERSIONINFOW);
+typedef NTSTATUS(WINAPI *RtlGetVersionPtr)(PRTL_OSVERSIONINFOW);
 
-static bool get_real_windows_version(DWORD* major, DWORD* minor, DWORD* build) {
-    HMODULE ntdll = GetModuleHandle(TEXT("ntdll.dll"));
-    if (ntdll) {
-        RtlGetVersionPtr RtlGetVersion = (RtlGetVersionPtr)GetProcAddress(ntdll, "RtlGetVersion");
-        if (RtlGetVersion) {
-            RTL_OSVERSIONINFOW osvi = {0};
-            osvi.dwOSVersionInfoSize = sizeof(osvi);
-            if (RtlGetVersion(&osvi) == 0) {
-                *major = osvi.dwMajorVersion;
-                *minor = osvi.dwMinorVersion; 
-                *build = osvi.dwBuildNumber;
-                return true;
-            }
-        }
-    }
-    return false;
+static bool get_real_windows_version(DWORD *major, DWORD *minor, DWORD *build)
+{
+	HMODULE ntdll = GetModuleHandle(TEXT("ntdll.dll"));
+	if (ntdll)
+	{
+		RtlGetVersionPtr RtlGetVersion = (RtlGetVersionPtr)GetProcAddress(ntdll, "RtlGetVersion");
+		if (RtlGetVersion)
+		{
+			RTL_OSVERSIONINFOW osvi = {0};
+			osvi.dwOSVersionInfoSize = sizeof(osvi);
+			if (RtlGetVersion(&osvi) == 0)
+			{
+				*major = osvi.dwMajorVersion;
+				*minor = osvi.dwMinorVersion;
+				*build = osvi.dwBuildNumber;
+				return true;
+			}
+		}
+	}
+	return false;
 }
 
-/* Check if the current Windows version supports ConPTY, which is a requirement for the Windows Console backend of ncurses. 
+/* Check if the current Windows version supports ConPTY, which is a requirement for the Windows Console backend of ncurses.
    This is because without ConPTY, the Windows Console does not provide the necessary capabilities for ncurses and
    escpecially the terminfo layer to function properly.
 */
 static BOOL
 conpty_supported(void)
- {
-        int res = FALSE;
+{
+	int res = FALSE;
 	DWORD major, minor, build;
 
-        T((T_CALLED("lib_win32conpty::conpty_supported")));
- 
- 	if (!get_real_windows_version(&major, &minor, &build)) {
+	T((T_CALLED("lib_win32conpty::conpty_supported")));
+
+	if (!get_real_windows_version(&major, &minor, &build))
+	{
 		T(("GetVersionEx failed"));
-	    	returnBool(FALSE);
-	}	
-        if (major >= REQUIRED_MAJOR_V)
-        {
-                if (major == REQUIRED_MAJOR_V)
-                {
-                        if (((minor == REQUIRED_MINOR_V) &&
-                             (build >= REQUIRED_BUILD)) ||
-                            ((minor > REQUIRED_MINOR_V)))
-                                res = TRUE;
-                }
-                else
-                        res = TRUE;
-        }
-        returnBool(res);
+		returnBool(FALSE);
+	}
+	if (major >= REQUIRED_MAJOR_V)
+	{
+		if (major == REQUIRED_MAJOR_V)
+		{
+			if (((minor == REQUIRED_MINOR_V) &&
+			     (build >= REQUIRED_BUILD)) ||
+			    ((minor > REQUIRED_MINOR_V)))
+				res = TRUE;
+		}
+		else
+			res = TRUE;
+	}
+	returnBool(res);
 }
 
 /*
@@ -361,8 +377,8 @@ is not a tty.
 The other purpose of this routine is to manage the assignment of console handles. If the
 assigned filedescriptors are NOT valid console handles, the call will return FALSE.
 
-The function will also return FALSE, if the Windows version we run on does not support ConPTY, 
-which is a requirement for the Windows Console backend of ncurses. This is because without 
+The function will also return FALSE, if the Windows version we run on does not support ConPTY,
+which is a requirement for the Windows Console backend of ncurses. This is because without
 ConPTY, the Windows Console does not provide the necessary capabilities for ncurses and
 escpecially the terminfo layer to function properly.
 */
@@ -376,20 +392,21 @@ pty_init(int fdOut, int fdIn)
 	/* initialize once, or not at all */
 	if (!WINCONSOLE.initialized)
 	{
-		if (!conpty_supported())	
+		if (!conpty_supported())
 		{
 			T(("Windows version does not support ConPTY"));
-			fprintf(stderr,"ncurses: Windows version does not support ConPTY\n");
+			fprintf(stderr, "ncurses: Windows version does not support ConPTY\n");
 			returnBool(FALSE);
 		}
-		
+
 		int i;
 		DWORD num_buttons;
 		WORD a;
 		BOOL b;
-		DWORD dwFlagIn  = CONMODE_IN_DEFAULT | VT_FLAG_IN;
-		DWORD dwFlagOut = CONMODE_OUT_DEFAULT | VT_FLAG_OUT;
-		
+		DWORD dwFlagIn = (ENABLE_VIRTUAL_TERMINAL_INPUT | ENABLE_LINE_INPUT | ENABLE_PROCESSED_INPUT | ENABLE_ECHO_INPUT | ENABLE_WINDOW_INPUT | ENABLE_MOUSE_INPUT | ENABLE_QUICK_EDIT_MODE | ENABLE_EXTENDED_FLAGS);
+
+		DWORD dwFlagOut = (ENABLE_VIRTUAL_TERMINAL_PROCESSING | ENABLE_PROCESSED_OUTPUT | ENABLE_WRAP_AT_EOL_OUTPUT);
+
 		if (fdIn != -1)
 		{
 			T(("In the first call fdIn is expected to be -1."));
@@ -402,7 +419,7 @@ pty_init(int fdOut, int fdIn)
 		const char *env_flags = getenv("NC_CONHOST_FLAGS");
 		if (env_flags && *env_flags)
 		{
-			char *endptr;			
+			char *endptr;
 			long flags_val = strtol(env_flags, &endptr, 0);
 			if (*endptr == '\0' && flags_val >= 0)
 			{
@@ -425,7 +442,7 @@ pty_init(int fdOut, int fdIn)
 			WINCONSOLE.pairs[i] = a;
 
 		HANDLE stdin_hdl = GetStdHandle(STD_INPUT_HANDLE);
-		HANDLE out_hdl   = fdOut >= 0 ? (HANDLE)_get_osfhandle(fdOut) : INVALID_HANDLE_VALUE;
+		HANDLE out_hdl = fdOut >= 0 ? (HANDLE)_get_osfhandle(fdOut) : INVALID_HANDLE_VALUE;
 
 		if (out_hdl == INVALID_HANDLE_VALUE || GetConsoleMode(out_hdl, &dwFlagOut) == 0)
 		{
@@ -444,43 +461,45 @@ pty_init(int fdOut, int fdIn)
 		WINCONSOLE.ttyflags.dwFlagIn = dwFlagIn;
 
 		SetConsoleMode(stdin_hdl, WINCONSOLE.ttyflags.dwFlagIn);
-		SetConsoleMode(out_hdl,   WINCONSOLE.ttyflags.dwFlagOut);
-		
+		SetConsoleMode(out_hdl, WINCONSOLE.ttyflags.dwFlagOut);
+
 		// the most conservative mode is to run in binary mode, and let us handle any necessary translations
-		// we have _nc_assemble_utf8_input (see below) to handle UTF-8 decoding, and we want to ensure that 
+		// we have _nc_assemble_utf8_input (see below) to handle UTF-8 decoding, and we want to ensure that
 		// we get the raw bytes as they come in without any interference from the C runtime.
-		// For output we have the helper _nc_wchar_to_utf8 to encode UTF-8 characters, and we want to ensure 
-		// that the C runtime does not attempt to translate line endings or perform any other transformations 
+		// For output we have the helper _nc_wchar_to_utf8 to encode UTF-8 characters, and we want to ensure
+		// that the C runtime does not attempt to translate line endings or perform any other transformations
 		// on the output data.
-		setmode(_fileno(stdin),  O_BINARY);
+		setmode(_fileno(stdin), O_BINARY);
 		setmode(fdOut, O_BINARY);
 
 		if (!GetConsoleScreenBufferInfo(out_hdl, &WINCONSOLE.SBI))
 		{
 			T(("GetConsoleScreenBufferInfo failed"));
 			returnBool(FALSE);
-		} else {
+		}
+		else
+		{
 			T(("GetConsoleScreenBufferInfo"));
 			T(("... buffer(X:%d Y:%d)",
-		   		WINCONSOLE.SBI.dwSize.X,
-		   		WINCONSOLE.SBI.dwSize.Y));
+			   WINCONSOLE.SBI.dwSize.X,
+			   WINCONSOLE.SBI.dwSize.Y));
 			T(("... window(X:%d Y:%d)",
-		   		WINCONSOLE.SBI.dwMaximumWindowSize.X,
-		   		WINCONSOLE.SBI.dwMaximumWindowSize.Y));
+			   WINCONSOLE.SBI.dwMaximumWindowSize.X,
+			   WINCONSOLE.SBI.dwMaximumWindowSize.Y));
 			T(("... cursor(X:%d Y:%d)",
-		   		WINCONSOLE.SBI.dwCursorPosition.X,
-		   		WINCONSOLE.SBI.dwCursorPosition.Y));
+			   WINCONSOLE.SBI.dwCursorPosition.X,
+			   WINCONSOLE.SBI.dwCursorPosition.Y));
 			T(("... display(Top:%d Bottom:%d Left:%d Right:%d)",
-		   		WINCONSOLE.SBI.srWindow.Top,
-		   		WINCONSOLE.SBI.srWindow.Bottom,
-		   		WINCONSOLE.SBI.srWindow.Left,
-		   		WINCONSOLE.SBI.srWindow.Right));
-			
+			   WINCONSOLE.SBI.srWindow.Top,
+			   WINCONSOLE.SBI.srWindow.Bottom,
+			   WINCONSOLE.SBI.srWindow.Left,
+			   WINCONSOLE.SBI.srWindow.Right));
+
 			WINCONSOLE.origin.X = WINCONSOLE.SBI.srWindow.Left;
 			WINCONSOLE.origin.Y = WINCONSOLE.SBI.srWindow.Top;
 		}
 		WINCONSOLE.save_SBI = WINCONSOLE.SBI;
-		
+
 		GetConsoleCursorInfo(out_hdl, &WINCONSOLE.save_CI);
 		T(("... initial cursor is %svisible, %d%%",
 		   (WINCONSOLE.save_CI.bVisible ? "" : "not-"),
@@ -488,11 +507,13 @@ pty_init(int fdOut, int fdIn)
 
 		WINCONSOLE.initialized = TRUE;
 		res = TRUE;
-	} else {
+	}
+	else
+	{
 		DWORD dwFlagOut;
 		DWORD dwFlagIn;
 		/* Already initialized - just check if stdout is still in ConPTY mode */
-		HANDLE in_hdl  = fdIn  >= 0 ? (HANDLE)_get_osfhandle(fdIn) : INVALID_HANDLE_VALUE;
+		HANDLE in_hdl = fdIn >= 0 ? (HANDLE)_get_osfhandle(fdIn) : INVALID_HANDLE_VALUE;
 		HANDLE out_hdl = fdOut >= 0 ? (HANDLE)_get_osfhandle(fdOut) : INVALID_HANDLE_VALUE;
 
 		if (out_hdl == INVALID_HANDLE_VALUE || GetConsoleMode(out_hdl, &dwFlagOut) == 0)
@@ -510,7 +531,7 @@ pty_init(int fdOut, int fdIn)
 		WINCONSOLE.used_input_handle = in_hdl;
 		WINCONSOLE.ttyflags.dwFlagIn = dwFlagIn;
 		setmode(fdIn, O_BINARY);
-		setmode(fdOut, O_BINARY);	
+		setmode(fdOut, O_BINARY);
 		res = TRUE;
 	}
 	BOOL check = output_is_conpty();
@@ -588,7 +609,6 @@ pty_size(int *Lines, int *Cols)
 	}
 }
 
-
 #if USE_WIDEC_SUPPORT
 
 // To avoid unpredictable interferences with the various C runtimes on Windows,
@@ -611,7 +631,7 @@ typedef struct
 {
 	unsigned char buffer[UTF8_MAX_BYTES]; /* Buffer for incomplete UTF-8 sequence */
 	size_t length;			      /* Current length of buffer */
-	mbstate_t state;                      /* Multibyte conversion state */
+	mbstate_t state;		      /* Multibyte conversion state */
 } utf8_input_buffer_t;
 
 static utf8_input_buffer_t utf8_buffer = {0};
@@ -640,8 +660,8 @@ codepoint_to_wchar(uint32_t codepoint, wchar_t *wch)
 		/* Supplementary planes - needs surrogate pair for Windows */
 		/* Convert to UTF-16 surrogate pair */
 		uint32_t code = codepoint - 0x10000;
-		wch[0] = (wchar_t)(0xD800 + (code >> 10));     /* High surrogate */
-		wch[1] = (wchar_t)(0xDC00 + (code & 0x3FF));   /* Low surrogate */
+		wch[0] = (wchar_t)(0xD800 + (code >> 10));   /* High surrogate */
+		wch[1] = (wchar_t)(0xDC00 + (code & 0x3FF)); /* Low surrogate */
 		return 2;
 	}
 	else
@@ -756,8 +776,8 @@ assemble_utf8_input(unsigned char byte, wchar_t *wch)
 	/* Unified UTF-8 decoding for both widec and non-widec builds */
 	uint32_t codepoint;
 	int consumed = decode_utf8_simple(utf8_buffer.buffer,
-					      utf8_buffer.length,
-					      &codepoint);
+					  utf8_buffer.length,
+					  &codepoint);
 	if (consumed > 0)
 	{
 		memset(&utf8_buffer, 0, sizeof(utf8_buffer));
@@ -846,112 +866,159 @@ pty_read(SCREEN *sp, int *result)
  * WIN32_CONPTY timeout handling function
  */
 static int
-pty_twait(const SCREEN *sp GCC_UNUSED, 
-                      int mode GCC_UNUSED, 
-                      int milliseconds, 
-                      int *timeleft,
-                      long (*gettime_func)(TimeType *, int)
-                      EVENTLIST_2nd(_nc_eventlist *evl))
+pty_twait(const SCREEN *sp GCC_UNUSED,
+	  int mode GCC_UNUSED,
+	  int milliseconds,
+	  int *timeleft,
+	  long (*gettime_func)(TimeType *, int)
+	      EVENTLIST_2nd(_nc_eventlist *evl))
 {
-    int result = TW_NONE;
-    TimeType t0;
-    
-    #define min(a, b) ((a) < (b) ? (a) : (b))
-    
-    long starttime = gettime_func(&t0, TRUE);
-    
-    TR(TRACE_IEVENT, ("start WIN32_CONPTY twait: %d milliseconds, mode: %d",
-		      milliseconds, mode));
+	int result = TW_NONE;
+	TimeType t0;
 
-    if (mode & (TW_INPUT | TW_MOUSE)) {
-        HANDLE in_handle = WINCONSOLE.used_input_handle;
-        DWORD wait_result;
-        
-        if (milliseconds < 0) {
-            while (TRUE) {
-                wait_result = WaitForSingleObject(in_handle, 100);
-                if (wait_result == WAIT_OBJECT_0) {
-                    result = TW_INPUT;
-                    if (mode & TW_MOUSE) result |= TW_MOUSE;
-                    break;
-                } else if (wait_result == WAIT_TIMEOUT) {
-                    continue;
-                } else {
-                    break;
-                }
-            }
-        } else if (milliseconds == 0) {
-            DWORD events_available = 0;
-            
-            if (GetNumberOfConsoleInputEvents(in_handle, &events_available)) {
-                if (events_available > 0) {
-                    INPUT_RECORD input_buffer[16];
-                    DWORD events_read = 0;
-                    
-                    if (PeekConsoleInput(in_handle, input_buffer, 
-                                       min(events_available, 16), &events_read)) {
-                        for (DWORD i = 0; i < events_read; i++) {
-                            if (input_buffer[i].EventType == KEY_EVENT && 
-                                input_buffer[i].Event.KeyEvent.bKeyDown) {
-                                result = TW_INPUT;
-                                if (mode & TW_MOUSE) result |= TW_MOUSE;
-                                break;
-                            } else if (input_buffer[i].EventType == MOUSE_EVENT) {
-                                if (mode & TW_MOUSE) result |= TW_MOUSE;
-                            }
-                        }
-                    } else {
-                        wait_result = WaitForSingleObject(in_handle, 0);
-                        if (wait_result == WAIT_OBJECT_0) {
-                            result = TW_INPUT;
-                            if (mode & TW_MOUSE) result |= TW_MOUSE;
-                        }
-                    }
-                } else {
-                    result = TW_NONE;
-                }
-            } else {
-                wait_result = WaitForSingleObject(in_handle, 0);
-                if (wait_result == WAIT_OBJECT_0) {
-                    result = TW_INPUT;
-                    if (mode & TW_MOUSE) result |= TW_MOUSE;
-                }
-            }
-        } else {
-            wait_result = WaitForSingleObject(in_handle, (DWORD)milliseconds);
-            if (wait_result == WAIT_OBJECT_0) {
-                result = TW_INPUT;
-                if (mode & TW_MOUSE) result |= TW_MOUSE;
-            }
-        }
-    } else if (milliseconds > 0) {
-        Sleep((DWORD)milliseconds);
-    }
-    
-    long elapsed = gettime_func(&t0, FALSE) - starttime;
-    if (timeleft) {
-        *timeleft = (milliseconds >= 0) ? Max(0, milliseconds - (int)elapsed) : milliseconds;
-    }
-    
-    TR(TRACE_IEVENT, ("end WIN32_CONPTY twait: returned %d, elapsed %ld msec",
-		      result, elapsed));
-    
-    #undef min
-    return result;
+#define min(a, b) ((a) < (b) ? (a) : (b))
+
+	long starttime = gettime_func(&t0, TRUE);
+
+	TR(TRACE_IEVENT, ("start WIN32_CONPTY twait: %d milliseconds, mode: %d",
+			  milliseconds, mode));
+
+	if (mode & (TW_INPUT | TW_MOUSE))
+	{
+		HANDLE in_handle = WINCONSOLE.used_input_handle;
+		DWORD wait_result;
+
+		if (milliseconds < 0)
+		{
+			while (TRUE)
+			{
+				wait_result = WaitForSingleObject(in_handle, 100);
+				if (wait_result == WAIT_OBJECT_0)
+				{
+					result = TW_INPUT;
+					if (mode & TW_MOUSE)
+						result |= TW_MOUSE;
+					break;
+				}
+				else if (wait_result == WAIT_TIMEOUT)
+				{
+					continue;
+				}
+				else
+				{
+					break;
+				}
+			}
+		}
+		else if (milliseconds == 0)
+		{
+			DWORD events_available = 0;
+
+			if (GetNumberOfConsoleInputEvents(in_handle, &events_available))
+			{
+				if (events_available > 0)
+				{
+					INPUT_RECORD input_buffer[16];
+					DWORD events_read = 0;
+
+					if (PeekConsoleInput(in_handle, input_buffer,
+							     min(events_available, 16), &events_read))
+					{
+						for (DWORD i = 0; i < events_read; i++)
+						{
+							if (input_buffer[i].EventType == KEY_EVENT &&
+							    input_buffer[i].Event.KeyEvent.bKeyDown)
+							{
+								result = TW_INPUT;
+								if (mode & TW_MOUSE)
+									result |= TW_MOUSE;
+								break;
+							}
+							else if (input_buffer[i].EventType == MOUSE_EVENT)
+							{
+								if (mode & TW_MOUSE)
+									result |= TW_MOUSE;
+							}
+						}
+					}
+					else
+					{
+						wait_result = WaitForSingleObject(in_handle, 0);
+						if (wait_result == WAIT_OBJECT_0)
+						{
+							result = TW_INPUT;
+							if (mode & TW_MOUSE)
+								result |= TW_MOUSE;
+						}
+					}
+				}
+				else
+				{
+					result = TW_NONE;
+				}
+			}
+			else
+			{
+				wait_result = WaitForSingleObject(in_handle, 0);
+				if (wait_result == WAIT_OBJECT_0)
+				{
+					result = TW_INPUT;
+					if (mode & TW_MOUSE)
+						result |= TW_MOUSE;
+				}
+			}
+		}
+		else
+		{
+			wait_result = WaitForSingleObject(in_handle, (DWORD)milliseconds);
+			if (wait_result == WAIT_OBJECT_0)
+			{
+				result = TW_INPUT;
+				if (mode & TW_MOUSE)
+					result |= TW_MOUSE;
+			}
+		}
+	}
+	else if (milliseconds > 0)
+	{
+		Sleep((DWORD)milliseconds);
+	}
+
+	long elapsed = gettime_func(&t0, FALSE) - starttime;
+	if (timeleft)
+	{
+		*timeleft = (milliseconds >= 0) ? Max(0, milliseconds - (int)elapsed) : milliseconds;
+	}
+
+	TR(TRACE_IEVENT, ("end WIN32_CONPTY twait: returned %d, elapsed %ld msec",
+			  result, elapsed));
+
+#undef min
+	return result;
 }
 
-typedef enum { NotKnown, Input, Output } HandleType;
+typedef enum
+{
+	NotKnown,
+	Input,
+	Output
+} HandleType;
 
-static HandleType classify_handle(HANDLE hdl) {
-    HandleType type = NotKnown;
-    if (hdl!= INVALID_HANDLE_VALUE) {
-	if (hdl == WINCONSOLE.used_input_handle) {
-	    type = Input;
-	} else if (hdl == WINCONSOLE.used_output_handle) {
-	    type = Output;
-	}	
-    }
-    return type;
+static HandleType classify_handle(HANDLE hdl)
+{
+	HandleType type = NotKnown;
+	if (hdl != INVALID_HANDLE_VALUE)
+	{
+		if (hdl == WINCONSOLE.used_input_handle)
+		{
+			type = Input;
+		}
+		else if (hdl == WINCONSOLE.used_output_handle)
+		{
+			type = Output;
+		}
+	}
+	return type;
 }
 
 static int
@@ -981,97 +1048,140 @@ pty_flush(int fd)
 	}
 	returnCode(code);
 }
- 
+
 static int
 pty_setmode(int fd, const TTY *arg)
 {
-	if (!arg) return ERR;
-	
+	if (!arg)
+		return ERR;
+
 	HANDLE in_hdl = WINCONSOLE.used_input_handle;
 	HANDLE out_hdl = WINCONSOLE.used_output_handle;
 	HANDLE fd_hdl = INVALID_HANDLE_VALUE;
 	HandleType fd_type = NotKnown;
-	
+
 	// Get handle from fd
-	if (fd >= 0) {
+	if (fd >= 0)
+	{
 		fd_hdl = _get_osfhandle(fd);
 		fd_type = classify_handle(fd_hdl);
 	}
-	if (fd_type == NotKnown) {
-		T(("_nc_conpty_setmode: fd %d does not correspond to console input or output handle", fd));
+	if (fd_type == NotKnown)
+	{
+		T(("WINCONSOLE.setmode: fd %d does not correspond to console input or output handle", fd));
 		return ERR;
 	}
 
 	// Determine which handles to use based on classification
-	HANDLE input_target  = INVALID_HANDLE_VALUE;
+	HANDLE input_target = INVALID_HANDLE_VALUE;
 	HANDLE output_target = INVALID_HANDLE_VALUE;
-	
-	if (fd_type == Input) {
+
+	if (fd_type == Input)
+	{
 		input_target = fd_hdl;
 		output_target = out_hdl;
-	} else if (fd_type == Output) {
+	}
+	else if (fd_type == Output)
+	{
 		input_target = in_hdl;
 		output_target = fd_hdl;
-	} else {
+	}
+	else
+	{
 		input_target = in_hdl;
 		output_target = out_hdl;
 	}
-	
+
 	// Apply modes to appropriate handles
 	bool input_ok = false, output_ok = false;
-	
-	if (input_target != INVALID_HANDLE_VALUE) {
-        DWORD mode = arg->dwFlagIn;
-        
-        /* 
-           ENABLE_VIRTUAL_TERMINAL_INPUT (VT) requires ENABLE_PROCESSED_INPUT to be effective.
-           If we request VT, we must ensure PROCESSED is set, otherwise SetConsoleMode fails.
-	   We always allow mouse and window input events if VT input is requested, as these 
-	   are commonly used together and it simplifies the logic to just enable them when 
-	   VT is enabled.
-        */
-        if (mode & VT_FLAG_IN) {
-            mode |= ENABLE_PROCESSED_INPUT | ENABLE_MOUSE_INPUT | ENABLE_WINDOW_INPUT;
-        }
 
-        /* Sanitize: ENABLE_ECHO_INPUT requires ENABLE_LINE_INPUT */ 
-        if ((mode & ENABLE_ECHO_INPUT) && !(mode & ENABLE_LINE_INPUT)) {
-             mode &= ~ENABLE_ECHO_INPUT;
-        }
-
-	input_ok = SetConsoleMode(input_target, mode);
-	if (input_ok) {
-		WINCONSOLE.ttyflags.dwFlagIn = mode;	}
-	}
-	
-	if (output_target != INVALID_HANDLE_VALUE) {
-		output_ok = SetConsoleMode(output_target, VT_FLAG_OUT |arg->dwFlagOut);
-		if (output_ok) {
-			WINCONSOLE.ttyflags.dwFlagOut = VT_FLAG_OUT | arg->dwFlagOut;
-		}
-	}
-	
-	// Handle errors
-	if (!input_ok || !output_ok)
+	if (input_target != INVALID_HANDLE_VALUE)
 	{
-		return ERR;
+		DWORD mode = arg->dwFlagIn;
+
+		/*
+		   ENABLE_VIRTUAL_TERMINAL_INPUT (VT) requires ENABLE_PROCESSED_INPUT to be effective.
+		   If we request VT, we must ensure PROCESSED is set, otherwise SetConsoleMode fails.
+		   We always allow mouse and window input events if VT input is requested, as these
+		   are commonly used together and it simplifies the logic to just enable them when
+		   VT is enabled.
+		*/
+		if (mode & ENABLE_VIRTUAL_TERMINAL_INPUT)
+		{
+			mode |= ENABLE_PROCESSED_INPUT | ENABLE_MOUSE_INPUT | ENABLE_WINDOW_INPUT;
+		}
+
+		/* Sanitize: ENABLE_ECHO_INPUT requires ENABLE_LINE_INPUT */
+		if ((mode & ENABLE_ECHO_INPUT) && !(mode & ENABLE_LINE_INPUT))
+		{
+			mode &= ~ENABLE_ECHO_INPUT;
+		}
+
+		input_ok = SetConsoleMode(input_target, mode);
+		if (input_ok)
+		{
+			// Make sure the cached value reflects the real value we set, as the
+			// caller may not have provided all necessary flags (e.g.
+			// PROCESSED_INPUT when VT is requested)
+			DWORD realMode;
+			if (GetConsoleMode(input_target, &realMode))
+			{
+				WINCONSOLE.ttyflags.dwFlagIn = realMode;
+			}
+			else
+			{
+				WINCONSOLE.ttyflags.dwFlagIn = mode;
+			}
+		}
+
+		// Ensure VT output is always enabled for the Windows Console backend
+		mode = arg->dwFlagOut | ENABLE_VIRTUAL_TERMINAL_PROCESSING;
+
+		if (output_target != INVALID_HANDLE_VALUE)
+		{
+			output_ok = SetConsoleMode(output_target, mode);
+			if (output_ok)
+			{
+				// Make sure the cached value reflects the real value we set,
+				// as the caller may not have provided all necessary flags
+				// (e.g. VT output is required for the Windows Console backend)
+				DWORD realMode;
+				if (GetConsoleMode(output_target, &realMode))
+				{
+					WINCONSOLE.ttyflags.dwFlagOut = realMode;
+				}
+				else
+				{
+					WINCONSOLE.ttyflags.dwFlagOut = mode;
+				}
+			}
+		}
+
+		// Handle errors
+		if (!input_ok || !output_ok)
+		{
+			return ERR;
+		}
+
+		return OK;
 	}
-		
-	return OK;
+	return ERR;
 }
 
 static int
 pty_getmode(int fd, TTY *arg)
 {
-	if (NULL==arg) return ERR;
+	if (NULL == arg)
+		return ERR;
 
 	HANDLE hdl = _get_osfhandle(fd);
 	HandleType type = classify_handle(hdl);
-	if (type == NotKnown) {
+	if (type == NotKnown)
+	{
 		T(("_nc_conpty_getmode: fd %d does not correspond to console input or output handle", fd));
 		return ERR;
-	}	
-	*arg = WINCONSOLE.ttyflags; 
+	}
+	*arg = WINCONSOLE.ttyflags;
 	return OK;
 }
 
