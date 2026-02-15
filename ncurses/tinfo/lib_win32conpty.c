@@ -53,6 +53,7 @@ static void pty_size(int *Lines, int *Cols);
 static BOOL pty_check_resize(void);
 static int pty_setmode(int fd, const TTY *arg);
 static int pty_getmode(int fd, TTY *arg);
+static int pty_setfilemode(TTY *arg);
 static int pty_flush(int fd);
 static int pty_read(SCREEN *sp, int *result);
 static int pty_twait(const SCREEN *sp GCC_UNUSED,
@@ -71,9 +72,11 @@ static size_t wchar_to_utf8(wchar_t wc, char utf8[UTF8_MAX_BYTES]);
  */
 static ConsoleInfo defaultCONSOLE = {
     .initialized = FALSE,
+    .used_fdIn = -1,
+    .used_fdOut = -1,
     .conhost_flags = 0,
-    .ttyflags = {0, 0},
-    .saved_ttyflags = {0, 0},
+    .ttyflags = {0, 0, 0, 0, 0, 0},
+    .saved_ttyflags = {0, 0, 0, 0, 0, 0},
     .used_input_handle = INVALID_HANDLE_VALUE,
     .used_output_handle = INVALID_HANDLE_VALUE,
     .numButtons = 1,
@@ -87,6 +90,7 @@ static ConsoleInfo defaultCONSOLE = {
     .check_resize = pty_check_resize,
     .setmode = pty_setmode,
     .getmode = pty_getmode,
+    .setfilemode = pty_setfilemode,
     .flush = pty_flush,
     .read = pty_read,
     .twait = pty_twait
@@ -447,6 +451,8 @@ pty_init(int fdOut, int fdIn)
 		for (i = 0; i < CON_NUMPAIRS; i++)
 			WINCONSOLE.pairs[i] = a;
 
+		WINCONSOLE.used_fdIn = _fileno(stdin);
+		WINCONSOLE.used_fdOut = fdOut;
 		HANDLE stdin_hdl = GetStdHandle(STD_INPUT_HANDLE);
 		HANDLE out_hdl = fdOut >= 0 ? (HANDLE)_get_osfhandle(fdOut) : INVALID_HANDLE_VALUE;
 
@@ -469,14 +475,10 @@ pty_init(int fdOut, int fdIn)
 		SetConsoleMode(stdin_hdl, WINCONSOLE.ttyflags.dwFlagIn);
 		SetConsoleMode(out_hdl, WINCONSOLE.ttyflags.dwFlagOut);
 
-		// the most conservative mode is to run in binary mode, and let us handle any necessary translations
-		// we have _nc_assemble_utf8_input (see below) to handle UTF-8 decoding, and we want to ensure that
-		// we get the raw bytes as they come in without any interference from the C runtime.
-		// For output we have the helper _nc_wchar_to_utf8 to encode UTF-8 characters, and we want to ensure
-		// that the C runtime does not attempt to translate line endings or perform any other transformations
-		// on the output data.
-		setmode(_fileno(stdin), O_BINARY);
-		setmode(fdOut, O_BINARY);
+		WINCONSOLE.ttyflags.InFileMode = _O_BINARY;
+		WINCONSOLE.ttyflags.InFileMode = _O_BINARY;
+		WINCONSOLE.ttyflags.setFlags = TRUE;
+		pty_setfilemode(&WINCONSOLE.ttyflags);
 
 		if (!GetConsoleScreenBufferInfo(out_hdl, &WINCONSOLE.SBI))
 		{
@@ -518,6 +520,8 @@ pty_init(int fdOut, int fdIn)
 	{
 		DWORD dwFlagOut;
 		DWORD dwFlagIn;
+		WINCONSOLE.used_fdIn = fdIn;
+		WINCONSOLE.used_fdOut = fdOut;
 		/* Already initialized - just check if stdout is still in ConPTY mode */
 		HANDLE in_hdl = fdIn >= 0 ? (HANDLE)_get_osfhandle(fdIn) : INVALID_HANDLE_VALUE;
 		HANDLE out_hdl = fdOut >= 0 ? (HANDLE)_get_osfhandle(fdOut) : INVALID_HANDLE_VALUE;
@@ -536,8 +540,18 @@ pty_init(int fdOut, int fdIn)
 		WINCONSOLE.ttyflags.dwFlagOut = dwFlagOut;
 		WINCONSOLE.used_input_handle = in_hdl;
 		WINCONSOLE.ttyflags.dwFlagIn = dwFlagIn;
-		setmode(fdIn, O_BINARY);
-		setmode(fdOut, O_BINARY);
+
+		// the most conservative mode is to run in binary mode, and let us handle any necessary translations
+		// we have _nc_assemble_utf8_input (see below) to handle UTF-8 decoding, and we want to ensure that
+		// we get the raw bytes as they come in without any interference from the C runtime.
+		// For output we have the helper _nc_wchar_to_utf8 to encode UTF-8 characters, and we want to ensure
+		// that the C runtime does not attempt to translate line endings or perform any other transformations
+		// on the output data.
+		WINCONSOLE.ttyflags.InFileMode = _O_BINARY;
+		WINCONSOLE.ttyflags.InFileMode = _O_BINARY;
+		WINCONSOLE.ttyflags.setFlags = TRUE;
+		pty_setfilemode(&WINCONSOLE.ttyflags);
+
 		res = TRUE;
 	}
 	BOOL check = output_is_conpty();
@@ -1055,6 +1069,29 @@ pty_flush(int fd)
 	returnCode(code);
 }
 
+static int 
+pty_setfilemode(TTY* arg)
+{
+	if (!arg)
+		return ERR;
+
+	if (arg->setFlags)
+	{
+		if (WINCONSOLE.used_fdIn >= 0)
+			_setmode(WINCONSOLE.used_fdIn, arg->InFileMode);
+		else
+			T(("Invalid input file descriptor"));
+
+		if (WINCONSOLE.used_fdOut >= 0)
+			_setmode(WINCONSOLE.used_fdOut, arg->OutFileMode);
+		else
+			T(("Invalid output file descriptor"));
+		
+		arg->setFlags = FALSE;
+	}
+	return OK;
+}
+
 static int
 pty_setmode(int fd, const TTY *arg)
 {
@@ -1123,6 +1160,8 @@ pty_setmode(int fd, const TTY *arg)
 			mode &= ~ENABLE_ECHO_INPUT;
 		}
 
+		pty_setfilemode((TTY*)arg);
+
 		input_ok = SetConsoleMode(input_target, mode);
 		if (input_ok)
 		{
@@ -1138,6 +1177,10 @@ pty_setmode(int fd, const TTY *arg)
 			{
 				WINCONSOLE.ttyflags.dwFlagIn = mode;
 			}
+		}
+		else
+		{
+			T(("Invalid input file descriptor"));
 		}
 
 		// Ensure VT output is always enabled for the Windows Console backend
@@ -1160,7 +1203,11 @@ pty_setmode(int fd, const TTY *arg)
 				{
 					WINCONSOLE.ttyflags.dwFlagOut = mode;
 				}
-			}
+			}		
+			else
+			{
+				T(("Invalid output file descriptor"));
+			}		
 		}
 
 		// Handle errors

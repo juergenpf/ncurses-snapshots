@@ -37,7 +37,9 @@
  */
 
 #include <curses.priv.h>
-
+#if defined(_NC_WINDOWS_NATIVE)
+#include <fcntl.h>
+#endif
 #ifndef CUR
 #define CUR SP_TERMTYPE
 #endif
@@ -142,7 +144,9 @@ NCURSES_SP_NAME(def_shell_mode) (NCURSES_SP_DCL0)
 	    if (termp->Ottyb.c_oflag & OFLAGS_TABS)
 		tab = back_tab = NULL;
 #elif defined(_NC_WINDOWS_NATIVE)
-	    /* noop */
+	    termp->Ottyb.InFileMode  = _O_TEXT;
+	    termp->Ottyb.OutFileMode = _O_TEXT;
+	    termp->Ottyb.setFlags = FALSE;
 #else
 	    if (termp->Ottyb.sg_flags & XTABS)
 		tab = back_tab = NULL;
@@ -177,7 +181,9 @@ NCURSES_SP_NAME(def_prog_mode) (NCURSES_SP_DCL0)
 #ifdef TERMIOS
 	    termp->Nttyb.c_oflag &= (unsigned) (~OFLAGS_TABS);
 #elif defined(_NC_WINDOWS_NATIVE)
-	    /* noop */
+	    termp->Nttyb.InFileMode  = _O_BINARY;
+	    termp->Nttyb.OutFileMode = _O_BINARY;
+	    termp->Nttyb.setFlags = FALSE;
 #else
 	    termp->Nttyb.sg_flags &= (unsigned) (~XTABS);
 #endif
@@ -204,6 +210,9 @@ NCURSES_SP_NAME(reset_prog_mode) (NCURSES_SP_DCL0)
     T((T_CALLED("reset_prog_mode(%p) ->term %p"), (void *) SP_PARM, (void *) termp));
 
     if (termp != NULL) {
+#if defined(_NC_WINDOWS_NATIVE)
+	termp->Nttyb.setFlags = TRUE;
+#endif
 	if (_nc_set_tty_mode(&termp->Nttyb) == OK) {
 	    if (SP_PARM) {
 		if (SP_PARM->_keypad_on)
@@ -237,6 +246,9 @@ NCURSES_SP_NAME(reset_shell_mode) (NCURSES_SP_DCL0)
 	    _nc_keypad(SP_PARM, FALSE);
 	    _nc_flush();
 	}
+#if defined(_NC_WINDOWS_NATIVE)
+	termp->Ottyb.setFlags = TRUE;
+#endif
 	rc = _nc_set_tty_mode(&termp->Ottyb);
     }
     returnCode(rc);

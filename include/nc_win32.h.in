@@ -112,8 +112,11 @@ extern NCURSES_EXPORT(int) _nc_wcwidth(uint32_t);
 // This is our equivalent to termios
 typedef struct
 {
-    DWORD dwFlagIn;     // Input Handle Console mode flags
-    DWORD dwFlagOut;    // Output Handle Console mode flags
+    DWORD dwFlagIn;                // Input Handle Console mode flags
+    DWORD dwFlagOut;               // Output Handle Console mode flags
+    int InFileMode;                // The translation mode of the input handle
+    int OutFileMode;               // The translation mode of the output handle
+    BOOL setFlags;                 // whether the file mode flags shoud be appled 
 } ConsoleMode;
 
 // This is for future use in an implementation that may make use of the Windows Console API 
@@ -137,6 +140,10 @@ typedef struct
 typedef struct {
   // Properties
     BOOL initialized;
+
+    int used_fdIn;                 /* The file descriptor we were initialized with for input */
+    int used_fdOut;                /* The file descriptor we were initialized with for output */ 
+
     unsigned int conhost_flags;    /* Host configuration flags */
     ConsoleMode ttyflags;          /* The desired state of the console  */
     ConsoleMode saved_ttyflags;    /* The state of the console at startup */
@@ -158,6 +165,7 @@ typedef struct {
     BOOL (*check_resize)(void);
     int (*setmode)(int fd, const ConsoleMode *arg);
     int (*getmode)(int fd, ConsoleMode *arg);
+    int (*setfilemode)(ConsoleMode *arg);
     int (*flush)(int fd);
     int (*read)(SCREEN *sp, int *result);
     int (*twait)(const SCREEN *sp, int mode, int milliseconds, int *timeleft, long (*gettime_func)(TimeType *, int) EVENTLIST_2nd(_nc_eventlist *evl));
