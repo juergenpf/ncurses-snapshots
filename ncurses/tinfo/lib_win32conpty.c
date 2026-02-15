@@ -34,6 +34,8 @@
 
 #include <curses.priv.h>
 
+MODULE_ID("$Id$")
+
 #if defined(_NC_WINDOWS_NATIVE)
 #include <locale.h>
 #include <stdio.h>
@@ -44,8 +46,6 @@
 #if USE_WIDEC_SUPPORT
 #include <wchar.h>
 #endif
-
-MODULE_ID("$Id$")
 
 // Prototypes of static function we want to use in initializers
 static BOOL pty_init(int fdOut, int fdIn);
@@ -79,12 +79,6 @@ static ConsoleInfo defaultCONSOLE = {
     .saved_ttyflags = {0, 0, 0, 0, 0, 0},
     .used_input_handle = INVALID_HANDLE_VALUE,
     .used_output_handle = INVALID_HANDLE_VALUE,
-    .numButtons = 1,
-    .pairs = {0},
-    .origin = {0, 0},
-    .SBI = {0},
-    .save_SBI = {0},
-    .save_CI = {0},
     .init = pty_init,
     .size = pty_size,
     .check_resize = pty_check_resize,
@@ -112,10 +106,10 @@ NCURSES_EXPORT_VAR(ConsoleInfo *)
 _nc_currentCONSOLE = &defaultCONSOLE;
 
 #define UTF8_CP 65001
-#define DEFAULT_UTF8_CTYPE_ENV "C.UTF-8"
+#define DEFAULT_UTF8_CTYPE_ENV ".UTF-8"
 
 #define DEFAULT_ASCII_CP 1252
-#define DEFAULT_ASCII_CTYPE_ENV "English_United States.1252"
+#define DEFAULT_ASCII_CTYPE_ENV ".1252"
 
 static BOOL
 locale_is_utf8()
@@ -292,11 +286,12 @@ conpty_supported(void)
 
 	if (!get_real_windows_version(&major, &minor, &build))
 	{
-		T(("GetVersionEx failed"));
+		T(("RtlGetVersion failed"));
 		returnBool(FALSE);
 	}
 	if (major >= REQUIRED_MAJOR_V)
 	{
+		T(("Windows version detected: %d.%d (build %d)", major, minor, build));
 		if (major == REQUIRED_MAJOR_V)
 		{
 			if (((minor == REQUIRED_MINOR_V) &&
@@ -325,7 +320,7 @@ output_is_conpty(void)
 	CONSOLE_SCREEN_BUFFER_INFO csbi;
 	bool result = false;
 
-	T((T_CALLED("lib_win32conpty::_nc_output_is_conpty()")));
+	T((T_CALLED("lib_win32conpty::output_is_conpty()")));
 
 	out_handle = WINCONSOLE.used_output_handle;
 	if (GetConsoleMode(out_handle, &console_mode) == 0)
@@ -391,7 +386,7 @@ pty_init(int fdOut, int fdIn)
 {
 	bool res = FALSE;
 
-	T((T_CALLED("lib_win32conpty::_nc_console_checkinit(fdIn=%d, fdOut=%d)"), fdIn, fdOut));
+	T((T_CALLED("lib_win32conpty::pty_init(fdOut=%d, fdIn=%d)"), fdOut, fdIn));
 
 	/* initialize once, or not at all */
 	if (!WINCONSOLE.initialized)
@@ -399,14 +394,13 @@ pty_init(int fdOut, int fdIn)
 		if (!conpty_supported())
 		{
 			T(("Windows version does not support ConPTY"));
-			fprintf(stderr, "ncurses: Windows version does not support ConPTY\n");
 			returnBool(FALSE);
 		}
 
-		int i;
-		DWORD num_buttons;
-		WORD a;
-		BOOL b;
+		// We set the console mode flags to the most basic ones that are required for ConPTY 
+		// to function properly. We will let the C runtime handle any necessary translations, 
+		// and we will handle UTF-8 encoding and decoding ourselves to avoid any unpredictable 
+		// interferences with the various C runtimes on Windows (when using wide c)
 		DWORD dwFlagIn = (ENABLE_LINE_INPUT 
 			| ENABLE_PROCESSED_INPUT 
 			| ENABLE_ECHO_INPUT  
@@ -437,81 +431,57 @@ pty_init(int fdOut, int fdIn)
 			}
 		}
 
-		if (GetNumberOfConsoleMouseButtons(&num_buttons))
-		{
-			WINCONSOLE.numButtons = (int)num_buttons;
-		}
-		else
-		{
-			WINCONSOLE.numButtons = 1;
-		}
 
-		a = MapColor(true, COLOR_WHITE) |
-		    MapColor(false, COLOR_BLACK);
-		for (i = 0; i < CON_NUMPAIRS; i++)
-			WINCONSOLE.pairs[i] = a;
-
+		// First call coming from setuptrm() only cares about output, so we can ignore fdIn. 
+		// We will validate the input handle on the next call when fdIn is provided.
+		// In the meantime, we use stdin as the input handle, which is a valid console handle 
+		// as long as the process has a console.
 		WINCONSOLE.used_fdIn = _fileno(stdin);
 		WINCONSOLE.used_fdOut = fdOut;
 		HANDLE stdin_hdl = GetStdHandle(STD_INPUT_HANDLE);
 		HANDLE out_hdl = fdOut >= 0 ? (HANDLE)_get_osfhandle(fdOut) : INVALID_HANDLE_VALUE;
+		DWORD dwFlag;
 
-		if (out_hdl == INVALID_HANDLE_VALUE || GetConsoleMode(out_hdl, &dwFlagOut) == 0)
+		if (out_hdl == INVALID_HANDLE_VALUE || GetConsoleMode(out_hdl, &dwFlag) == 0)
 		{
 			T(("Output handle is not a console"));
 			returnBool(FALSE);
 		}
 		WINCONSOLE.used_output_handle = out_hdl;
-		WINCONSOLE.ttyflags.dwFlagOut = dwFlagOut;
 
-		if (stdin_hdl == INVALID_HANDLE_VALUE || GetConsoleMode(stdin_hdl, &dwFlagIn) == 0)
+		if (stdin_hdl == INVALID_HANDLE_VALUE || GetConsoleMode(stdin_hdl, &dwFlag) == 0)
 		{
 			T(("StdIn handle is not a console"));
 			returnBool(FALSE);
 		}
 		WINCONSOLE.used_input_handle = stdin_hdl;
-		WINCONSOLE.ttyflags.dwFlagIn = dwFlagIn;
 
-		SetConsoleMode(stdin_hdl, WINCONSOLE.ttyflags.dwFlagIn);
-		SetConsoleMode(out_hdl, WINCONSOLE.ttyflags.dwFlagOut);
+		SetConsoleMode(out_hdl, dwFlagOut);
+		// We immediately read the console mode back to reflect any changes the
+		// runtime my have added, so the saved value reflects the actual mode
+		// of tghe console. 
+		if (GetConsoleMode(out_hdl, &dwFlagOut) == 0)
+		{
+			T(("GetConsoleMode() failed for stdout"));
+			returnBool(FALSE);
+		}
+		WINCONSOLE.ttyflags.dwFlagOut = dwFlagOut;
+
+		SetConsoleMode(stdin_hdl, dwFlagIn);
+		// We immediately read the console mode back to reflect any changes the
+		// runtime my have added, so the saved value reflects the actual mode
+		// of tghe console. 
+		if (GetConsoleMode(stdin_hdl, &dwFlagIn) == 0)
+		{
+			T(("GetConsoleMode() failed for stdin"));
+			returnBool(FALSE);
+		}
+		WINCONSOLE.ttyflags.dwFlagIn = dwFlagIn;
 
 		WINCONSOLE.ttyflags.InFileMode = _O_BINARY;
 		WINCONSOLE.ttyflags.InFileMode = _O_BINARY;
 		WINCONSOLE.ttyflags.setMode = TRUE;
 		pty_setfilemode(&WINCONSOLE.ttyflags);
-
-		if (!GetConsoleScreenBufferInfo(out_hdl, &WINCONSOLE.SBI))
-		{
-			T(("GetConsoleScreenBufferInfo failed"));
-			returnBool(FALSE);
-		}
-		else
-		{
-			T(("GetConsoleScreenBufferInfo"));
-			T(("... buffer(X:%d Y:%d)",
-			   WINCONSOLE.SBI.dwSize.X,
-			   WINCONSOLE.SBI.dwSize.Y));
-			T(("... window(X:%d Y:%d)",
-			   WINCONSOLE.SBI.dwMaximumWindowSize.X,
-			   WINCONSOLE.SBI.dwMaximumWindowSize.Y));
-			T(("... cursor(X:%d Y:%d)",
-			   WINCONSOLE.SBI.dwCursorPosition.X,
-			   WINCONSOLE.SBI.dwCursorPosition.Y));
-			T(("... display(Top:%d Bottom:%d Left:%d Right:%d)",
-			   WINCONSOLE.SBI.srWindow.Top,
-			   WINCONSOLE.SBI.srWindow.Bottom,
-			   WINCONSOLE.SBI.srWindow.Left,
-			   WINCONSOLE.SBI.srWindow.Right));
-
-			WINCONSOLE.origin.X = WINCONSOLE.SBI.srWindow.Left;
-			WINCONSOLE.origin.Y = WINCONSOLE.SBI.srWindow.Top;
-		}
-		WINCONSOLE.save_SBI = WINCONSOLE.SBI;
-
-		GetConsoleCursorInfo(out_hdl, &WINCONSOLE.save_CI);
-		T(("... initial cursor is %svisible, %d%%",
-		   (WINCONSOLE.save_CI.bVisible ? "" : "not-"),
-		   (int)WINCONSOLE.save_CI.dwSize));
 
 		WINCONSOLE.initialized = TRUE;
 		res = TRUE;
@@ -522,8 +492,8 @@ pty_init(int fdOut, int fdIn)
 		DWORD dwFlagIn;
 		WINCONSOLE.used_fdIn = fdIn;
 		WINCONSOLE.used_fdOut = fdOut;
-		/* Already initialized - just check if stdout is still in ConPTY mode */
 		HANDLE in_hdl = fdIn >= 0 ? (HANDLE)_get_osfhandle(fdIn) : INVALID_HANDLE_VALUE;
+		/* Already initialized - just check if stdout is still in ConPTY mode */
 		HANDLE out_hdl = fdOut >= 0 ? (HANDLE)_get_osfhandle(fdOut) : INVALID_HANDLE_VALUE;
 
 		if (out_hdl == INVALID_HANDLE_VALUE || GetConsoleMode(out_hdl, &dwFlagOut) == 0)
@@ -619,11 +589,9 @@ pty_size(int *Lines, int *Cols)
 				*Cols = (int)(csbi.srWindow.Right + 1 - csbi.srWindow.Left);
 			}
 			else
-			{
-				*Lines = (int)(WINCONSOLE.SBI.srWindow.Bottom + 1 -
-					       WINCONSOLE.SBI.srWindow.Top);
-				*Cols = (int)(WINCONSOLE.SBI.srWindow.Right + 1 -
-					      WINCONSOLE.SBI.srWindow.Left);
+			{ // Fallback to default size if we cannot get console info
+				*Lines = 25;
+				*Cols = 80;
 			}
 		}
 	}
@@ -900,7 +868,7 @@ pty_twait(const SCREEN *sp GCC_UNUSED,
 
 	long starttime = gettime_func(&t0, TRUE);
 
-	TR(TRACE_IEVENT, ("start WIN32_CONPTY twait: %d milliseconds, mode: %d",
+	TR(TRACE_IEVENT, ("start WINCONSOLE.twait: %d milliseconds, mode: %d",
 			  milliseconds, mode));
 
 	if (mode & (TW_INPUT | TW_MOUSE))
@@ -1010,7 +978,7 @@ pty_twait(const SCREEN *sp GCC_UNUSED,
 		*timeleft = (milliseconds >= 0) ? Max(0, milliseconds - (int)elapsed) : milliseconds;
 	}
 
-	TR(TRACE_IEVENT, ("end WIN32_CONPTY twait: returned %d, elapsed %ld msec",
+	TR(TRACE_IEVENT, ("end WINCONSOLE.twait: returned %d, elapsed %ld msec",
 			  result, elapsed));
 
 #undef min
@@ -1048,7 +1016,7 @@ pty_flush(int fd)
 	HANDLE hdl = _get_osfhandle(fd);
 	HandleType type = classify_handle(hdl);
 
-	T((T_CALLED("lib_win32conmod::_nc_conpty_flush(fd=%d)"), fd));
+	T((T_CALLED("WINCONSOLE.lush(fd=%d)"), fd));
 
 	if (type == Input)
 	{
@@ -1064,7 +1032,7 @@ pty_flush(int fd)
 	else
 	{
 		code = ERR;
-		T(("_nc_conpty_flush not requesting a handle owned by console."));
+		T(("WINCONSOLE.flush not requesting a handle owned by console."));
 	}
 	returnCode(code);
 }
@@ -1231,7 +1199,7 @@ pty_getmode(int fd, TTY *arg)
 	HandleType type = classify_handle(hdl);
 	if (type == NotKnown)
 	{
-		T(("_nc_conpty_getmode: fd %d does not correspond to console input or output handle", fd));
+		T(("WINCONSOLE.getmode: fd %d does not correspond to console input or output handle", fd));
 		return ERR;
 	}
 	*arg = WINCONSOLE.ttyflags;

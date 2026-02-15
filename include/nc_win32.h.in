@@ -135,8 +135,6 @@ typedef struct
 #ifndef EVENTLIST_2nd
  #define EVENTLIST_2nd(param) /* nothing */
 #endif
-
-#define CON_NUMPAIRS 64
 typedef struct {
   // Properties
     BOOL initialized;
@@ -151,13 +149,6 @@ typedef struct {
     /* Handle tracking for fd-based operations */
     HANDLE used_input_handle;      /* Handle actually used for input operations */
     HANDLE used_output_handle;     /* Handle actually used for output operations */
-
-    int numButtons;
-    WORD pairs[CON_NUMPAIRS];
-    COORD origin;
-    CONSOLE_SCREEN_BUFFER_INFO SBI;
-    CONSOLE_SCREEN_BUFFER_INFO save_SBI;
-    CONSOLE_CURSOR_INFO save_CI;
 
   // Metods
     BOOL (*init)(int fdOut, int fdIn);
