@@ -206,9 +206,6 @@ NCURSES_SP_NAME(reset_prog_mode) (NCURSES_SP_DCL0)
     T((T_CALLED("reset_prog_mode(%p) ->term %p"), (void *) SP_PARM, (void *) termp));
 
     if (termp != NULL) {
-#if defined(_NC_WINDOWS_NATIVE)
-	termp->Nttyb.setMode = TRUE;
-#endif
 	if (_nc_set_tty_mode(&termp->Nttyb) == OK) {
 	    if (SP_PARM) {
 		if (SP_PARM->_keypad_on)
@@ -242,9 +239,6 @@ NCURSES_SP_NAME(reset_shell_mode) (NCURSES_SP_DCL0)
 	    _nc_keypad(SP_PARM, FALSE);
 	    _nc_flush();
 	}
-#if defined(_NC_WINDOWS_NATIVE)
-	termp->Ottyb.setMode = TRUE;
-#endif
 	rc = _nc_set_tty_mode(&termp->Ottyb);
     }
     returnCode(rc);

@@ -264,8 +264,8 @@ _nc_trace_ttymode(const TTY * tty)
 	_nc_STRCAT(buf, "\n", TRACE_BUF_SIZE(0));
 	lookup_bits(buf, fileModes , "OutFileMode", (tty->OutFileMode));
 	_nc_STRCAT(buf, "\n", TRACE_BUF_SIZE(0));
-	_nc_STRCAT(buf, ", setMode=", TRACE_BUF_SIZE(0));
-	_nc_STRCAT(buf, tty->setMode ? "TRUE" : "FALSE", TRACE_BUF_SIZE(0));
+	_nc_STRCAT(buf, ", setfMode=", TRACE_BUF_SIZE(0));
+	_nc_STRCAT(buf, tty->setfMode ? "TRUE" : "FALSE", TRACE_BUF_SIZE(0));
     }
  #else
     /* reference: ttcompat(4M) on SunOS 4.1 */
