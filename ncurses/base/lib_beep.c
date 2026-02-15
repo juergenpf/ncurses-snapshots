@@ -64,10 +64,6 @@ NCURSES_SP_NAME(beep) (NCURSES_SP_DCL0)
 
     T((T_CALLED("beep(%p)"), (void *) SP_PARM));
 
-#if USE_TERM_DRIVER
-    if (SP_PARM != NULL)
-	res = CallDriver_1(SP_PARM, td_doBeepOrFlash, TRUE);
-#else
     /* FIXME: should make sure that we are not in altchar mode */
     if (cur_term == NULL) {
 	res = ERR;
@@ -77,7 +73,6 @@ NCURSES_SP_NAME(beep) (NCURSES_SP_DCL0)
 	res = NCURSES_PUTP2_FLUSH("flash_screen", flash_screen);
 	_nc_flush();
     }
-#endif
 
     returnCode(res);
 }

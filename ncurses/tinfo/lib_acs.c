@@ -59,24 +59,6 @@ NCURSES_EXPORT_VAR (chtype) acs_map[ACS_LEN] =
 };
 #endif
 
-#if USE_TERM_DRIVER
-NCURSES_EXPORT(chtype)
-NCURSES_SP_NAME(_nc_acs_char) (NCURSES_SP_DCLx int c)
-{
-    chtype *map;
-    if (c < 0 || c >= ACS_LEN)
-	return (chtype) 0;
-    map = (SP_PARM != NULL) ? SP_PARM->_acs_map :
-#if BROKEN_LINKER || USE_REENTRANT
-	_nc_prescreen.real_acs_map
-#else
-	acs_map
-#endif
-	;
-    return map[c];
-}
-#endif /* USE_TERM_DRIVER */
-
 NCURSES_EXPORT(void)
 NCURSES_SP_NAME(_nc_init_acs) (NCURSES_SP_DCL0)
 {
@@ -166,9 +148,6 @@ NCURSES_SP_NAME(_nc_init_acs) (NCURSES_SP_DCL0)
     real_map['Y'] = '|';	/* vertical line */
     real_map['E'] = '+';	/* large plus or crossover */
 
-#if USE_TERM_DRIVER
-    CallDriver_2(SP_PARM, td_initacs, real_map, fake_map);
-#else
     if (ena_acs != NULL) {
 	NCURSES_PUTP2("ena_acs", ena_acs);
     }
@@ -245,7 +224,6 @@ NCURSES_SP_NAME(_nc_init_acs) (NCURSES_SP_DCL0)
 	_nc_unlock_global(tracef);
     }
 #endif /* TRACE */
-#endif
 }
 
 #if NCURSES_SP_FUNCS

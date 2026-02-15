@@ -41,6 +41,10 @@ MODULE_ID("$Id: lib_tracebits.c,v 1.37 2025/12/23 09:23:38 tom Exp $")
 #include <sys/termio.h>		/* needed for ISC */
 #endif
 
+#if defined(_NC_WINDOWS_NATIVE)
+#include <fcntl.h>
+#endif
+
 /* may be undefined if we're using termio.h */
 #ifndef TOSTOP
 #define TOSTOP 0
@@ -68,7 +72,7 @@ MODULE_ID("$Id: lib_tracebits.c,v 1.37 2025/12/23 09:23:38 tom Exp $")
 
 #ifdef TRACE
 
-#if defined(USE_WIN32CON_DRIVER)
+#if defined(_NC_WINDOWS_NATIVE)
 #define BITNAMELEN 36
 #else
 #define BITNAMELEN 8
@@ -214,7 +218,7 @@ _nc_trace_ttymode(const TTY * tty)
 	if (tty->c_lflag & ALLLOCAL)
 	    lookup_bits(buf, lflags, "lflags", tty->c_lflag);
     }
-#elif defined(USE_WIN32CON_DRIVER)
+#elif defined(_NC_WINDOWS_NATIVE)
 #define DATA(name)        { name, { #name } }
     static const BITNAMES dwFlagsOut[] =
     {
@@ -236,15 +240,34 @@ _nc_trace_ttymode(const TTY * tty)
 	DATA(ENABLE_AUTO_POSITION),
 	DATA(ENABLE_VIRTUAL_TERMINAL_INPUT)
     };
-
+    static const BITNAMES fileModes[] =
+    {
+	DATA(_O_TEXT),
+	DATA(_O_BINARY),
+	DATA(_O_WTEXT),
+	DATA(_O_U16TEXT),
+	DATA(_O_U8TEXT)
+    };
+	
     buf = _nc_trace_buf(0,
-			8 + sizeof(dwFlagsOut) +
-			8 + sizeof(dwFlagsIn));
+                        14 + sizeof(dwFlagsOut) +
+                        14 + sizeof(dwFlagsIn)  +
+			14 + sizeof(fileModes   + 
+			24));
     if (buf != NULL) {
-	lookup_bits(buf, dwFlagsIn, "dwIn", tty->dwFlagIn);
-	lookup_bits(buf, dwFlagsOut, "dwOut", tty->dwFlagOut);
+	_nc_STRCAT(buf, "\n", TRACE_BUF_SIZE(0));
+        lookup_bits(buf, dwFlagsIn, "dwFlagIn", tty->dwFlagIn);
+	_nc_STRCAT(buf, "\n", TRACE_BUF_SIZE(0));
+        lookup_bits(buf, dwFlagsOut, "dwFlagOut", tty->dwFlagOut);
+	_nc_STRCAT(buf, "\n", TRACE_BUF_SIZE(0));
+	lookup_bits(buf, fileModes , "InFileMode", (tty->InFileMode));
+	_nc_STRCAT(buf, "\n", TRACE_BUF_SIZE(0));
+	lookup_bits(buf, fileModes , "OutFileMode", (tty->OutFileMode));
+	_nc_STRCAT(buf, "\n", TRACE_BUF_SIZE(0));
+	_nc_STRCAT(buf, ", setMode=", TRACE_BUF_SIZE(0));
+	_nc_STRCAT(buf, tty->setMode ? "TRUE" : "FALSE", TRACE_BUF_SIZE(0));
     }
-#else
+ #else
     /* reference: ttcompat(4M) on SunOS 4.1 */
 #ifndef EVENP
 #define EVENP 0

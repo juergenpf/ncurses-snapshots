@@ -70,9 +70,6 @@ NCURSES_SP_NAME(assume_default_colors) (NCURSES_SP_DCLx int fg, int bg)
 
     T((T_CALLED("assume_default_colors(%p,%d,%d)"), (void *) SP_PARM, fg, bg));
     if (SP_PARM != NULL) {
-#if USE_TERM_DRIVER
-	code = CallDriver_2(SP_PARM, td_defaultcolors, fg, bg);
-#else
 	if ((orig_pair || orig_colors) && !initialize_pair) {
 
 	    SP_PARM->_default_color = isDefaultColor(fg) || isDefaultColor(bg);
@@ -90,7 +87,6 @@ NCURSES_SP_NAME(assume_default_colors) (NCURSES_SP_DCLx int fg, int bg)
 	    }
 	    code = OK;
 	}
-#endif
     }
     returnCode(code);
 }

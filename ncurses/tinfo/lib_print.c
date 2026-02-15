@@ -105,7 +105,7 @@ NCURSES_SP_NAME(mcprint) (NCURSES_SP_DCLx char *data, int len)
     return (result);
 }
 
-#if NCURSES_SP_FUNCS && !USE_TERM_DRIVER
+#if NCURSES_SP_FUNCS
 NCURSES_EXPORT(int)
 mcprint(char *data, int len)
 {

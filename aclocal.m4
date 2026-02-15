@@ -5129,7 +5129,6 @@ CF_EOF
 				prefix=$cf_prefix \
 				suffix=$cf_suffix \
 				subset=$cf_subset \
-				driver=$cf_cv_term_driver \
 				SymLink="$LN_S" \
 				TermlibRoot=$TINFO_NAME \
 				TermlibSuffix=$TINFO_SUFFIX \

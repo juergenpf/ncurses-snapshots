@@ -51,11 +51,7 @@
 
 MODULE_ID("$Id: lib_newterm.c,v 1.110 2025/12/27 12:28:45 tom Exp $")
 
-#if USE_TERM_DRIVER
-#define NumLabels      InfoOf(SP_PARM).numlabels
-#else
 #define NumLabels      num_labels
-#endif
 
 #ifndef ONLCR			/* Allows compilation under the QNX 4.2 OS */
 #define ONLCR 0
@@ -88,12 +84,18 @@ _nc_initscr(NCURSES_SP_DCL0)
 	buf.c_oflag &= (unsigned) ~(ONLCR);
 #elif HAVE_SGTTY_H
 	buf.sg_flags &= ~(ECHO | CRMOD);
-#elif USE_NAMED_PIPES
-	buf.dwFlagIn = CONMODE_IN_DEFAULT;
-	buf.dwFlagOut = CONMODE_OUT_DEFAULT | VT_FLAG_OUT;
-	if (WINCONSOLE.isTermInfoConsole) {
-	    buf.dwFlagIn |= VT_FLAG_IN;
-	}
+#elif defined(_NC_WINDOWS_NATIVE)
+        buf.dwFlagIn  = (ENABLE_VIRTUAL_TERMINAL_INPUT 
+		| ENABLE_PROCESSED_INPUT 
+		| ENABLE_WINDOW_INPUT 
+		| ENABLE_MOUSE_INPUT 
+		| ENABLE_QUICK_EDIT_MODE 
+		| ENABLE_EXTENDED_FLAGS);
+		
+        buf.dwFlagOut = (ENABLE_VIRTUAL_TERMINAL_PROCESSING 
+		| ENABLE_PROCESSED_OUTPUT 
+		| ENABLE_WRAP_AT_EOL_OUTPUT 
+		| DISABLE_NEWLINE_AUTO_RETURN);
 #else
 	memset(&buf, 0, sizeof(buf));
 #endif
@@ -201,12 +203,6 @@ NCURSES_SP_NAME(newterm) (NCURSES_SP_DCLx
     current = CURRENT_SCREEN;
     its_term = (current ? current->_term : NULL);
 
-#if USE_NAMED_PIPES
-    _setmode(fileno(_ifp), _O_BINARY);
-    _setmode(fileno(_ofp), _O_BINARY);
-#endif
-
-    INIT_TERM_DRIVER();
     /* this loads the capability entry, then sets LINES and COLS */
     if (
 	   TINFO_SETUP_TERM(&new_term, name,
@@ -215,9 +211,6 @@ NCURSES_SP_NAME(newterm) (NCURSES_SP_DCLx
 	bool filter_mode;
 
 	_nc_set_screen(NULL);
-#if USE_TERM_DRIVER
-	assert(new_term != NULL);
-#endif
 
 #if NCURSES_SP_FUNCS
 	slk_format = SP_PARM->slk_format;
@@ -245,19 +238,18 @@ NCURSES_SP_NAME(newterm) (NCURSES_SP_DCLx
 	} else {
 	    int value;
 	    int cols;
-
-#if USE_TERM_DRIVER
-	    TERMINAL_CONTROL_BLOCK *TCB;
-#elif !NCURSES_SP_FUNCS
+#if defined(_NC_WINDOWS_NATIVE)
+	    if (!WINCONSOLE.init(fileno(_ofp), fileno(_ifp)))
+	    {
+		_nc_set_screen(current);
+		returnSP(NULL);
+	    } else {
+#endif
+#if !NCURSES_SP_FUNCS
 	    _nc_set_screen(CURRENT_SCREEN);
 #endif
 	    assert(SP_PARM != NULL);
 	    cols = *(ptrCols(SP_PARM));
-#if USE_TERM_DRIVER
-	    _nc_set_screen(SP_PARM);
-	    TCB = (TERMINAL_CONTROL_BLOCK *) new_term;
-	    TCB->csp = SP_PARM;
-#endif
 	    /*
 	     * In setupterm() we did a set_curterm(), but it was before we set
 	     * CURRENT_SCREEN.  So the "current" screen's terminal pointer was
@@ -271,11 +263,7 @@ NCURSES_SP_NAME(newterm) (NCURSES_SP_DCLx
 	    if (current)
 		current->_term = its_term;
 
-#if USE_TERM_DRIVER
-	    SP_PARM->_term = new_term;
-#else
 	    new_term = SP_PARM->_term;
-#endif
 
 	    /* allow user to set maximum escape delay from the environment */
 	    if ((value = _nc_getenv_num("ESCDELAY")) >= 0) {
@@ -301,7 +289,6 @@ NCURSES_SP_NAME(newterm) (NCURSES_SP_DCLx
 	    SP_PARM->_use_meta = FALSE;
 #endif
 	    SP_PARM->_endwin = ewInitial;
-#if !USE_TERM_DRIVER
 	    /*
 	     * Check whether we can optimize scrolling under dumb terminals in
 	     * case we do not have any of these capabilities, scrolling
@@ -314,16 +301,12 @@ NCURSES_SP_NAME(newterm) (NCURSES_SP_DCLx
 				    (parm_index ||
 				     parm_delete_line ||
 				     delete_line)));
-#endif
 
 	    NCURSES_SP_NAME(baudrate) (NCURSES_SP_ARG);		/* sets a field in the screen structure */
 
 	    SP_PARM->_keytry = NULL;
 
 	    /* compute movement costs so we can do better move optimization */
-#if USE_TERM_DRIVER
-	    TCBOf(SP_PARM)->drv->td_scinit(SP_PARM);
-#else /* ! USE_TERM_DRIVER */
 	    /*
 	     * Check for mismatched graphic-rendition capabilities.  Most SVr4
 	     * terminfo trees contain entries that have rmul or rmso equated to
@@ -345,13 +328,15 @@ NCURSES_SP_NAME(newterm) (NCURSES_SP_DCLx
 
 	    /* initialize terminal to a sane state */
 	    _nc_screen_init();
-#endif /* USE_TERM_DRIVER */
 
 	    /* Initialize the terminal line settings. */
 	    _nc_initscr(NCURSES_SP_ARG);
 
 	    _nc_signal_handler(TRUE);
 	    result = SP_PARM;
+#if defined(_NC_WINDOWS_NATIVE)
+	}
+#endif
 	}
     }
     _nc_unlock_global(curses);

@@ -33,101 +33,59 @@
  ****************************************************************************/
 
 #include <curses.priv.h>
-#include <tchar.h>
 
 MODULE_ID("$Id: lib_win32util.c,v 1.7 2025/06/28 16:58:13 tom Exp $")
 
 #ifdef _NC_WINDOWS_NATIVE
 
-#ifdef _NC_CHECK_MINTTY
-#define PSAPI_VERSION 2
-#include <psapi.h>
-
-#define array_length(a) (sizeof(a)/sizeof(a[0]))
-
-/*   This function tests, whether or not the ncurses application
-     is running as a descendant of MSYS2/cygwin mintty terminal
-     application. mintty doesn't use Windows Console for its screen
-     I/O, so the native Windows _isatty doesn't recognize it as
-     character device. But we can discover we are at the end of an
-     Pipe and can query the server side of the pipe, looking whether
-     or not this is mintty.
-     For now we terminate the program if we discover that situation.
-     Although in theory it would be possible, to remotely manipulate
-     the terminal state of mintty, this is out of scope for now and
-     not worth the significant effort.
- */
-NCURSES_EXPORT(int)
-_nc_console_checkmintty(int fd, LPHANDLE pMinTTY)
-{
-    HANDLE handle = _nc_console_handle(fd);
-    DWORD dw;
-    int code = 0;
-
-    T((T_CALLED("lib_winhelper::_nc_console_checkmintty(%d, %p)"), fd, pMinTTY));
-
-    if (handle != INVALID_HANDLE_VALUE) {
-	dw = GetFileType(handle);
-	if (dw == FILE_TYPE_PIPE) {
-	    if (GetNamedPipeInfo(handle, 0, 0, 0, 0)) {
-		ULONG pPid;
-		/* Requires NT6 */
-		if (GetNamedPipeServerProcessId(handle, &pPid)) {
-		    TCHAR buf[MAX_PATH];
-		    DWORD len = 0;
-		    /* These security attributes may allow us to
-		       create a remote thread in mintty to manipulate
-		       the terminal state remotely */
-		    HANDLE pHandle = OpenProcess(PROCESS_CREATE_THREAD
-						 | PROCESS_QUERY_INFORMATION
-						 | PROCESS_VM_OPERATION
-						 | PROCESS_VM_WRITE
-						 | PROCESS_VM_READ,
-						 FALSE,
-						 pPid);
-		    if (pMinTTY)
-			*pMinTTY = INVALID_HANDLE_VALUE;
-		    if (pHandle != INVALID_HANDLE_VALUE) {
-			if ((len = GetProcessImageFileName(pHandle,
-							   buf,
-							   (DWORD)
-							   array_length(buf)))) {
-			    TCHAR *pos = _tcsrchr(buf, _T('\\'));
-			    if (pos) {
-				pos++;
-				if (_tcsnicmp(pos, _TEXT("mintty.exe"), 10)
-				    == 0) {
-				    if (pMinTTY)
-					*pMinTTY = pHandle;
-				    code = 1;
-				}
-			    }
-			}
-		    }
-		}
-	    }
-	}
-    }
-    returnCode(code);
-}
-#endif /* _NC_CHECK_MINTTY */
-
 #if HAVE_GETTIMEOFDAY == 2
-#define JAN1970 116444736000000000LL	/* the value for 01/01/1970 00:00 */
+#define JAN1970 116444736000000000LL /* the value for 01/01/1970 00:00 */
 
 NCURSES_EXPORT(int)
 _nc_gettimeofday(struct timeval *tv, void *tz GCC_UNUSED)
 {
-    union {
-	FILETIME ft;
-	long long since1601;	/* time since 1 Jan 1601 in 100ns units */
-    } data;
+	union
+	{
+		FILETIME ft;
+		long long since1601; /* time since 1 Jan 1601 in 100ns units */
+	} data;
 
-    GetSystemTimeAsFileTime(&data.ft);
-    tv->tv_usec = (long) ((data.since1601 / 10LL) % 1000000LL);
-    tv->tv_sec = (long) ((data.since1601 - JAN1970) / 10000000LL);
-    return (0);
+	GetSystemTimeAsFileTime(&data.ft);
+	tv->tv_usec = (long)((data.since1601 / 10LL) % 1000000LL);
+	tv->tv_sec = (long)((data.since1601 - JAN1970) / 10000000LL);
+	return (0);
 }
 #endif // HAVE_GETTIMEOFDAY == 2
+
+#if USE_WIDEC_SUPPORT
+#define mk_wcwidth(ucs)          _nc_wcwidth(ucs)
+#define mk_wcswidth(pwcs, n)     _nc_wcswidth(pwcs, n)
+#define mk_wcwidth_cjk(ucs)      _nc_wcwidth_cjk(ucs)
+#define mk_wcswidth_cjk(pwcs, n) _nc_wcswidth_cjk(pwcs, n)
+
+#include <stddef.h>
+
+typedef enum {
+    WcUnknown = 0
+    ,WcSoftHyphen = 1		/* soft-hyphen is spacing, e.g., Latin-1 */
+    ,WcPrivateFullwidth = 2	/* private-use codes can be fullwidth in CJK */
+    ,WcEmojiFullwidth = 4	/* Emojis are fullwidth */
+} WcModes;
+
+NCURSES_EXPORT(int) mk_wcwidth_init(int);
+NCURSES_EXPORT(int) mk_wcwidth(uint32_t);
+NCURSES_EXPORT(int) mk_wcswidth(const uint32_t *, size_t);
+NCURSES_EXPORT(int) mk_wcwidth_cjk(uint32_t);
+NCURSES_EXPORT(int) mk_wcswidth_cjk(const uint32_t *, size_t);
+NCURSES_EXPORT(int) mk_is_emoji(wchar_t ucs);
+
+#include <wcwidth.h>
+#else
+void _nc_empty_wcwidth(void);
+void
+_nc_empty_wcwidth(void)
+{
+}
+#endif // USE_WIDEC_SUPPORT
 
 #endif // _NC_WINDOWS_NATIVE
