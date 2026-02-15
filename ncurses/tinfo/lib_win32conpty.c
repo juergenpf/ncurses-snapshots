@@ -54,7 +54,6 @@ static BOOL pty_check_resize(void);
 static int pty_setmode(int fd, const TTY *arg);
 static int pty_getmode(int fd, TTY *arg);
 static int pty_defmode(TTY *arg, BOOL isShell);
-static int pty_setfilemode(TTY *arg);
 static int pty_flush(int fd);
 static int pty_read(SCREEN *sp, int *result);
 static int pty_twait(const SCREEN *sp GCC_UNUSED,
@@ -82,7 +81,6 @@ static ConsoleInfo defaultCONSOLE = {
     .setmode = pty_setmode,
     .getmode = pty_getmode,
     .defmode = pty_defmode,
-    .setfilemode = pty_setfilemode,
     .flush = pty_flush,
     .read = pty_read,
     .twait = pty_twait
@@ -500,7 +498,9 @@ pty_init(int fdOut, int fdIn)
 		defaultCONSOLE.ttyflags.dwFlagIn = dwFlagIn;
 
 		_setmode(defaultCONSOLE.used_fdIn, _O_BINARY);
+		_setmode(defaultCONSOLE.used_fdOut, _O_BINARY);
 		defaultCONSOLE.ttyflags.InFileMode = _O_BINARY;
+		defaultCONSOLE.ttyflags.OutFileMode = _O_BINARY;
 
 		result = TRUE;
 	}
@@ -825,9 +825,9 @@ pty_flush(int fd)
 }
 
 static int 
-pty_setfilemode(TTY* arg)
+setfilemode(TTY* arg)
 {
-	T((T_CALLED("lib_win32conpty::pty_setfilemode(TTY*=%p)"), arg));
+	T((T_CALLED("lib_win32conpty::setfilemode(TTY*=%p)"), arg));
 
 	if (!arg)
 		returnCode(ERR);
@@ -838,7 +838,6 @@ pty_setfilemode(TTY* arg)
 			_setmode(defaultCONSOLE.used_fdIn, arg->InFileMode);
 		else
 			T(("Invalid input file descriptor"));
-
 		if (defaultCONSOLE.used_fdOut >= 0)
 			_setmode(defaultCONSOLE.used_fdOut, arg->OutFileMode);
 		else
@@ -917,7 +916,7 @@ pty_setmode(int fd, const TTY *arg)
 			mode &= ~ENABLE_ECHO_INPUT;
 		}
 
-		pty_setfilemode((TTY*)arg);
+		setfilemode((TTY*)arg);
 
 		input_ok = SetConsoleMode(input_target, mode);
 		if (input_ok)
