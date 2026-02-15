@@ -255,6 +255,7 @@ _nc_trace_ttymode(const TTY * tty)
 			14 + sizeof(fileModes   + 
 			24));
     if (buf != NULL) {
+	_nc_STRCAT(buf, "\n", TRACE_BUF_SIZE(0));
         lookup_bits(buf, dwFlagsIn, "dwFlagIn", tty->dwFlagIn);
 	_nc_STRCAT(buf, "\n", TRACE_BUF_SIZE(0));
         lookup_bits(buf, dwFlagsOut, "dwFlagOut", tty->dwFlagOut);
