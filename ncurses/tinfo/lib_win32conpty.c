@@ -500,9 +500,7 @@ pty_init(int fdOut, int fdIn)
 		defaultCONSOLE.ttyflags.dwFlagIn = dwFlagIn;
 
 		_setmode(defaultCONSOLE.used_fdIn, _O_BINARY);
-		_setmode(defaultCONSOLE.used_fdOut, _O_BINARY);
 		defaultCONSOLE.ttyflags.InFileMode = _O_BINARY;
-		defaultCONSOLE.ttyflags.OutFileMode = _O_BINARY;
 
 		result = TRUE;
 	}
