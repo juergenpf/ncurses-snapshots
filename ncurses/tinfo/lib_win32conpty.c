@@ -477,7 +477,7 @@ pty_init(int fdOut, int fdIn)
 
 		WINCONSOLE.ttyflags.InFileMode = _O_BINARY;
 		WINCONSOLE.ttyflags.InFileMode = _O_BINARY;
-		WINCONSOLE.ttyflags.setFlags = TRUE;
+		WINCONSOLE.ttyflags.setMode = TRUE;
 		pty_setfilemode(&WINCONSOLE.ttyflags);
 
 		if (!GetConsoleScreenBufferInfo(out_hdl, &WINCONSOLE.SBI))
@@ -549,7 +549,7 @@ pty_init(int fdOut, int fdIn)
 		// on the output data.
 		WINCONSOLE.ttyflags.InFileMode = _O_BINARY;
 		WINCONSOLE.ttyflags.InFileMode = _O_BINARY;
-		WINCONSOLE.ttyflags.setFlags = TRUE;
+		WINCONSOLE.ttyflags.setMode = TRUE;
 		pty_setfilemode(&WINCONSOLE.ttyflags);
 
 		res = TRUE;
@@ -1075,7 +1075,7 @@ pty_setfilemode(TTY* arg)
 	if (!arg)
 		return ERR;
 
-	if (arg->setFlags)
+	if (arg->setMode)
 	{
 		if (WINCONSOLE.used_fdIn >= 0)
 			_setmode(WINCONSOLE.used_fdIn, arg->InFileMode);
@@ -1087,7 +1087,7 @@ pty_setfilemode(TTY* arg)
 		else
 			T(("Invalid output file descriptor"));
 		
-		arg->setFlags = FALSE;
+		arg->setMode = FALSE;
 	}
 	return OK;
 }

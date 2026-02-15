@@ -116,7 +116,7 @@ typedef struct
     DWORD dwFlagOut;               // Output Handle Console mode flags
     int InFileMode;                // The translation mode of the input handle
     int OutFileMode;               // The translation mode of the output handle
-    BOOL setFlags;                 // whether the file mode flags shoud be appled 
+    BOOL setMode;                  // whether the file mode shoud be appled; will be reset after applying the file mode 
 } ConsoleMode;
 
 // This is for future use in an implementation that may make use of the Windows Console API 

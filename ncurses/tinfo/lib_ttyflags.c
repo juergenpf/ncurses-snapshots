@@ -146,7 +146,7 @@ NCURSES_SP_NAME(def_shell_mode) (NCURSES_SP_DCL0)
 #elif defined(_NC_WINDOWS_NATIVE)
 	    termp->Ottyb.InFileMode  = _O_TEXT;
 	    termp->Ottyb.OutFileMode = _O_TEXT;
-	    termp->Ottyb.setFlags = FALSE;
+	    termp->Ottyb.setMode = FALSE;
 #else
 	    if (termp->Ottyb.sg_flags & XTABS)
 		tab = back_tab = NULL;
@@ -183,7 +183,7 @@ NCURSES_SP_NAME(def_prog_mode) (NCURSES_SP_DCL0)
 #elif defined(_NC_WINDOWS_NATIVE)
 	    termp->Nttyb.InFileMode  = _O_BINARY;
 	    termp->Nttyb.OutFileMode = _O_BINARY;
-	    termp->Nttyb.setFlags = FALSE;
+	    termp->Nttyb.setMode = FALSE;
 #else
 	    termp->Nttyb.sg_flags &= (unsigned) (~XTABS);
 #endif
@@ -211,7 +211,7 @@ NCURSES_SP_NAME(reset_prog_mode) (NCURSES_SP_DCL0)
 
     if (termp != NULL) {
 #if defined(_NC_WINDOWS_NATIVE)
-	termp->Nttyb.setFlags = TRUE;
+	termp->Nttyb.setMode = TRUE;
 #endif
 	if (_nc_set_tty_mode(&termp->Nttyb) == OK) {
 	    if (SP_PARM) {
@@ -247,7 +247,7 @@ NCURSES_SP_NAME(reset_shell_mode) (NCURSES_SP_DCL0)
 	    _nc_flush();
 	}
 #if defined(_NC_WINDOWS_NATIVE)
-	termp->Ottyb.setFlags = TRUE;
+	termp->Ottyb.setMode = TRUE;
 #endif
 	rc = _nc_set_tty_mode(&termp->Ottyb);
     }
