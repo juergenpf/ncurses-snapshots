@@ -112,11 +112,11 @@ extern NCURSES_EXPORT(int) _nc_wcwidth(uint32_t);
 // This is our equivalent to termios
 typedef struct
 {
-    DWORD dwFlagIn;                // Input Handle Console mode flags
-    DWORD dwFlagOut;               // Output Handle Console mode flags
-    int InFileMode;                // The translation mode of the input handle
-    int OutFileMode;               // The translation mode of the output handle
-    BOOL setfMode;                 // whether the file mode shoud be appled 
+    DWORD dwFlagIn;        // Input Handle Console mode flags
+    DWORD dwFlagOut;       // Output Handle Console mode flags
+    int InFileMode;        // The translation mode of the input file
+    int OutFileMode;       // The translation mode of the output file
+    BOOL setfMode;         // whether the file mode shoud be appled 
 } ConsoleMode;
 
 // This is for future use in an implementation that may make use of the Windows Console API 
@@ -138,11 +138,11 @@ typedef struct
 #endif
 extern NCURSES_EXPORT(size_t) _nc_wchar_to_utf8(wchar_t wc, char utf8[UTF8_MAX_BYTES]);
 NCURSES_EXPORT(int) _nc_assemble_utf8_input(unsigned char byte, wchar_t *wch);
-#endif
+#endif /* USE_WIDEC_SUPPORT */
 
 typedef struct {
   // Properties
-    BOOL initialized;
+    BOOL initialized;              /* Whether the console has been initialized */
 
     int used_fdIn;                 /* The file descriptor we were initialized with for input */
     int used_fdOut;                /* The file descriptor we were initialized with for output */ 
@@ -151,9 +151,8 @@ typedef struct {
     
     ConsoleMode ttyflags;          /* The desired state of the console  */
     
-    /* Handle tracking for fd-based operations */
-    HANDLE used_input_handle;      /* Handle actually used for input operations */
-    HANDLE used_output_handle;     /* Handle actually used for output operations */
+    HANDLE used_input_handle;      /* Console Handle actually used for input operations */
+    HANDLE used_output_handle;     /* Console Handle actually used for output operations */
 
   // Metods
     BOOL (*init)(int fdOut, int fdIn);
@@ -168,7 +167,7 @@ typedef struct {
     int (*twait)(const SCREEN *sp, int mode, int milliseconds, int *timeleft, long (*gettime_func)(TimeType *, int) EVENTLIST_2nd(_nc_eventlist *evl));
   } ConsoleInfo;
 
-// Guaranteed to be initialzed by the runtime.
+// Guaranteed to be statically initialzed.
 extern NCURSES_EXPORT_VAR(ConsoleInfo*) _nc_currentCONSOLE;
 #define WINCONSOLE (*_nc_currentCONSOLE)
 

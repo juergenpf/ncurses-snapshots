@@ -63,9 +63,6 @@ static int pty_twait(const SCREEN *sp GCC_UNUSED,
 		     int *timeleft,
 		     long (*gettime_func)(TimeType *, int)
 			 EVENTLIST_2nd(_nc_eventlist *evl));
-#if USE_WIDEC_SUPPORT
-static size_t wchar_to_utf8(wchar_t wc, char utf8[UTF8_MAX_BYTES]);
-#endif
 
 /*   A process can only have a single console, so it is safe
 	 to maintain all the information about it in a single
@@ -76,7 +73,7 @@ static ConsoleInfo defaultCONSOLE = {
     .used_fdIn = -1,
     .used_fdOut = -1,
     .conhost_flags = 0,
-    .ttyflags = {0, 0, 0, 0, 0, 0},
+    .ttyflags = {0, 0, 0, 0, 0},
     .used_input_handle = INVALID_HANDLE_VALUE,
     .used_output_handle = INVALID_HANDLE_VALUE,
     .init = pty_init,
@@ -983,8 +980,16 @@ pty_setmode(int fd, const TTY *arg)
 	returnCode(ERR);
 }
 
+/*
+* The defmode function is only called from def_shell_mode and def_prog_mode, and it's only
+* purpose is to set the setfMode flag to true. If this flag is set, the setmode function
+* above will actually apply the file mode settings to the console streams.
+* This approach should help to avoid excessive unnecessary calls to _setmode, which can be 
+* expensive and may cause issues with some C runtimes on Windows if called too frequently or 
+with incompatible modes.
+*/
 static int
-pty_defmode(TTY *arg, BOOL isShell GCC_UNUSED)
+pty_defmode(TTY *arg, BOOL isShell)
 {
 	T((T_CALLED("lib_win32conpty::pty_defmode(TTY*=%p, isShell=%d)"), arg, isShell));
 
@@ -992,9 +997,26 @@ pty_defmode(TTY *arg, BOOL isShell GCC_UNUSED)
 		returnCode(ERR);
 
 	arg->setfMode = TRUE;
+	if (isShell)
+	{
+		arg->dwFlagIn &= ~(ENABLE_VIRTUAL_TERMINAL_INPUT);
+	}
+	else
+	{
+		arg->dwFlagIn |= ENABLE_VIRTUAL_TERMINAL_INPUT;
+	}
 	returnCode(OK);
 }
 
+/*
+* getmode always sets the setfMode flag to FALSE. The trick is, that def_shell_mode and
+* def_prog_mode will call abov method defmode to set the flag right after getting it.
+* So only calls to reset_shell_mode and reset_prog_mode will have the setfMode flag 
+* set to TRUE, which means that the next call to setmode will apply any file mode changes 
+* to the console streams.
+* By that approach the Windows specific filemode handling is finally reduced to the calls
+* in the lib_ttyflag.c functions. 
+*/
 static int
 pty_getmode(int fd, TTY *arg)
 {
