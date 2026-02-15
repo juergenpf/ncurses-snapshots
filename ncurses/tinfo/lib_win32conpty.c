@@ -1000,10 +1000,12 @@ pty_defmode(TTY *arg, BOOL isShell)
 	if (isShell)
 	{
 		arg->dwFlagIn &= ~(ENABLE_VIRTUAL_TERMINAL_INPUT);
+		arg->dwFlagOut |= ENABLE_VIRTUAL_TERMINAL_PROCESSING;
 	}
 	else
 	{
 		arg->dwFlagIn |= ENABLE_VIRTUAL_TERMINAL_INPUT;
+		arg->dwFlagOut |= ENABLE_VIRTUAL_TERMINAL_PROCESSING;
 	}
 	returnCode(OK);
 }
