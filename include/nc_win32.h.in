@@ -143,8 +143,10 @@ typedef struct {
     int used_fdOut;                /* The file descriptor we were initialized with for output */ 
 
     unsigned int conhost_flags;    /* Host configuration flags */
+    
     ConsoleMode ttyflags;          /* The desired state of the console  */
-    ConsoleMode saved_ttyflags;    /* The state of the console at startup */
+    ConsoleMode o_ttyflags;        /* The state that was originally set when the program started */
+    ConsoleMode n_ttyflags;        /* The state that represents the initial mode when in ncurses */
     
     /* Handle tracking for fd-based operations */
     HANDLE used_input_handle;      /* Handle actually used for input operations */
@@ -156,6 +158,7 @@ typedef struct {
     BOOL (*check_resize)(void);
     int (*setmode)(int fd, const ConsoleMode *arg);
     int (*getmode)(int fd, ConsoleMode *arg);
+    int (*defmode )(ConsoleMode *arg, BOOL isShell);
     int (*setfilemode)(ConsoleMode *arg);
     int (*flush)(int fd);
     int (*read)(SCREEN *sp, int *result);

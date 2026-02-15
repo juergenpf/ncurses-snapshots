@@ -144,9 +144,7 @@ NCURSES_SP_NAME(def_shell_mode) (NCURSES_SP_DCL0)
 	    if (termp->Ottyb.c_oflag & OFLAGS_TABS)
 		tab = back_tab = NULL;
 #elif defined(_NC_WINDOWS_NATIVE)
-	    termp->Ottyb.InFileMode  = _O_TEXT;
-	    termp->Ottyb.OutFileMode = _O_TEXT;
-	    termp->Ottyb.setMode = FALSE;
+	   WINCONSOLE.defmode(&termp->Ottyb, TRUE);
 #else
 	    if (termp->Ottyb.sg_flags & XTABS)
 		tab = back_tab = NULL;
@@ -179,11 +177,9 @@ NCURSES_SP_NAME(def_prog_mode) (NCURSES_SP_DCL0)
 	 */
 	if (_nc_get_tty_mode(&termp->Nttyb) == OK) {
 #ifdef TERMIOS
-	    termp->Nttyb.c_oflag &= (unsigned) (~OFLAGS_TABS);
+	    termp->Nttyb.c_oflag &= (unsigned) (~OFLAGS_TABS);	
 #elif defined(_NC_WINDOWS_NATIVE)
-	    termp->Nttyb.InFileMode  = _O_BINARY;
-	    termp->Nttyb.OutFileMode = _O_BINARY;
-	    termp->Nttyb.setMode = FALSE;
+	   WINCONSOLE.defmode(&termp->Nttyb, FALSE);
 #else
 	    termp->Nttyb.sg_flags &= (unsigned) (~XTABS);
 #endif

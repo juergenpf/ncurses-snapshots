@@ -53,6 +53,7 @@ static void pty_size(int *Lines, int *Cols);
 static BOOL pty_check_resize(void);
 static int pty_setmode(int fd, const TTY *arg);
 static int pty_getmode(int fd, TTY *arg);
+static int pty_defmode(TTY *arg, BOOL isShell);
 static int pty_setfilemode(TTY *arg);
 static int pty_flush(int fd);
 static int pty_read(SCREEN *sp, int *result);
@@ -76,7 +77,8 @@ static ConsoleInfo defaultCONSOLE = {
     .used_fdOut = -1,
     .conhost_flags = 0,
     .ttyflags = {0, 0, 0, 0, 0, 0},
-    .saved_ttyflags = {0, 0, 0, 0, 0, 0},
+    .o_ttyflags = {0, 0, 0, 0, 0, 0},
+    .n_ttyflags = {0, 0, 0, 0, 0, 0},
     .used_input_handle = INVALID_HANDLE_VALUE,
     .used_output_handle = INVALID_HANDLE_VALUE,
     .init = pty_init,
@@ -84,6 +86,7 @@ static ConsoleInfo defaultCONSOLE = {
     .check_resize = pty_check_resize,
     .setmode = pty_setmode,
     .getmode = pty_getmode,
+    .defmode = pty_defmode,
     .setfilemode = pty_setfilemode,
     .flush = pty_flush,
     .read = pty_read,
@@ -350,21 +353,6 @@ output_is_conpty(void)
 	returnCode(result);
 }
 
-static WORD
-MapColor(BOOL fore, int color)
-{
-	static const int _cmap[] =
-	    {0, 4, 2, 6, 1, 5, 3, 7};
-	int a;
-	if (color < 0 || color > 7)
-		a = fore ? 7 : 0;
-	else
-		a = _cmap[color];
-	if (!fore)
-		a = a << 4;
-	return (WORD)a;
-}
-
 /*
 This initializaton function can be called multiple time, and actually it is called from within
 setupterm() the first time and potentially if we enter ncurses from newterm() the next time.
@@ -442,14 +430,14 @@ pty_init(int fdOut, int fdIn)
 		HANDLE out_hdl = fdOut >= 0 ? (HANDLE)_get_osfhandle(fdOut) : INVALID_HANDLE_VALUE;
 		DWORD dwFlag;
 
-		if (out_hdl == INVALID_HANDLE_VALUE || GetConsoleMode(out_hdl, &dwFlag) == 0)
+		if (out_hdl == INVALID_HANDLE_VALUE || GetConsoleMode(out_hdl, &defaultCONSOLE.o_ttyflags.dwFlagOut) == 0)
 		{
 			T(("Output handle is not a console"));
 			returnBool(FALSE);
 		}
 		WINCONSOLE.used_output_handle = out_hdl;
 
-		if (stdin_hdl == INVALID_HANDLE_VALUE || GetConsoleMode(stdin_hdl, &dwFlag) == 0)
+		if (stdin_hdl == INVALID_HANDLE_VALUE || GetConsoleMode(stdin_hdl, &defaultCONSOLE.o_ttyflags.dwFlagIn) == 0)
 		{
 			T(("StdIn handle is not a console"));
 			returnBool(FALSE);
@@ -478,16 +466,34 @@ pty_init(int fdOut, int fdIn)
 		}
 		WINCONSOLE.ttyflags.dwFlagIn = dwFlagIn;
 
+		// The trick is, that in the very first call we save in ttyflags the original 
+		// file mode as it was before we set it, and we set the file mode to binary. 
+		// This allows us to restore the original console mode and file mode later when 
+		// the application calls reset_shell_mode() or endwin(). 
+		// We know this routine is first called from setupterm(), and rigt after that
+		// def_shell_mode() is called, which is where we will store the original
+		// console and file mode.
+		//
+		// The most conservative mode is to run in binary mode, and let us handle any 
+		// necessary translations we have assemble_utf8_input() (see below) to handle 
+		// UTF-8 decoding, and we want to ensure that we get the raw bytes as they come 
+		// in without any interference from the C runtime.
+		// For output we have the helper wchar_to_utf8() to encode UTF-8 characters, 
+		// and we want to ensure that the C runtime does not attempt to translate 
+		// line endings or perform any other transformations on the output data.
+		WINCONSOLE.o_ttyflags.InFileMode = _setmode(WINCONSOLE.used_fdIn, _O_BINARY);
+		WINCONSOLE.o_ttyflags.OutFileMode = _setmode(WINCONSOLE.used_fdOut, _O_BINARY);
 		WINCONSOLE.ttyflags.InFileMode = _O_BINARY;
-		WINCONSOLE.ttyflags.InFileMode = _O_BINARY;
-		WINCONSOLE.ttyflags.setMode = TRUE;
-		pty_setfilemode(&WINCONSOLE.ttyflags);
+		WINCONSOLE.ttyflags.OutFileMode = _O_BINARY;
+		WINCONSOLE.n_ttyflags = WINCONSOLE.ttyflags;
 
 		WINCONSOLE.initialized = TRUE;
 		res = TRUE;
 	}
 	else
-	{
+	{ // This branch is called from newterm() when fdIn is provided, so we need to validate 
+	  // that the provided fdIn and fdOut are valid console handles, and if so we update the 
+	  // WINCONSOLE structure to use the new handles.
 		DWORD dwFlagOut;
 		DWORD dwFlagIn;
 		WINCONSOLE.used_fdIn = fdIn;
@@ -511,16 +517,11 @@ pty_init(int fdOut, int fdIn)
 		WINCONSOLE.used_input_handle = in_hdl;
 		WINCONSOLE.ttyflags.dwFlagIn = dwFlagIn;
 
-		// the most conservative mode is to run in binary mode, and let us handle any necessary translations
-		// we have _nc_assemble_utf8_input (see below) to handle UTF-8 decoding, and we want to ensure that
-		// we get the raw bytes as they come in without any interference from the C runtime.
-		// For output we have the helper _nc_wchar_to_utf8 to encode UTF-8 characters, and we want to ensure
-		// that the C runtime does not attempt to translate line endings or perform any other transformations
-		// on the output data.
+		_setmode(WINCONSOLE.used_fdIn, _O_BINARY);
+		_setmode(WINCONSOLE.used_fdOut, _O_BINARY);
 		WINCONSOLE.ttyflags.InFileMode = _O_BINARY;
-		WINCONSOLE.ttyflags.InFileMode = _O_BINARY;
-		WINCONSOLE.ttyflags.setMode = TRUE;
-		pty_setfilemode(&WINCONSOLE.ttyflags);
+		WINCONSOLE.ttyflags.OutFileMode = _O_BINARY;
+		WINCONSOLE.ttyflags.setMode = FALSE;
 
 		res = TRUE;
 	}
@@ -1054,8 +1055,6 @@ pty_setfilemode(TTY* arg)
 			_setmode(WINCONSOLE.used_fdOut, arg->OutFileMode);
 		else
 			T(("Invalid output file descriptor"));
-		
-		arg->setMode = FALSE;
 	}
 	return OK;
 }
@@ -1190,6 +1189,24 @@ pty_setmode(int fd, const TTY *arg)
 }
 
 static int
+pty_defmode(TTY *arg, BOOL isShell)
+{
+	if (NULL == arg)
+		return ERR;
+
+	if (isShell)
+	{
+		*arg = WINCONSOLE.o_ttyflags;
+	}
+	else
+	{
+		*arg = WINCONSOLE.n_ttyflags;
+	}
+	arg->setMode = TRUE;
+	return OK;
+}
+
+static int
 pty_getmode(int fd, TTY *arg)
 {
 	if (NULL == arg)
@@ -1203,6 +1220,7 @@ pty_getmode(int fd, TTY *arg)
 		return ERR;
 	}
 	*arg = WINCONSOLE.ttyflags;
+	arg->setMode = FALSE;
 	return OK;
 }
 
