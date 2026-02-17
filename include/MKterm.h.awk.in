@@ -140,7 +140,7 @@ BEGIN {
 	print  "#include <termio.h>"
 	print  "#define TTY struct termio"
 	print  ""
-	print  "#elif (defined(_NC_WINDOWS_NATIVE) || defined(_WIN32) || defined(_WIN64) || defined(__MINGW32__) || defined(__MINGW64__))"
+	print  "#elif (defined(_NC_WINDOWS_NATIVE) || defined(_WIN32) || defined(_WIN64))"
 	print  ""
 	print  "#include <nc_win32.h>"
 	print  "#define TTY ConsoleMode"
