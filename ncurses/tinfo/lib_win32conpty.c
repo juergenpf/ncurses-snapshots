@@ -75,6 +75,8 @@ static ConsoleInfo defaultCONSOLE = {
     .ttyflags = {0, 0, 0, 0, 0},
     .used_input_handle = INVALID_HANDLE_VALUE,
     .used_output_handle = INVALID_HANDLE_VALUE,
+    .LINES = -1,
+    .COLS = -1,
     .init = pty_init,
     .size = pty_size,
     .check_resize = pty_check_resize,
@@ -511,10 +513,6 @@ pty_init(int fdOut, int fdIn)
 	returnBool(result);
 }
 
-/* Windows Console resize detection */
-static int last_console_lines = -1;
-static int last_console_cols = -1;
-
 /*
  * Check if the Windows Console has been resized.
  * This provides SIGWINCH-like functionality for Windows ConPTY.
@@ -530,17 +528,17 @@ pty_check_resize(void)
 
 	pty_size(&current_lines, &current_cols);
 
-	if (last_console_lines == -1 || last_console_cols == -1)
+	if (defaultCONSOLE.LINES == -1 || defaultCONSOLE.COLS == -1)
 	{
-		last_console_lines = current_lines;
-		last_console_cols = current_cols;
+		defaultCONSOLE.LINES = current_lines;
+		defaultCONSOLE.COLS = current_cols;
 		returnBool(FALSE);
 	}
 
-	if (current_lines != last_console_lines || current_cols != last_console_cols)
+	if (current_lines != defaultCONSOLE.LINES || current_cols != defaultCONSOLE.COLS)
 	{
-		last_console_lines = current_lines;
-		last_console_cols = current_cols;
+		defaultCONSOLE.LINES = current_lines;
+		defaultCONSOLE.COLS = current_cols;
 
 		_nc_globals.have_sigwinch = 1;
 
@@ -550,6 +548,14 @@ pty_check_resize(void)
 	returnBool(resized);
 }
 
+/*
+ * Get the current size of the Windows Console in lines and columns.
+ * This method must not alter the cached values stored in ConsoleInfo.
+ * It should report the result from the GetConsoleScreenBufferInfo 
+ * API call directly. It may use the cached values as a fallback if the 
+ * API call fails. The use of this API call is non-destructive in the 
+ * API context.
+ */
 static void
 pty_size(int *Lines, int *Cols)
 {
@@ -573,14 +579,13 @@ pty_size(int *Lines, int *Cols)
 				*Cols = (int)(csbi.srWindow.Right + 1 - csbi.srWindow.Left);
 			}
 			else
-			{ // Fallback to default size if we cannot get console info
-				*Lines = 25;
-				*Cols = 80;
+			{ // Fallback to cached values or defaults if we can't get the console size
+				*Lines = defaultCONSOLE.LINES != -1 ? defaultCONSOLE.LINES : 24;
+				*Cols = defaultCONSOLE.COLS   != -1 ? defaultCONSOLE.COLS : 80;
 			}
 		}
 	}
 }
-
 
 /*
  * WIN32_CONPTY input function (handles both widec and non-widec builds)
@@ -596,6 +601,15 @@ pty_read(SCREEN *sp, int *result)
 	T((T_CALLED("lib_win32conpty::pty_read(SCREEN*=%p, result=%p)"), sp, result));
 
 	_nc_set_read_thread(TRUE);
+	// TODO: Analyze whether or not it might be better to use ReadFile() here 
+	// instead of read() to avoid any potential issues with the C runtime's 
+	// buffering and encoding translations. Using ReadFile() directly on the 
+	// console handle would give us more direct control over the input and might 
+	// be more efficient, but it would also require more complex handling of UTF-8 
+	// sequences and might not integrate as well with the C runtime's FILE* buffering. 
+	// For now, we will use read() for simplicity and compatibility with the rest of 
+	// the codebase, but this is something that could be revisited in the future if 
+	// we encounter issues or want to optimize input handling.
 	n = (int)read(sp->_ifd, &byte_buffer, (size_t)1);
 	_nc_set_read_thread(FALSE);
 

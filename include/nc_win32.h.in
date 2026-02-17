@@ -154,6 +154,9 @@ typedef struct {
     HANDLE used_input_handle;      /* Console Handle actually used for input operations */
     HANDLE used_output_handle;     /* Console Handle actually used for output operations */
 
+    int LINES;                     /* Cached console size */
+    int COLS;                      /* Cached console size */
+
   // Metods
     BOOL (*init)(int fdOut, int fdIn);
     void (*size)(int *Lines, int *Cols);
