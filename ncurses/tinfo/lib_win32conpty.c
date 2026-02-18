@@ -921,7 +921,13 @@ pty_setmode(int fd, const TTY *arg)
 		*/
 		if (mode & ENABLE_VIRTUAL_TERMINAL_INPUT)
 		{
-			mode |= ENABLE_PROCESSED_INPUT | ENABLE_MOUSE_INPUT | ENABLE_WINDOW_INPUT;
+			mode |= ENABLE_PROCESSED_INPUT | ENABLE_MOUSE_INPUT;
+			
+			// ENABLE_WINDOW_INPUT is recommended if you use ReadConsoleInput to read input, 
+			// but it can cause issues with some C runtimes on Windows that also want to read 
+			// input from the console, so we disable it when VT is enabled to avoid potential 
+			// conflicts. It is generally not needed for typical ConPTY applications.
+			mode &= ~ENABLE_WINDOW_INPUT; 
 		}
 
 		/* Sanitize: ENABLE_ECHO_INPUT requires ENABLE_LINE_INPUT */
@@ -1011,12 +1017,14 @@ pty_defmode(TTY *arg, BOOL isShell)
 	if (isShell)
 	{
 		arg->dwFlagIn &= ~(ENABLE_VIRTUAL_TERMINAL_INPUT);
+		arg->dwFlagIn |= (ENABLE_WINDOW_INPUT);
 		arg->dwFlagOut |= ENABLE_VIRTUAL_TERMINAL_PROCESSING;
 	}
 	else
 	{
 		arg->dwFlagIn |= ENABLE_VIRTUAL_TERMINAL_INPUT;
-		arg->dwFlagOut |= ENABLE_VIRTUAL_TERMINAL_PROCESSING;
+		arg->dwFlagIn &= ~(ENABLE_WINDOW_INPUT);
+		arg->dwFlagOut |= ENABLE_VIRTUAL_TERMINAL_PROCESSING; // paranoia doesn't hurt
 	}
 	returnCode(OK);
 }
