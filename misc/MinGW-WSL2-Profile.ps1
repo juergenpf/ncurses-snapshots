@@ -65,8 +65,7 @@ function Test-NCurses {
     [string]$Target="$NCSRC\build\test"
     [bool]$Legacy=$false
     [string]$ConfigLog=(Join-Path (Join-Path $NCSRC "build") "config.log")
-    [string]$DefaultCP="65001"
-    [string]$DefaultLocale="German_Germany.UTF-8"
+    [int]$DefaultCP=65001
     [string]$gdb=Get-MinGWGDBPath
 
     if (-not (Test-Path -Path $target -PathType Container)) {
@@ -77,8 +76,7 @@ function Test-NCurses {
         $Legacy=Select-String -Path $ConfigLog -Pattern "--disable-widec" -Quiet
     }
     if ($Legacy) {
-        $DefaultCP="1252"
-        $DefaultLocale="German_Germany.1252"
+        $DefaultCP=1252
     }
     Push-Location -Path "$target"
     $Env:PATH="$inst\bin;$NC_INIPATH"
@@ -89,20 +87,17 @@ function Test-NCurses {
     }
    if (!$Legacy) {
 	    [Console]::OutputEncoding = [System.Text.Encoding]::GetEncoding(65001)
-        $Env:NC_WINCP="65001"
-        $Env:NC_WIN_CTYPE="German_Germany.UTF-8"
     } else {
         Write-Host "Separate Terminal session will be started with these settings:"
         Write-Host "NCDBG=$gdb"
     }
-    Write-Host "NC_WIN_CTYPE=$Env:NC_WIN_CTYPE"
-    Write-Host "NC_WINCP$Env:NC_WINCP"
     Write-Host "TERM=$Env:TERM"
+    Write-Host "CodePage=$DefaultCP"
     Write-Host "TERMINFO=$Env:TERMINFO"
     if ($Legacy) {
         Pop-Location
         Set-Location $ENV:USERPROFILE
-        Start-Process cmd -ArgumentList "/K","PUSHD $Target && SET NCDBG=$gdb SET NC_WINCP=$DefaultCP && SET NC_WIN_CTYPE=$DefaultLocale && chcp $DefaultCP"
+        Start-Process cmd.exe -ArgumentList "/K","PUSHD $Target && SET NCDBG=$gdb SET NC_WINCP=$DefaultCP && SET NC_WIN_CTYPE=$DefaultLocale && chcp $DefaultCP"
     }
 }
 

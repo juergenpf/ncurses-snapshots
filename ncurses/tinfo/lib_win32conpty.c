@@ -99,132 +99,27 @@ static ConsoleInfo defaultCONSOLE = {
 NCURSES_EXPORT_VAR(ConsoleInfo *)
 _nc_currentCONSOLE = &defaultCONSOLE;
 
-
 #define UTF8_CP 65001
-#define DEFAULT_UTF8_CTYPE_ENV ".UTF-8"
 
-#define DEFAULT_ASCII_CP 1252
-#define DEFAULT_ASCII_CTYPE_ENV ".1252"
-
-
-/* Check Codepage exists */
-static BOOL
-valid_codepage(UINT cp)
-{
-	BOOL result = FALSE;
-	CPINFOEX info;
-	if (GetCPInfoEx(cp, 0, &info) != 0) {
-#if USE_WIDEC_SUPPORT
-		result = (cp == UTF8_CP); /* only UTF-8 */
-#else
-		result = (cp != UTF8_CP); /* all but UTF-8 */
-#endif
-	}
-	return result;
-}	
-
-/* Check Windows Locale is valid */
-static BOOL
-valid_locale(const char *loc)
-{
-	BOOL result = FALSE;
-
-	if (!loc || !*loc)
-		return FALSE;
-
-	if (!setlocale(LC_CTYPE, loc))
-		return FALSE;
-
-	/* Let's check whether or not in wide case we have UTF-8 and anything else in non-wide case */
-#if USE_WIDEC_SUPPORT
-	result = (GetACP() == UTF8_CP);
-#else
-	result = (GetACP() != UTF8_CP);
-#endif
-	/* Reset to previous value */
-	setlocale(LC_CTYPE, "");
-	return result;
-}
-
-/* Encoding setup for Windows */
+/* As long as we rely on MinGW for building, it doesn't provide support for 
+* .UTF-8 locale names, so we need to use the codepage numbers directly.
+* As soon as we have native compiles with clang or msvc against UCRT working, 
+* we can switch to the more standard locale names and improve this 
+* initialization logic to be more robust and flexible in handling different 
+* types of encodings and locales on Windows.
+*/
 static void
 encoding_init(void)
 {
-#if USE_WIDEC_SUPPORT
-	UINT default_cp = UTF8_CP;
-	const char *default_ctype = DEFAULT_UTF8_CTYPE_ENV;
+	UINT cp =
+#ifdef USE_WIDEC_SUPPORT
+		UTF8_CP;
 #else
-	UINT default_cp = DEFAULT_ASCII_CP;
-	const char *default_ctype = DEFAULT_ASCII_CTYPE_ENV;
+		GetACP();
 #endif
-	const char *env_cp = getenv("NC_WINCP");
-	const char *env_ctype = getenv("NC_WIN_CTYPE");
 
-	UINT cp = default_cp;
-	const char *ctype = default_ctype;
-	UINT tmp;
-	UINT cur_in;
-	UINT cur_out;
-	const char *cur_loc;
-
-	if (env_cp && *env_cp)
-	{
-		tmp = (UINT)atoi(env_cp);
-		if (valid_codepage(tmp))
-			cp = tmp;
-	}
-
-	if (env_ctype && *env_ctype)
-	{
-		if (valid_locale(env_ctype))
-			ctype = env_ctype;
-	}
-
-	cur_in = GetConsoleCP();
-	cur_out = GetConsoleOutputCP();
-
-	if (!valid_codepage(cur_in) ||
-	    !valid_codepage(cur_out))
-	{
-		cur_in = cur_out = default_cp;
-	}
-
-	if (!env_cp && valid_codepage(cur_out))
-		cp = cur_out;
-
-	cur_loc = setlocale(LC_CTYPE, NULL);
-	if (!env_ctype && cur_loc && valid_locale(cur_loc))
-		ctype = cur_loc;
-
-	if (valid_codepage(cp))
-	{
-		SetConsoleCP(cp);
-		SetConsoleOutputCP(cp);
-		SetConsoleCP(cp);
-	}
-	else
-	{
-		SetConsoleCP(default_cp);
-		SetConsoleOutputCP(default_cp);
-		SetConsoleCP(default_cp);
-	}
-
-	if (!setlocale(LC_CTYPE, ctype))
-	{
-		/* Fallback - try alternative UTF-8 locale names for Windows */
-#if USE_WIDEC_SUPPORT
-		if (!setlocale(LC_CTYPE, ".UTF8") &&
-		    !setlocale(LC_CTYPE, ".utf8") &&
-		    !setlocale(LC_CTYPE, "en_US.UTF-8") &&
-		    !setlocale(LC_CTYPE, "C.65001"))
-		{
-			/* Final fallback */
-			setlocale(LC_CTYPE, default_ctype);
-		}
-#else
-		setlocale(LC_CTYPE, default_ctype);
-#endif
-	}
+	SetConsoleCP(cp);
+	SetConsoleOutputCP(cp);
 }
 
 #define REQUIRED_MAJOR_V (DWORD)10
