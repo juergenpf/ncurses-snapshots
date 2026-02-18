@@ -555,6 +555,8 @@ pty_check_resize(void)
  * API call directly. It may use the cached values as a fallback if the 
  * API call fails. The use of this API call is non-destructive in the 
  * API context.
+ * This method can be safely called before the Console is initialized,
+ * because we can fallback to query the standard handles.x
  */
 static void
 pty_size(int *Lines, int *Cols)
@@ -579,9 +581,19 @@ pty_size(int *Lines, int *Cols)
 				*Cols = (int)(csbi.srWindow.Right + 1 - csbi.srWindow.Left);
 			}
 			else
-			{ // Fallback to cached values or defaults if we can't get the console size
-				*Lines = defaultCONSOLE.LINES != -1 ? defaultCONSOLE.LINES : 24;
-				*Cols = defaultCONSOLE.COLS   != -1 ? defaultCONSOLE.COLS : 80;
+			{ // Maybe stderr works...
+				if (GetConsoleScreenBufferInfo(GetStdHandle(STD_ERROR_HANDLE), &csbi))
+				{
+					*Lines = (int)(csbi.srWindow.Bottom + 1 - csbi.srWindow.Top);
+					*Cols = (int)(csbi.srWindow.Right + 1 - csbi.srWindow.Left);
+				}
+				else
+					// Fallback to cached values or defaults if we can't get the console size
+					// We assume Windows Terminal is our host, it has modern default size of
+					// 120x30, but if the cached values are set we use those instead to reflect
+					// the actual size of the console.
+					*Lines = defaultCONSOLE.LINES != -1 ? defaultCONSOLE.LINES : 120;
+				*Cols = defaultCONSOLE.COLS != -1 ? defaultCONSOLE.COLS : 30;
 			}
 		}
 	}
@@ -921,13 +933,7 @@ pty_setmode(int fd, const TTY *arg)
 		*/
 		if (mode & ENABLE_VIRTUAL_TERMINAL_INPUT)
 		{
-			mode |= ENABLE_PROCESSED_INPUT | ENABLE_MOUSE_INPUT;
-			
-			// ENABLE_WINDOW_INPUT is recommended if you use ReadConsoleInput to read input, 
-			// but it can cause issues with some C runtimes on Windows that also want to read 
-			// input from the console, so we disable it when VT is enabled to avoid potential 
-			// conflicts. It is generally not needed for typical ConPTY applications.
-			mode &= ~ENABLE_WINDOW_INPUT; 
+			mode |= ENABLE_PROCESSED_INPUT | ENABLE_MOUSE_INPUT | ENABLE_WINDOW_INPUT;
 		}
 
 		/* Sanitize: ENABLE_ECHO_INPUT requires ENABLE_LINE_INPUT */
@@ -1017,14 +1023,12 @@ pty_defmode(TTY *arg, BOOL isShell)
 	if (isShell)
 	{
 		arg->dwFlagIn &= ~(ENABLE_VIRTUAL_TERMINAL_INPUT);
-		arg->dwFlagIn |= (ENABLE_WINDOW_INPUT);
 		arg->dwFlagOut |= ENABLE_VIRTUAL_TERMINAL_PROCESSING;
 	}
 	else
 	{
 		arg->dwFlagIn |= ENABLE_VIRTUAL_TERMINAL_INPUT;
-		arg->dwFlagIn &= ~(ENABLE_WINDOW_INPUT);
-		arg->dwFlagOut |= ENABLE_VIRTUAL_TERMINAL_PROCESSING; // paranoia doesn't hurt
+		arg->dwFlagOut |= ENABLE_VIRTUAL_TERMINAL_PROCESSING;
 	}
 	returnCode(OK);
 }
