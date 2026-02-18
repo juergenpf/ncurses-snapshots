@@ -106,53 +106,44 @@ _nc_currentCONSOLE = &defaultCONSOLE;
 #define DEFAULT_ASCII_CP 1252
 #define DEFAULT_ASCII_CTYPE_ENV ".1252"
 
-static BOOL
-locale_is_utf8()
-{
-	return GetACP() == UTF8_CP;
-}
-
-static BOOL
-locale_compatible_with_ncurses()
-{
-#if USE_WIDEC_SUPPORT
-	return locale_is_utf8();
-#else
-	return !locale_is_utf8();
-#endif
-}
-
-static BOOL
-codepage_compatible_with_ncurses(UINT cp)
-{
-#if USE_WIDEC_SUPPORT
-	return cp == UTF8_CP; /* only UTF-8 */
-#else
-	return cp != UTF8_CP; /* all but UTF-8 */
-#endif
-}
 
 /* Check Codepage exists */
 static BOOL
 valid_codepage(UINT cp)
 {
+	BOOL result = FALSE;
 	CPINFOEX info;
-	return GetCPInfoEx(cp, 0, &info) != 0;
-}
+	if (GetCPInfoEx(cp, 0, &info) != 0) {
+#if USE_WIDEC_SUPPORT
+		result = (cp == UTF8_CP); /* only UTF-8 */
+#else
+		result = (cp != UTF8_CP); /* all but UTF-8 */
+#endif
+	}
+	return result;
+}	
 
 /* Check Windows Locale is valid */
 static BOOL
 valid_locale(const char *loc)
 {
+	BOOL result = FALSE;
+
 	if (!loc || !*loc)
 		return FALSE;
 
 	if (!setlocale(LC_CTYPE, loc))
 		return FALSE;
 
+	/* Let's check whether or not in wide case we have UTF-8 and anything else in non-wide case */
+#if USE_WIDEC_SUPPORT
+	result = (GetACP() == UTF8_CP);
+#else
+	result = (GetACP() != UTF8_CP);
+#endif
 	/* Reset to previous value */
 	setlocale(LC_CTYPE, "");
-	return TRUE;
+	return result;
 }
 
 /* Encoding setup for Windows */
@@ -179,13 +170,13 @@ encoding_init(void)
 	if (env_cp && *env_cp)
 	{
 		tmp = (UINT)atoi(env_cp);
-		if (valid_codepage(tmp) && codepage_compatible_with_ncurses(tmp))
+		if (valid_codepage(tmp))
 			cp = tmp;
 	}
 
 	if (env_ctype && *env_ctype)
 	{
-		if (valid_locale(env_ctype) && locale_compatible_with_ncurses(env_ctype))
+		if (valid_locale(env_ctype))
 			ctype = env_ctype;
 	}
 
@@ -193,22 +184,19 @@ encoding_init(void)
 	cur_out = GetConsoleOutputCP();
 
 	if (!valid_codepage(cur_in) ||
-	    !valid_codepage(cur_out) ||
-	    !codepage_compatible_with_ncurses(cur_in) ||
-	    !codepage_compatible_with_ncurses(cur_out))
+	    !valid_codepage(cur_out))
 	{
 		cur_in = cur_out = default_cp;
 	}
 
-	if (!env_cp && valid_codepage(cur_out) && codepage_compatible_with_ncurses(cur_out))
+	if (!env_cp && valid_codepage(cur_out))
 		cp = cur_out;
 
 	cur_loc = setlocale(LC_CTYPE, NULL);
-	if (!env_ctype && cur_loc && valid_locale(cur_loc) &&
-	    locale_compatible_with_ncurses(cur_loc))
+	if (!env_ctype && cur_loc && valid_locale(cur_loc))
 		ctype = cur_loc;
 
-	if (valid_codepage(cp) && codepage_compatible_with_ncurses(cp))
+	if (valid_codepage(cp))
 	{
 		SetConsoleCP(cp);
 		SetConsoleOutputCP(cp);
@@ -250,19 +238,26 @@ static bool get_real_windows_version(DWORD *major, DWORD *minor, DWORD *build)
 	HMODULE ntdll = GetModuleHandle(TEXT("ntdll.dll"));
 	if (ntdll)
 	{
-		RtlGetVersionPtr RtlGetVersion = (RtlGetVersionPtr)GetProcAddress(ntdll, "RtlGetVersion");
-		if (RtlGetVersion)
-		{
-			RTL_OSVERSIONINFOW osvi = {0};
-			osvi.dwOSVersionInfoSize = sizeof(osvi);
-			if (RtlGetVersion(&osvi) == 0)
-			{
-				*major = osvi.dwMajorVersion;
-				*minor = osvi.dwMinorVersion;
-				*build = osvi.dwBuildNumber;
-				return true;
-			}
-		}
+	       FARPROC proc = GetProcAddress(ntdll, "RtlGetVersion");
+	       union {
+		       FARPROC proc;
+		       RtlGetVersionPtr func;
+	       } cast;
+		   RtlGetVersionPtr RtlGetVersion = NULL;
+	       cast.proc = proc;
+	       RtlGetVersion = cast.func;
+	       if (RtlGetVersion)
+	       {
+		       RTL_OSVERSIONINFOW osvi = {0};
+		       osvi.dwOSVersionInfoSize = sizeof(osvi);
+		       if (RtlGetVersion(&osvi) == 0)
+		       {
+			       *major = osvi.dwMajorVersion;
+			       *minor = osvi.dwMinorVersion;
+			       *build = osvi.dwBuildNumber;
+			       return true;
+		       }
+	       }
 	}
 	return false;
 }
@@ -288,7 +283,7 @@ conpty_supported(void)
 	}
 	if (major >= REQUIRED_MAJOR_V)
 	{
-		T(("Windows version detected: %d.%d (build %d)", major, minor, build));
+		T(("Windows version detected: %d.%d (build %d)",(int) major, (int) minor, (int) build));
 		if (major == REQUIRED_MAJOR_V)
 		{
 			if (((minor == REQUIRED_MINOR_V) &&
@@ -367,18 +362,13 @@ static BOOL
 pty_init(int fdOut, int fdIn)
 {
 	BOOL result = FALSE;
+	BOOL check;
 
 	T((T_CALLED("lib_win32conpty::pty_init(fdOut=%d, fdIn=%d)"), fdOut, fdIn));
 
 	/* initialize once, or not at all */
 	if (!defaultCONSOLE.initialized)
 	{
-		if (!conpty_supported())
-		{
-			T(("Windows version does not support ConPTY"));
-			returnBool(FALSE);
-		}
-
 		// We set the console mode flags to the most basic ones that are required for ConPTY 
 		// to function properly. We will let the C runtime handle any necessary translations, 
 		// and we will handle UTF-8 encoding and decoding ourselves to avoid any unpredictable 
@@ -393,6 +383,18 @@ pty_init(int fdOut, int fdIn)
 			| DISABLE_NEWLINE_AUTO_RETURN 
 			| ENABLE_WRAP_AT_EOL_OUTPUT);
 
+		const char *env_flags = getenv("NC_CONHOST_FLAGS");
+		DWORD dwFlag;
+
+		HANDLE stdin_hdl = GetStdHandle(STD_INPUT_HANDLE);
+		HANDLE out_hdl = fdOut >= 0 ? (HANDLE)(uintptr_t)_get_osfhandle(fdOut) : INVALID_HANDLE_VALUE;
+
+		if (!conpty_supported())
+		{
+			T(("Windows version does not support ConPTY"));
+			returnBool(FALSE);
+		}
+
 		if (fdIn != -1)
 		{
 			T(("In the first call fdIn is expected to be -1."));
@@ -403,7 +405,6 @@ pty_init(int fdOut, int fdIn)
 
 		// The NC_CONHOST_FLAGS environment variable is for future use.
 		defaultCONSOLE.conhost_flags = 0;
-		const char *env_flags = getenv("NC_CONHOST_FLAGS");
 		if (env_flags && *env_flags)
 		{
 			char *endptr;
@@ -420,9 +421,6 @@ pty_init(int fdOut, int fdIn)
 		// as long as the process has a console.
 		defaultCONSOLE.used_fdIn = _fileno(stdin);
 		defaultCONSOLE.used_fdOut = fdOut;
-		HANDLE stdin_hdl = GetStdHandle(STD_INPUT_HANDLE);
-		HANDLE out_hdl = fdOut >= 0 ? (HANDLE)_get_osfhandle(fdOut) : INVALID_HANDLE_VALUE;
-		DWORD dwFlag;
 
 		if (out_hdl == INVALID_HANDLE_VALUE || GetConsoleMode(out_hdl, &dwFlag) == 0)
 		{
@@ -478,11 +476,12 @@ pty_init(int fdOut, int fdIn)
 	  // WINCONSOLE structure to use the new handles.
 		DWORD dwFlagOut;
 		DWORD dwFlagIn;
+		HANDLE in_hdl = fdIn >= 0 ? (HANDLE)(uintptr_t)_get_osfhandle(fdIn) : INVALID_HANDLE_VALUE;
+		/* Already initialized - just check if stdout is still in ConPTY mode */
+		HANDLE out_hdl = fdOut >= 0 ? (HANDLE)(uintptr_t)_get_osfhandle(fdOut) : INVALID_HANDLE_VALUE;
+
 		defaultCONSOLE.used_fdIn = fdIn;
 		defaultCONSOLE.used_fdOut = fdOut;
-		HANDLE in_hdl = fdIn >= 0 ? (HANDLE)_get_osfhandle(fdIn) : INVALID_HANDLE_VALUE;
-		/* Already initialized - just check if stdout is still in ConPTY mode */
-		HANDLE out_hdl = fdOut >= 0 ? (HANDLE)_get_osfhandle(fdOut) : INVALID_HANDLE_VALUE;
 
 		if (out_hdl == INVALID_HANDLE_VALUE || GetConsoleMode(out_hdl, &dwFlagOut) == 0)
 		{
@@ -506,7 +505,7 @@ pty_init(int fdOut, int fdIn)
 
 		result = TRUE;
 	}
-	BOOL check = output_is_conpty();
+	check = output_is_conpty();
 	T(("... console initialized=%d, isConpty=%d",
 	   defaultCONSOLE.initialized,
 	   check));
@@ -674,13 +673,10 @@ pty_twait(const SCREEN *sp GCC_UNUSED,
 {
 	int result = TW_NONE;
 	TimeType t0;
+	long starttime = gettime_func(&t0, TRUE);
+	long elapsed;
 
 	TR(TRACE_IEVENT, ("start twait: %d milliseconds, mode: %d", milliseconds, mode));
-
-#define min(a, b) ((a) < (b) ? (a) : (b))
-
-	long starttime = gettime_func(&t0, TRUE);
-
 	TR(TRACE_IEVENT, ("start WINCONSOLE.twait: %d milliseconds, mode: %d",
 			  milliseconds, mode));
 
@@ -785,7 +781,7 @@ pty_twait(const SCREEN *sp GCC_UNUSED,
 		Sleep((DWORD)milliseconds);
 	}
 
-	long elapsed = gettime_func(&t0, FALSE) - starttime;
+	elapsed = gettime_func(&t0, FALSE) - starttime;
 	if (timeleft)
 	{
 		*timeleft = (milliseconds >= 0) ? Max(0, milliseconds - (int)elapsed) : milliseconds;
@@ -794,7 +790,6 @@ pty_twait(const SCREEN *sp GCC_UNUSED,
 	TR(TRACE_IEVENT, ("end WINCONSOLE.twait: returned %d, elapsed %ld msec",
 			  result, elapsed));
 
-#undef min
 	return result;
 }
 
@@ -826,7 +821,7 @@ static int
 pty_flush(int fd)
 {
 	int code = OK;
-	HANDLE hdl = _get_osfhandle(fd);
+	HANDLE hdl = (HANDLE)(uintptr_t)_get_osfhandle(fd);
 	HandleType type = classify_handle(hdl);
 
 	T((T_CALLED("lib_win32conpty::pty_flush(fd=%d)"), fd));
@@ -851,7 +846,7 @@ pty_flush(int fd)
 }
 
 static int 
-setfilemode(TTY* arg)
+setfilemode(const TTY* arg)
 {
 	T((T_CALLED("lib_win32conpty::setfilemode(TTY*=%p)"), arg));
 
@@ -875,20 +870,25 @@ setfilemode(TTY* arg)
 static int
 pty_setmode(int fd, const TTY *arg)
 {
+	HANDLE in_hdl = defaultCONSOLE.used_input_handle;
+	HANDLE out_hdl = defaultCONSOLE.used_output_handle;
+	HANDLE fd_hdl = INVALID_HANDLE_VALUE;
+	HandleType fd_type = NotKnown;
+	// Determine which handles to use based on classification
+	HANDLE input_target = INVALID_HANDLE_VALUE;
+	HANDLE output_target = INVALID_HANDLE_VALUE;
+	BOOL input_ok = FALSE;
+	BOOL output_ok = FALSE;
+
 	T((T_CALLED("lib_win32conpty::pty_setmode(fd=%d, TTY*=%p)"), fd, arg));
 	
 	if (!arg)
 		returnCode(ERR);
 
-	HANDLE in_hdl = defaultCONSOLE.used_input_handle;
-	HANDLE out_hdl = defaultCONSOLE.used_output_handle;
-	HANDLE fd_hdl = INVALID_HANDLE_VALUE;
-	HandleType fd_type = NotKnown;
-
 	// Get handle from fd
 	if (fd >= 0)
 	{
-		fd_hdl = _get_osfhandle(fd);
+		fd_hdl = (HANDLE)(uintptr_t)_get_osfhandle(fd);
 		fd_type = classify_handle(fd_hdl);
 	}
 	if (fd_type == NotKnown)
@@ -896,10 +896,6 @@ pty_setmode(int fd, const TTY *arg)
 		T(("WINCONSOLE.setmode: fd %d does not correspond to console input or output handle", fd));
 		returnCode(ERR);
 	}
-
-	// Determine which handles to use based on classification
-	HANDLE input_target = INVALID_HANDLE_VALUE;
-	HANDLE output_target = INVALID_HANDLE_VALUE;
 
 	if (fd_type == Input)
 	{
@@ -916,9 +912,6 @@ pty_setmode(int fd, const TTY *arg)
 		input_target = in_hdl;
 		output_target = out_hdl;
 	}
-
-	// Apply modes to appropriate handles
-	bool input_ok = false, output_ok = false;
 
 	if (input_target != INVALID_HANDLE_VALUE)
 	{
@@ -942,7 +935,7 @@ pty_setmode(int fd, const TTY *arg)
 			mode &= ~ENABLE_ECHO_INPUT;
 		}
 
-		setfilemode((TTY*)arg);
+		setfilemode(arg);
 
 		input_ok = SetConsoleMode(input_target, mode);
 		if (input_ok)
@@ -1045,13 +1038,15 @@ pty_defmode(TTY *arg, BOOL isShell)
 static int
 pty_getmode(int fd, TTY *arg)
 {
+	HANDLE hdl = (HANDLE)(uintptr_t)_get_osfhandle(fd);
+	HandleType type = NotKnown;
+
 	T((T_CALLED("lib_win32conpty::pty_getmode(fd=%d, TTY*=%p)"), fd, arg));
 
 	if (NULL == arg)
 		returnCode(ERR);
 
-	HANDLE hdl = _get_osfhandle(fd);
-	HandleType type = classify_handle(hdl);
+	type = classify_handle(hdl);
 	if (type == NotKnown)
 	{
 		T(("WINCONSOLE.getmode: fd %d does not correspond to console input or output handle", fd));
