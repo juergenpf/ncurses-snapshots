@@ -29,16 +29,10 @@
 ## $Id$
 ## Author: Juergen Pfeifer
 #------------------------------------------------------------------------------
-# You may change the following variables according to your environment
-[string]$DEFAULT_WSL_DISTRO="Ubuntu"
-[string]$DEFAULT_UTF8_LOCALE="German_Germany.UTF-8"
-[int]$DEFAULT_ASCII_CODEPAGE=1252
-[string]$DEFAULT_ASCII_LOCALE="German_Germany.1252"
-[string]$NC_SRC_PATTERN="\home\@USER@\src\ncurses"
+# You may change the following two variables according to your environment
+$NC_DISTRO_NAME="Ubuntu"
+$NC_SRC_PATTERN="\home\@USER@\src\ncurses"
 
-# Please leave the rest of the code unchanged, unless you know what you are doing. 
-# The functions defined below rely on the above variables and may not work correctly 
-# if you change them without understanding the implications.
 $NC_INIPATH=$Env:PATH
 
 function Get-MinGWGDBPath {
@@ -61,20 +55,18 @@ function Get-MinGWGDBPath {
 }
 
 function Test-NCurses {
-    [CmdletBinding()]
     param(
-        [Switch]$Trace,
-        [switch]$SameSession
+        [Switch]$Trace
     )
     [string]$User=${Env:USERNAME}.ToLowerInvariant()
     [string]$src=$NC_SRC_PATTERN -replace "@USER@",$User
-    [string]$NCSRC="\\wsl$\${DEFAULT_WSL_DISTRO}${src}"
+    [string]$NCSRC="\\wsl$\${NC_DISTRO_NAME}${src}"
     [string]$inst="${NCSRC}\inst\mingw64"
     [string]$Target="$NCSRC\build\test"
     [bool]$Legacy=$false
     [string]$ConfigLog=(Join-Path (Join-Path $NCSRC "build") "config.log")
     [int]$DefaultCP=65001
-    [string]$DefaultLocale=$DEFAULT_UTF8_LOCALE
+    [string]$gdb=Get-MinGWGDBPath
 
     if (-not (Test-Path -Path $target -PathType Container)) {
         Write-Error "Test directory not found: $target"
@@ -84,41 +76,28 @@ function Test-NCurses {
         $Legacy=Select-String -Path $ConfigLog -Pattern "--disable-widec" -Quiet
     }
     if ($Legacy) {
-        $DefaultCP=$DEFAULT_ASCII_CODEPAGE
-        $DefaultLocale=$DEFAULT_ASCII_LOCALE
+        $DefaultCP=1252
     }
-    if (!$Legacy -or ($Legacy -and $SameSession)) {
-        Push-Location -Path "$target"
-        $Env:PATH="$inst\bin;$NC_INIPATH"
-        $Env:TERM="ms-terminal"
-        $Env:TERMINFO="$inst\share\terminfo"
-        if ($Trace) {
-            $Env:NCURSES_TRACE=8191
-        } else {
-            $Env:NCURSES_TRACE=$null
-        }
-
-	    [Console]::OutputEncoding = [System.Text.Encoding]::GetEncoding($DefaultCP)
-        $Env:NC_WINCP=$DefaultCP
-        $Env:NC_WIN_CTYPE=$DefaultLocale   
-        Write-Host "NC_WIN_CTYPE=$Env:NC_WIN_CTYPE"
-        Write-Host "NC_WINCP=$Env:NC_WINCP"
-        Write-Host "TERM=$Env:TERM"
-        Write-Host "TERMINFO=$Env:TERMINFO"
-        Write-Host "NC_TRACE=${Env:NCURSES_TRACE}"
+    Push-Location -Path "$target"
+    $Env:PATH="$inst\bin;$NC_INIPATH"
+    $Env:TERM="ms-terminal"
+    $Env:TERMINFO="$inst\share\terminfo"
+    if ($Trace) {
+        $Env:NCURSES_TRACE=8191
     }
-    
+   if (!$Legacy) {
+	    [Console]::OutputEncoding = [System.Text.Encoding]::GetEncoding(65001)
+    } else {
+        Write-Host "Separate Terminal session will be started with these settings:"
+        Write-Host "NCDBG=$gdb"
+    }
+    Write-Host "TERM=$Env:TERM"
+    Write-Host "CodePage=$DefaultCP"
+    Write-Host "TERMINFO=$Env:TERMINFO"
     if ($Legacy) {
-        if (-not $SameSession) {
-            $passedParams = ($PSBoundParameters.GetEnumerator() | ForEach-Object {
-                if ($_.Value -is [switch]) {
-                    if ($_.Value) { "-$($_.Key)" }
-                } else {
-                    "-$($_.Key) '$($_.Value)'"
-                }
-            } | Where-Object { $_ }) -join ' '
-            Start-Process (Join-Path $PSHOME "pwsh.exe") -ArgumentList "-NoExit", "-Command","Test-NCurses -SameSession $passedParams"
-        }
+        Pop-Location
+        Set-Location $ENV:USERPROFILE
+        Start-Process cmd.exe -ArgumentList "/K","PUSHD $Target && SET NCDBG=$gdb SET NC_WINCP=$DefaultCP && SET NC_WIN_CTYPE=$DefaultLocale && chcp $DefaultCP"
     }
 }
 

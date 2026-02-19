@@ -104,26 +104,37 @@ _nc_CONSOLE;
   This function returns 0 if the Windows version has no support for
   the modern Console interface, otherwise it returns 1
  */
+typedef NTSTATUS(WINAPI *RtlGetVersionPtr)(PRTL_OSVERSIONINFOW);
 
-typedef NTSTATUS (WINAPI *RtlGetVersionPtr)(PRTL_OSVERSIONINFOW);
-
-static bool get_real_windows_version(DWORD* major, DWORD* minor, DWORD* build) {
-    HMODULE ntdll = GetModuleHandle(TEXT("ntdll.dll"));
-    if (ntdll) {
-        RtlGetVersionPtr RtlGetVersion = (RtlGetVersionPtr)GetProcAddress(ntdll, "RtlGetVersion");
-        if (RtlGetVersion) {
-            RTL_OSVERSIONINFOW osvi = {0};
-            osvi.dwOSVersionInfoSize = sizeof(osvi);
-            if (RtlGetVersion(&osvi) == 0) {
-                *major = osvi.dwMajorVersion;
-                *minor = osvi.dwMinorVersion; 
-                *build = osvi.dwBuildNumber;
-                return true;
-            }
-        }
-    }
-    return false;
+static bool get_real_windows_version(DWORD *major, DWORD *minor, DWORD *build)
+{
+	HMODULE ntdll = GetModuleHandle(TEXT("ntdll.dll"));
+	if (ntdll)
+	{
+	       FARPROC proc = GetProcAddress(ntdll, "RtlGetVersion");
+	       union {
+		       FARPROC proc;
+		       RtlGetVersionPtr func;
+	       } cast;
+		   RtlGetVersionPtr RtlGetVersion = NULL;
+	       cast.proc = proc;
+	       RtlGetVersion = cast.func;
+	       if (RtlGetVersion)
+	       {
+		       RTL_OSVERSIONINFOW osvi = {0};
+		       osvi.dwOSVersionInfoSize = sizeof(osvi);
+		       if (RtlGetVersion(&osvi) == 0)
+		       {
+			       *major = osvi.dwMajorVersion;
+			       *minor = osvi.dwMinorVersion;
+			       *build = osvi.dwBuildNumber;
+			       return true;
+		       }
+	       }
+	}
+	return false;
 }
+
 
 NCURSES_EXPORT(int)
  _nc_console_vt_supported(void)
@@ -1521,83 +1532,20 @@ static int valid_locale(const char *loc)
 	return 1;
 }
 
+#define UTF8_CP 65001
+
 /* Encoding setup for Windows */
 NCURSES_EXPORT(void)
 _nc_win32_encoding_init(void)
 {
-#if USE_WIDEC_SUPPORT
-    UINT default_cp = CP_UTF8;
-    const char *default_ctype = "C.UTF-8";
+	UINT cp =
+#ifdef USE_WIDEC_SUPPORT
+		UTF8_CP;
 #else
-    UINT default_cp = 1252;
-    const char *default_ctype = "English_United States.1252";
+		GetACP();
 #endif
-
-    const char *env_cp    = getenv("NC_WINCP");
-    const char *env_ctype = getenv("NC_WIN_CTYPE");
-
-    UINT cp = default_cp;
-    const char *ctype = default_ctype;
-    UINT tmp;
-    UINT cur_in;
-    UINT cur_out;
-    const char *cur_loc;
-
-    if (env_cp && *env_cp) {
-        tmp = (UINT)atoi(env_cp);
-        if (valid_codepage(tmp) && codepage_compatible_with_ncurses(tmp))
-            cp = tmp;
-    }
-
-    if (env_ctype && *env_ctype) {
-        if (valid_locale(env_ctype) && locale_compatible_with_ncurses(env_ctype))
-            ctype = env_ctype;
-    }
-
-    cur_in  = GetConsoleCP();
-    cur_out = GetConsoleOutputCP();
-
-    if (!valid_codepage(cur_in) ||
-	!valid_codepage(cur_out) ||
-	!codepage_compatible_with_ncurses(cur_in) ||
-	!codepage_compatible_with_ncurses(cur_out)) {
-        cur_in = cur_out = default_cp;
-    }
-
-    if (!env_cp && valid_codepage(cur_out) && codepage_compatible_with_ncurses(cur_out))
-        cp = cur_out;
-
-    cur_loc = setlocale(LC_CTYPE, NULL);
-    if (!env_ctype && cur_loc && valid_locale(cur_loc) &&
-			locale_compatible_with_ncurses(cur_loc))
-        ctype = cur_loc;
-
-    if (valid_codepage(cp) && codepage_compatible_with_ncurses(cp)) {
-        SetConsoleCP(cp);
-        SetConsoleOutputCP(cp);
-    } else {
-        SetConsoleCP(default_cp);
-        SetConsoleOutputCP(default_cp);
-    }
-
-    if (!setlocale(LC_CTYPE, ctype)) {
-        /* Fallback - try alternative UTF-8 locale names for Windows */
-#if USE_WIDEC_SUPPORT
-        if (!setlocale(LC_CTYPE, ".UTF8") && 
-            !setlocale(LC_CTYPE, ".utf8") &&
-            !setlocale(LC_CTYPE, "en_US.UTF-8") &&
-            !setlocale(LC_CTYPE, "English_United States.65001")) {
-            /* Final fallback */
-            setlocale(LC_CTYPE, default_ctype);
-        }
-#else
-        setlocale(LC_CTYPE, default_ctype);
-#endif
-    }
-
-    _nc_setmode(_fileno(stdin),  true, false);
-    _nc_setmode(_fileno(stdout), false, false);
-    _nc_setmode(_fileno(stderr), false, false);
+	SetConsoleCP(cp);
+	SetConsoleOutputCP(cp);
 }
 
 #endif // _NC_WINDOWS
