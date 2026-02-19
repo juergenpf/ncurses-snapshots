@@ -125,7 +125,13 @@ typedef struct
 #define NC_CONHOST_FLAG_MASK (NC_CONHOST_FLAG_SUPPORT_EVENTS)
 
 #ifndef TimeType
+#if defined(_UCRT)
+#define TimeType struct timespec
+#elif defined(_MSC_VER)
+#define TimeType struct _timeb
+#else
 #define TimeType struct timeval
+#endif
 #endif
 
 #ifndef EVENTLIST_2nd
@@ -154,8 +160,8 @@ typedef struct {
     HANDLE used_input_handle;      /* Console Handle actually used for input operations */
     HANDLE used_output_handle;     /* Console Handle actually used for output operations */
 
-    int LINES;                     /* Cached console size */
-    int COLS;                      /* Cached console size */
+    int sbi_lines;                     /* Cached console size */
+    int sbi_cols;                      /* Cached console size */
 
   // Metods
     BOOL (*init)(int fdOut, int fdIn);                /* Initialize with I/O file descriptors. fdIn maybe -1 in first call */

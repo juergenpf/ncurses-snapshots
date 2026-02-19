@@ -75,8 +75,8 @@ static ConsoleInfo defaultCONSOLE = {
     .ttyflags = {0, 0, 0, 0, 0},
     .used_input_handle = INVALID_HANDLE_VALUE,
     .used_output_handle = INVALID_HANDLE_VALUE,
-    .LINES = -1,
-    .COLS = -1,
+    .sbi_lines = -1,
+    .sbi_cols = -1,
     .init = pty_init,
     .size = pty_size,
     .check_resize = pty_check_resize,
@@ -117,7 +117,23 @@ encoding_init(void)
 #else
 		GetACP();
 #endif
+	char *cur_loc = setlocale(LC_CTYPE, NULL);
+	char *newlocale = NULL;
 
+	T((T_CALLED("lib_win32conpty::encoding_init() - code page will be set to %u"), cp));
+	T(("conpty Current locale: %s", cur_loc ? cur_loc : "NULL"));
+#if defined(_UCRT)
+	T(("conpty using UCRT"));
+#if USE_WIDEC_SUPPORT
+	T(("conpty: Try setting locale to .UTF-8 for wide character support"));
+    newlocale=setlocale(LC_CTYPE, ".UTF-8");
+	T(("conpty setlocale() result locale is %s", newlocale ? newlocale : "NULL"));
+	cur_loc = setlocale(LC_CTYPE, NULL);
+	T(("conpty Current locale now %s, code page %u", cur_loc ? cur_loc : "NULL", cp));
+#endif /* USE_WIDEC_SUPPORT */
+#else
+	T(("conpty: Not using UCRT - relying on current locale for code page handling"));
+#endif /* defined(_UCRT	) */
 	SetConsoleCP(cp);
 	SetConsoleOutputCP(cp);
 }
@@ -422,17 +438,17 @@ pty_check_resize(void)
 
 	pty_size(&current_lines, &current_cols);
 
-	if (defaultCONSOLE.LINES == -1 || defaultCONSOLE.COLS == -1)
+	if (defaultCONSOLE.sbi_lines == -1 || defaultCONSOLE.sbi_cols == -1)
 	{
-		defaultCONSOLE.LINES = current_lines;
-		defaultCONSOLE.COLS = current_cols;
+		defaultCONSOLE.sbi_lines = current_lines;
+		defaultCONSOLE.sbi_cols = current_cols;
 		returnBool(FALSE);
 	}
 
-	if (current_lines != defaultCONSOLE.LINES || current_cols != defaultCONSOLE.COLS)
+	if (current_lines != defaultCONSOLE.sbi_lines || current_cols != defaultCONSOLE.sbi_cols)
 	{
-		defaultCONSOLE.LINES = current_lines;
-		defaultCONSOLE.COLS = current_cols;
+		defaultCONSOLE.sbi_lines = current_lines;
+		defaultCONSOLE.sbi_cols = current_cols;
 
 		_nc_globals.have_sigwinch = 1;
 
@@ -486,8 +502,8 @@ pty_size(int *Lines, int *Cols)
 					// We assume Windows Terminal is our host, it has modern default size of
 					// 120x30, but if the cached values are set we use those instead to reflect
 					// the actual size of the console.
-					*Lines = defaultCONSOLE.LINES != -1 ? defaultCONSOLE.LINES : 120;
-				*Cols = defaultCONSOLE.COLS != -1 ? defaultCONSOLE.COLS : 30;
+					*Lines = defaultCONSOLE.sbi_lines != -1 ? defaultCONSOLE.sbi_lines : 120;
+				*Cols = defaultCONSOLE.sbi_cols != -1 ? defaultCONSOLE.sbi_cols : 30;
 			}
 		}
 	}
