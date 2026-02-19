@@ -126,7 +126,7 @@ encoding_init(void)
 	T(("conpty using UCRT"));
 #if USE_WIDEC_SUPPORT
 	T(("conpty: Try setting locale to .UTF-8 for wide character support"));
-    newlocale=setlocale(LC_CTYPE, ".UTF-8");
+        newlocale=setlocale(LC_CTYPE, ".UTF-8");
 	T(("conpty setlocale() result locale is %s", newlocale ? newlocale : "NULL"));
 	cur_loc = setlocale(LC_CTYPE, NULL);
 	T(("conpty Current locale now %s, code page %u", cur_loc ? cur_loc : "NULL", cp));
@@ -540,8 +540,12 @@ pty_read(SCREEN *sp, int *result)
 		return n;
 	}
 
-#if USE_WIDEC_SUPPORT
-	/* Wide mode: decode UTF-8 sequences */
+#if USE_WIDEC_SUPPORT && !defined(_UCRT)
+	/* Wide mode: decode UTF-8 sequences.
+	* We only have to do that when using msvcrt, because UCRT has native UTF-8 support 
+	* when the locale is set to .UTF-8, so in that case we can rely on the C runtime 
+	* to do the decoding for us and just return the raw bytes directly.
+	*/
 	wchar_t wch;
 	int ch;
 

@@ -58,9 +58,11 @@ _nc_gettimeofday(struct timeval *tv, void *tz GCC_UNUSED)
 #endif // HAVE_GETTIMEOFDAY == 2
 
 #if USE_WIDEC_SUPPORT
-// To avoid unpredictable interferences with the various C runtimes on Windows,
-// we use O_BINARY mode on the input and output file handles. This requires, that
-// we handle the UTF-8 encoding and decoding ourselves.
+#if !defined(_UCRT)
+/* This is only needed when using msvcrt, because UCRT has native UTF-8 support 
+ * when the locale is set to .UTF-8, so in that case we can rely on the C runtime 
+ * to do the decoding for us and just return the raw bytes directly.  
+*/
 NCURSES_EXPORT(size_t)
 _nc_wchar_to_utf8(wchar_t wc, char utf8[UTF8_MAX_BYTES])
 {
@@ -256,6 +258,7 @@ _nc_assemble_utf8_input(unsigned char byte, wchar_t *wch)
 		return -1; /* Invalid sequence */
 	}
 }
+#endif // !defined(_UCRT)
 
 #define mk_wcwidth(ucs)          _nc_wcwidth(ucs)
 #define mk_wcswidth(pwcs, n)     _nc_wcswidth(pwcs, n)

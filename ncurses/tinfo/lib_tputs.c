@@ -231,14 +231,15 @@ NCURSES_SP_NAME(_nc_outch)(NCURSES_SP_DCLx int ch)
 	return rc;
 }
 
-#if defined(_NC_WINDOWS_NATIVE) && USE_WIDEC_SUPPORT
+#if defined(_NC_WINDOWS_NATIVE) && USE_WIDEC_SUPPORT && !defined(_UCRT)
 /*
-We have to operate the Windows Console Output stream in _O_BINARY mode, so no UTF-8
-translation is performed by the OS. Therefore we have to encode UTF-8 characters
-ourselves.
-
-This routine is only used by the PUTC macro in the core update function of tty_updat.c
- */
+* When using msvcrt, because we have to operate the Windows Console Output 
+* stream in _O_BINARY mode, so no UTF-8 translation is performed by the OS. 
+* Therefore we have to encode UTF-8 characters ourselves.
+*
+* This routine is only used by the PUTC macro in the core update function of 
+* tty_updat.c
+*/
 NCURSES_EXPORT(int)
 NCURSES_SP_NAME(_nc_outch_ex)(NCURSES_SP_DCLx int ch)
 {
