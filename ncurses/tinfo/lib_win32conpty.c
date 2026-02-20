@@ -841,7 +841,7 @@ pty_setmode(int fd, const TTY *arg)
 		*/
 		if (mode & ENABLE_VIRTUAL_TERMINAL_INPUT)
 		{
-			mode |= ENABLE_PROCESSED_INPUT | ENABLE_MOUSE_INPUT | ENABLE_WINDOW_INPUT;
+			mode |= ENABLE_PROCESSED_INPUT;
 		}
 
 		/* Sanitize: ENABLE_ECHO_INPUT requires ENABLE_LINE_INPUT */

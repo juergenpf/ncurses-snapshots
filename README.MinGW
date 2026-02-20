@@ -49,7 +49,7 @@ correctness. Our future plan is to drop legacy support and to only support
 Windows versions with virtuale console and pseudo terminal support 
 (Windows 10.0 build 17763, released in 2018).
 
-In the legacy Windows code for versions oölder than the above mentioned, there is
+In the legacy Windows code for versions older than the above mentioned, there is
 no terminfo support. We have just support for the classical ncurses, panel, menu
 and form library. This is important to notice, because there are some programs who
 use and link against ncurses, but actually are using terminfo functionality. these
@@ -308,7 +308,27 @@ done in WSL2, which is much more responsive than MSYS2.
 Of course, if you don't use WSL2 but a native Linux Box, you can't use this workaround
 and have to use the Wine based approach.
 
-You can get MSYS2 from
+The MinGW gcc targets the MSVCRT, which Microsoft now considers Legacy. As mentioned
+above, the new Universal-C-Runtime (UCRT) is the way to go on Windows. If you want
+to build for UCRT, at the moment we recommend using MSYS2, which has support for
+building UCRT libraries and programs with gcc or clang. You can find more details
+here:
+
+	https://www.msys2.org/docs/environments/
+
+Unfortunately, Debian and so Ubuntu decided to package only the old MinGW stuff, 
+the new UCRT toolchains are not supported for cross-compiles.
+
+If you are willing to experiment, the Arch Linux project offers packages that 
+support MinGW targetting UCRT, so you may give that a try, even in WSL2 and
+cross compile for UCRT.
+
+As a personal note, on UCRT I really recommend to use the wide build of ncurses
+if you write new code for Terminal apps with ncurses on Windows. The whole OS 
+and the runtime are centered around Unicode, and the wide version of ncurses
+build against UCRT works quite nicely in that environment.
+
+If want to give UCRT a try or don't want to do cross-builds. you can get MSYS2 from
 
 	https://www.msys2.org/
 
