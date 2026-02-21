@@ -55,7 +55,7 @@ static int pty_setmode(int fd, const TTY *arg);
 static int pty_getmode(int fd, TTY *arg);
 static int pty_defmode(TTY *arg, BOOL isShell);
 static int pty_flush(int fd);
-static int pty_read(SCREEN *sp, int *result);
+static int pty_read(const SCREEN *sp, int *result);
 static int pty_twait(const SCREEN *sp GCC_UNUSED,
 		     int mode GCC_UNUSED,
 		     int milliseconds,
@@ -515,10 +515,12 @@ pty_size(int *Lines, int *Cols)
  * In non-wide mode: Returns raw bytes directly (for single-byte encodings like CP1252)
  */
 static int
-pty_read(SCREEN *sp, int *result)
+pty_read(const SCREEN *sp, int *result)
 {
 	unsigned char byte_buffer;
 	int n;
+	INPUT_RECORD rec;
+	DWORD read_count;
 
 	T((T_CALLED("lib_win32conpty::pty_read(SCREEN*=%p, result=%p)"), sp, result));
 
@@ -650,7 +652,7 @@ pty_twait(const SCREEN *sp GCC_UNUSED,
 							{
 								if (mode & TW_MOUSE)
 									result |= TW_MOUSE;
-							}
+							} 
 						}
 					}
 					else

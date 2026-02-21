@@ -161,7 +161,7 @@ typedef struct {
     int (*getmode)(int fd, ConsoleMode *arg);         /* Our GET_TTY implementation */
     int (*defmode )(ConsoleMode *arg, BOOL isShell);  /* Used by shell-/prog-mode handling to manage file mides of the I/O streams */
     int (*flush)(int fd);                             /* flush the console I/O stream denoted by the file descriptor */
-    int (*read)(SCREEN *sp, int *result);             /* Read bytes from the input stream. If wide characters are used, the UTF-8 assembly is done here */
+    int (*read)(const SCREEN *sp, int *result);       /* Read bytes from the input stream. If wide characters are used, the UTF-8 assembly is done here */
     /* We need our special implementation of twait, because Windows has a totally different approach
        to async I/O than UNIX typically does with the poll/select mechanism */
     int (*twait)(const SCREEN *sp, int mode, int milliseconds, int *timeleft, long (*gettime_func)(void *, int) EVENTLIST_2nd(_nc_eventlist *evl));
