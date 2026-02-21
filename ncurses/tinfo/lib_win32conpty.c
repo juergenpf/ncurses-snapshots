@@ -111,14 +111,20 @@ _nc_currentCONSOLE = &defaultCONSOLE;
 static void
 encoding_init(void)
 {
-	UINT cp =
-#ifdef USE_WIDEC_SUPPORT
-		UTF8_CP;
-#else
-		GetACP();
-#endif
-	char *cur_loc = setlocale(LC_CTYPE, NULL);
+	char *cur_loc = NULL;
+#if USE_WIDEC_SUPPORT
 	char *newlocale = NULL;
+	UINT cp = UTF8_CP;
+#else
+	WCHAR buf[16];
+	int len = GetLocaleInfoEx(
+    		LOCALE_NAME_SYSTEM_DEFAULT,
+    		LOCALE_IDEFAULTANSICODEPAGE,
+    		buf,
+    		16);
+	UINT cp = (UINT)_wtoi(buf);
+#endif 
+	cur_loc = setlocale(LC_CTYPE, NULL);
 
 	T((T_CALLED("lib_win32conpty::encoding_init() - code page will be set to %u"), cp));
 	T(("conpty Current locale: %s", cur_loc ? cur_loc : "NULL"));
