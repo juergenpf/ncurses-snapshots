@@ -185,7 +185,8 @@ _nc_timed_wait(const SCREEN *sp MAYBE_UNUSED,
 
 #if defined(_NC_WINDOWS_NATIVE)
     /* WIN32_CONPTY specific timeout handling - delegate to specialized function */
-    return WINCONSOLE.twait(sp, mode, milliseconds, timeleft, _nc_gettime EVENTLIST_2nd(evl));
+    return WINCONSOLE.twait(sp, mode, milliseconds, timeleft, (long (*)(void *, int))
+_nc_gettime EVENTLIST_2nd(evl));
     
 #else /* Unix/Linux implementation */
 

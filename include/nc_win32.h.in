@@ -124,16 +124,6 @@ typedef struct
 #define NC_CONHOST_FLAG_SUPPORT_EVENTS 0x0001
 #define NC_CONHOST_FLAG_MASK (NC_CONHOST_FLAG_SUPPORT_EVENTS)
 
-#ifndef TimeType
-#if defined(_UCRT)
-#define TimeType struct timespec
-#elif defined(_MSC_VER)
-#define TimeType struct _timeb
-#else
-#define TimeType struct timeval
-#endif
-#endif
-
 #ifndef EVENTLIST_2nd
  #define EVENTLIST_2nd(param) /* nothing */
 #endif
@@ -174,7 +164,7 @@ typedef struct {
     int (*read)(SCREEN *sp, int *result);             /* Read bytes from the input stream. If wide characters are used, the UTF-8 assembly is done here */
     /* We need our special implementation of twait, because Windows has a totally different approach
        to async I/O than UNIX typically does with the poll/select mechanism */
-    int (*twait)(const SCREEN *sp, int mode, int milliseconds, int *timeleft, long (*gettime_func)(TimeType *, int) EVENTLIST_2nd(_nc_eventlist *evl));
+    int (*twait)(const SCREEN *sp, int mode, int milliseconds, int *timeleft, long (*gettime_func)(void *, int) EVENTLIST_2nd(_nc_eventlist *evl));
   } ConsoleInfo;
 
 // Guaranteed to be statically initialzed.

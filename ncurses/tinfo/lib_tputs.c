@@ -292,7 +292,7 @@ _nc_outch(int ch)
 	return NCURSES_SP_NAME(_nc_outch)(CURRENT_SCREEN, ch);
 }
 
-#if defined(_NC_WINDOWS_NATIVE) && USE_WIDEC_SUPPORT
+#if defined(_NC_WINDOWS_NATIVE) && USE_WIDEC_SUPPORT && !defined(_UCRT)
 NCURSES_EXPORT(int)
 _nc_outch_ex(int ch)
 {

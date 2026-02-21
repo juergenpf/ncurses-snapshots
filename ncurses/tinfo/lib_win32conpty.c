@@ -60,7 +60,7 @@ static int pty_twait(const SCREEN *sp GCC_UNUSED,
 		     int mode GCC_UNUSED,
 		     int milliseconds,
 		     int *timeleft,
-		     long (*gettime_func)(TimeType *, int)
+		     long (*gettime_func)(void *, int)
 			 EVENTLIST_2nd(_nc_eventlist *evl));
 
 /*   A process can only have a single console, so it is safe
@@ -583,7 +583,7 @@ pty_twait(const SCREEN *sp GCC_UNUSED,
 	  int mode GCC_UNUSED,
 	  int milliseconds,
 	  int *timeleft,
-	  long (*gettime_func)(TimeType *, int)
+	  long (*gettime_func)(void *, int)
 	      EVENTLIST_2nd(_nc_eventlist *evl))
 {
 	int result = TW_NONE;
