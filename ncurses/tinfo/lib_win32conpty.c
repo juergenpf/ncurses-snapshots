@@ -113,9 +113,12 @@ encoding_init(void)
 {
 	char *cur_loc = NULL;
 #if USE_WIDEC_SUPPORT
+#if defined(_UCRT)
 	char *newlocale = NULL;
+#endif
 	UINT cp = UTF8_CP;
 #else
+	/* We query the system for the default ANSI code page */
 	WCHAR buf[16];
 	int len = GetLocaleInfoEx(
     		LOCALE_NAME_SYSTEM_DEFAULT,
