@@ -129,6 +129,12 @@ encoding_init(void)
 #else
 	if (len > 0)
 		cp = (UINT)_wtoi(buf);
+	else
+		cp = 1252; /* last line of defense if GetLocaleInfoEx fails is to assume a 
+			    * reasonable default code page, which is the most common ANSI code 
+			    * page on Western systems. This is not ideal, but there isn't much 
+			    * else we can do in this case, and it at least allows the console 
+			    * to function with a reasonable character set in most cases. */
 #endif
 	snprintf(localebuf, sizeof(localebuf), ".%u", cp);
 	cur_loc = setlocale(LC_CTYPE, NULL);
