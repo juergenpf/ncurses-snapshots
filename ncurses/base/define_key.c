@@ -47,11 +47,7 @@ NCURSES_SP_NAME(define_key) (NCURSES_SP_DCLx const char *str, int keycode)
     } else if (keycode > 0) {
 	unsigned ukey = (unsigned) keycode;
 
-#if USE_TERM_DRIVER
-#define CallHasKey(keycode) CallDriver_1(SP_PARM, td_kyExist, keycode)
-#else
 #define CallHasKey(keycode) NCURSES_SP_NAME(has_key)(NCURSES_SP_ARGx keycode)
-#endif
 
 	if (str != NULL) {
 	    NCURSES_SP_NAME(define_key) (NCURSES_SP_ARGx str, 0);

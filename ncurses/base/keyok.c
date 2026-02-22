@@ -53,9 +53,6 @@ NCURSES_SP_NAME(keyok) (NCURSES_SP_DCLx int c, bool flag)
 
     if (HasTerminal(SP_PARM)) {
 	T((T_CALLED("keyok(%p, %d,%d)"), (void *) SP_PARM, c, flag));
-#if USE_TERM_DRIVER
-	code = CallDriver_2(sp, td_kyOk, c, flag);
-#else
 	if (c >= 0) {
 	    int count = 0;
 	    char *s;
@@ -89,7 +86,6 @@ NCURSES_SP_NAME(keyok) (NCURSES_SP_DCLx int c, bool flag)
 		}
 	    }
 	}
-#endif
     }
     returnCode(code);
 }

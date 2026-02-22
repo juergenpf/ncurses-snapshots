@@ -51,9 +51,6 @@ NCURSES_SP_NAME(restartterm) (NCURSES_SP_DCLx
 			      int *errret)
 {
     int result;
-#if USE_TERM_DRIVER
-    TERMINAL *new_term = NULL;
-#endif
 
     START_TRACE();
     T((T_CALLED("restartterm(%p,%s,%d,%p)"),
@@ -67,9 +64,6 @@ NCURSES_SP_NAME(restartterm) (NCURSES_SP_DCLx
     } else if (SP_PARM != NULL) {
 	TTY_FLAGS save_flags = SP_PARM->_tty_flags;
 
-#if USE_TERM_DRIVER
-	SP_PARM->_term = new_term;
-#endif
 	if (save_flags._echo) {
 	    NCURSES_SP_NAME(echo) (NCURSES_SP_ARG);
 	} else {

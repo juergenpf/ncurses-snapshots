@@ -59,6 +59,11 @@
 #include <os2.h>
 #endif
 
+#if defined(_NC_WINDOWS_NATIVE)
+#include <windows.h>
+#include <io.h>
+#endif
+
 #if USE_FUNC_POLL
 # if HAVE_SYS_TIME_H
 #  include <sys/time.h>
@@ -177,6 +182,14 @@ _nc_timed_wait(const SCREEN *sp MAYBE_UNUSED,
     int count;
     int result = TW_NONE;
     TimeType t0;
+
+#if defined(_NC_WINDOWS_NATIVE)
+    /* WIN32_CONPTY specific timeout handling - delegate to specialized function */
+    return WINCONSOLE.twait(sp, mode, milliseconds, timeleft, (long (*)(void *, int))
+_nc_gettime EVENTLIST_2nd(evl));
+    
+#else /* Unix/Linux implementation */
+
 #if (USE_FUNC_POLL || HAVE_SELECT)
     int fd;
 #endif
@@ -518,6 +531,8 @@ _nc_timed_wait(const SCREEN *sp MAYBE_UNUSED,
 	free((char *) fds);
 #endif
 #endif
+
+#endif /* _NC_WINDOWS_NATIVE */
 
     return (result);
 }
