@@ -111,35 +111,39 @@ _nc_currentCONSOLE = &defaultCONSOLE;
 static void
 encoding_init(void)
 {
-	char *cur_loc = NULL;
-#if USE_WIDEC_SUPPORT
 #if defined(_UCRT)
 	char *newlocale = NULL;
 #endif
-	UINT cp = UTF8_CP;
-#else
+	char *cur_loc = NULL;
 	/* We query the system for the default ANSI code page */
 	WCHAR buf[16];
+	char localebuf[16];
+	UINT cp;
 	int len = GetLocaleInfoEx(
     		LOCALE_NAME_SYSTEM_DEFAULT,
     		LOCALE_IDEFAULTANSICODEPAGE,
     		buf,
     		16);
-	UINT cp = (UINT)_wtoi(buf);
-#endif 
+#if USE_WIDEC_SUPPORT
+	cp = UTF8_CP;
+#else
+	if (len > 0)
+		cp = (UINT)_wtoi(buf);
+#endif
+	snprintf(localebuf, sizeof(localebuf), ".%u", cp);
 	cur_loc = setlocale(LC_CTYPE, NULL);
 
 	T((T_CALLED("lib_win32conpty::encoding_init() - code page will be set to %u"), cp));
 	T(("conpty Current locale: %s", cur_loc ? cur_loc : "NULL"));
 #if defined(_UCRT)
 	T(("conpty using UCRT"));
-#if USE_WIDEC_SUPPORT
-	T(("conpty: Try setting locale to .UTF-8 for wide character support"));
-        newlocale=setlocale(LC_CTYPE, ".UTF-8");
+
+	T(("conpty: Try setting locale according to desired codepage %s", localebuf));
+        newlocale=setlocale(LC_CTYPE, localebuf);
 	T(("conpty setlocale() result locale is %s", newlocale ? newlocale : "NULL"));
+
 	cur_loc = setlocale(LC_CTYPE, NULL);
 	T(("conpty Current locale now %s, code page %u", cur_loc ? cur_loc : "NULL", cp));
-#endif /* USE_WIDEC_SUPPORT */
 #else
 	T(("conpty: Not using UCRT - relying on current locale for code page handling"));
 #endif /* defined(_UCRT	) */
