@@ -201,12 +201,8 @@ NCURSES_SP_NAME(newterm) (NCURSES_SP_DCLx
     current = CURRENT_SCREEN;
     its_term = (current ? current->_term : NULL);
 
-#if USE_NAMED_PIPES
-    _setmode(fileno(_ifp), _O_BINARY);
-    _setmode(fileno(_ofp), _O_BINARY);
-#endif
-
     INIT_TERM_DRIVER();
+
     /* this loads the capability entry, then sets LINES and COLS */
     if (
 	   TINFO_SETUP_TERM(&new_term, name,
@@ -351,6 +347,10 @@ NCURSES_SP_NAME(newterm) (NCURSES_SP_DCLx
 	    _nc_initscr(NCURSES_SP_ARG);
 
 	    _nc_signal_handler(TRUE);
+#if USE_NAMED_PIPES || defined(_NC_WINDOWS_NATIVE)
+	    _nc_setmode(fileno(_ifp), true, true);
+    	    _nc_setmode(fileno(_ofp), false, true);
+#endif
 	    result = SP_PARM;
 	}
     }

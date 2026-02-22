@@ -7810,8 +7810,13 @@ main_menu(bool top)
 	 */
 	command = 0;
 	for (;;) {
-	    char ch = '\0';
-	    if (read(fileno(stdin), &ch, (size_t) 1) <= 0) {
+#if USE_WIDEC_SUPPORT
+            wint_t ch = 0;
+            if ( (ch = fgetwc(stdin)) == WEOF) {
+#else
+            char ch = '\0';
+            if (read(fileno(stdin), &ch, (size_t) 1) <= 0) {
+#endif
 		int save_err = errno;
 		perror("\nOOPS");
 		if (save_err == EINTR) {
