@@ -64,6 +64,9 @@ NCURSES_SP_NAME(endwin) (NCURSES_SP_DCL0)
 	    code = ERR;
     }
 
+#if defined(_NC_WINDOWS_NATIVE)
+	code = WINCONSOLE.stop_input_subsystem();
+#endif
     returnCode(code);
 }
 

@@ -92,40 +92,24 @@
 extern "C" {
 #endif
 
-#if defined(CURSES_PRIV_H) || defined(TEST_PRIV_H)
+#define TTY_MODE_UNSPECIFIED 0
+#define TTY_MODE_SHELL 1
+#define TTY_MODE_PROGRAM 2
+// This is our equivalent to termios (aka TTY)
+typedef struct
+{
+    DWORD dwFlagIn;        /* Input Handle Console mode flags */
+    DWORD dwFlagOut;       /* Output Handle Console mode flags */
+    uint8_t kind;          /* 0=unspecified, 1=shell, 2=prog */
+} ConsoleMode;
+
+#if defined(CURSES_PRIV_H) || defined(TEST_PRIV_H) || 1
 
 #if !HAVE_CLOCK_GETTIME && !HAVE_GETTIMEOFDAY
 extern NCURSES_EXPORT(int) _nc_gettimeofday(struct timeval *, void *);
 #undef HAVE_GETTIMEOFDAY
 #define HAVE_GETTIMEOFDAY 2
 #define gettimeofday(tv,tz) _nc_gettimeofday(tv,tz)
-#endif
-
-#endif /* defined(CURSES_PRIV_H) || defined(TEST_PRIV_H) */
-
-#if !HAVE_WCWIDTH
-#undef wcwidth
-#define wcwidth(ucs) _nc_wcwidth((wchar_t)(ucs))
-extern NCURSES_EXPORT(int) _nc_wcwidth(uint32_t);
-#endif
-
-// This is our equivalent to termios (aka TTY)
-typedef struct
-{
-    DWORD dwFlagIn;        /* Input Handle Console mode flags */
-    DWORD dwFlagOut;       /* Output Handle Console mode flags */
-    int InFileMode;        /* The translation mode of the input file */
-    int OutFileMode;       /* The translation mode of the output file */
-    BOOL setfMode;         /* If TRUE, the file mode will be applied in the next SET_TTY call */
-} ConsoleMode;
-
-// This is for future use in an implementation that may make use of the Windows Console API 
-// in a more direct way, and is not intended to be a public documentation at the moment.
-#define NC_CONHOST_FLAG_SUPPORT_EVENTS 0x0001
-#define NC_CONHOST_FLAG_MASK (NC_CONHOST_FLAG_SUPPORT_EVENTS)
-
-#ifndef EVENTLIST_2nd
- #define EVENTLIST_2nd(param) /* nothing */
 #endif
 
 #if USE_WIDEC_SUPPORT && !defined(_UCRT)
@@ -136,40 +120,73 @@ extern NCURSES_EXPORT(size_t) _nc_wchar_to_utf8(wchar_t wc, char utf8[UTF8_MAX_B
 NCURSES_EXPORT(int) _nc_assemble_utf8_input(unsigned char byte, wchar_t *wch);
 #endif /* USE_WIDEC_SUPPORT && !defined(_UCRT) */
 
+// This is for future use in an implementation that may make use of the Windows Console API 
+// in a more direct way, and is not intended to be a public documentation at the moment.
+#define NC_CONHOST_FLAG_SUPPORT_EVENTS 0x0001
+#define NC_CONHOST_FLAG_MASK (NC_CONHOST_FLAG_SUPPORT_EVENTS)
+
+#ifndef EVENTLIST_2nd
+ #define EVENTLIST_2nd(param) /* nothing */
+#endif
+
+// --- Poll-Events ---
+#ifndef POLLIN
+#define POLLIN  0x0001  // Input verfügbar
+#define POLLOUT 0x0004  // Output verfügbar (für stdout/pipe, optional)
+#define POLLERR 0x0008  // Fehler
+#endif
+
+// --- Struktur wie unter UNIX ---
+struct pty_pollfd {
+    int fd;         // nur 0 (STDIN) unterstützt)
+    short events;   // zu prüfende Events
+    short revents;  // zurückgegebene Events
+};
+
+// --- Typ für Anzahl der FDs ---
+typedef unsigned long nfds_t;
+
 typedef struct {
   // Properties
-    BOOL initialized;              /* Whether the console has been initialized */
+    BOOL initialized;                /* Whether the console has been initialized */
 
-    int used_fdIn;                 /* The file descriptor we were initialized with for input */
-    int used_fdOut;                /* The file descriptor we were initialized with for output */ 
-
-    unsigned int conhost_flags;    /* Host configuration flags */
+    unsigned int conhost_flags;      /* Host configuration flags */
     
-    ConsoleMode ttyflags;          /* The desired state of the console  */
+    ConsoleMode ttyflags;            /* The desired state of the console  */
     
-    HANDLE used_input_handle;      /* Console Handle actually used for input operations */
-    HANDLE used_output_handle;     /* Console Handle actually used for output operations */
+    HANDLE ConsoleHandleIn;          /* Console Handle actually used for input operations */
+    HANDLE ConsoleHandleOut;         /* Console Handle actually used for output operations */
 
-    int sbi_lines;                     /* Cached console size */
-    int sbi_cols;                      /* Cached console size */
+    int sbi_lines;                   /* Cached console size */
+    int sbi_cols;                    /* Cached console size */
 
   // Metods
-    BOOL (*init)(int fdOut, int fdIn);                /* Initialize with I/O file descriptors. fdIn maybe -1 in first call */
-    void (*size)(int *Lines, int *Cols);              /* Query console size. Safe to be called before init */ 
-    BOOL (*check_resize)(void);                       /* Return TRUE if the console has been resized */
-    int (*setmode)(int fd, const ConsoleMode *arg);   /* Our SET_TTY implementation */
-    int (*getmode)(int fd, ConsoleMode *arg);         /* Our GET_TTY implementation */
-    int (*defmode )(ConsoleMode *arg, BOOL isShell);  /* Used by shell-/prog-mode handling to manage file mides of the I/O streams */
-    int (*flush)(int fd);                             /* flush the console I/O stream denoted by the file descriptor */
-    int (*read)(const SCREEN *sp, int *result);       /* Read bytes from the input stream. If wide characters are used, the UTF-8 assembly is done here */
-    /* We need our special implementation of twait, because Windows has a totally different approach
-       to async I/O than UNIX typically does with the poll/select mechanism */
-    int (*twait)(const SCREEN *sp, int mode, int milliseconds, int *timeleft, long (*gettime_func)(void *, int) EVENTLIST_2nd(_nc_eventlist *evl));
+    BOOL (*init)(int fdOut, int fdIn);                   /* Initialize with I/O file descriptors. fdIn maybe -1 in first call */
+    void (*size)(int *Lines, int *Cols);                 /* Query console size. Safe to be called before init */ 
+    BOOL (*check_resize)(void);                          /* Return TRUE if the console has been resized */
+    int (*setmode)(int fd, const ConsoleMode *arg);      /* Our SET_TTY implementation */
+    int (*getmode)(int fd, ConsoleMode *arg);            /* Our GET_TTY implementation */
+    int (*defmode )(ConsoleMode *arg, BOOL isShell);     /* Used by shell-/prog-mode handling to manage file mides of the I/O streams */
+    int (*flush)(int fd);                                /* flush the console I/O stream denoted by the file descriptor */
+    int (*read)(const SCREEN *sp, int *result);          /* Read bytes from the input stream. If wide characters are used, the UTF-8 assembly is done here */
+    int (*write)(int fd, const void *buf, size_t count); /* Write bytes to the output stream. If wide characters are used, the UTF-8 encoding is done here */
+    int (*start_input_subsystem)(void);                  /* In prog mode, we control the input stream */
+    int (*stop_input_subsystem)(void);                   /* In shell mode, we leave it to the C runtime */
+    /* No, not the full poll. Just the signature and a minimal implementation to poll the console input stream */
+    int (*poll)(struct pty_pollfd *fds, nfds_t nfds, int timeout_ms); 
   } ConsoleInfo;
 
 // Guaranteed to be statically initialzed.
 extern NCURSES_EXPORT_VAR(ConsoleInfo*) _nc_currentCONSOLE;
 #define WINCONSOLE (*_nc_currentCONSOLE)
+
+#endif /* defined(CURSES_PRIV_H) || defined(TEST_PRIV_H) */
+
+#if !HAVE_WCWIDTH
+#undef wcwidth
+#define wcwidth(ucs) _nc_wcwidth((wchar_t)(ucs))
+extern NCURSES_EXPORT(int) _nc_wcwidth(uint32_t);
+#endif
 
 #ifdef __cplusplus
 }

@@ -96,6 +96,12 @@ initscr(void)
 		    " ($TERM=\"%s\"); exiting\n", name);
 	    ExitProgram(EXIT_FAILURE);
 	}
+#if defined(_NC_WINDOWS_NATIVE)
+	if (WINCONSOLE.start_input_subsystem() == ERR) {
+	    fprintf(stderr, "ncurses: failed to initialize Windows Pseudo-Console input system; exiting\n");
+	    ExitProgram(EXIT_FAILURE);
+	}
+#endif
 
 	/* def_shell_mode - done in newterm/_nc_setupscreen */
 #if NCURSES_SP_FUNCS

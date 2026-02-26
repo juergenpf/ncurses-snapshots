@@ -62,6 +62,10 @@ ospeed = 0; /* used by termcap library */
 NCURSES_EXPORT_VAR(int)
 _nc_nulls_sent = 0;
 
+#if defined(_NC_WINDOWS_NATIVE)
+#define write(fd,buf,len) WINCONSOLE.write(fd, buf, len)
+#endif
+
 #if NCURSES_NO_PADDING
 NCURSES_EXPORT(void)
 _nc_set_no_padding(SCREEN *sp)

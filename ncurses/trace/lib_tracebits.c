@@ -240,32 +240,17 @@ _nc_trace_ttymode(const TTY * tty)
 	DATA(ENABLE_AUTO_POSITION),
 	DATA(ENABLE_VIRTUAL_TERMINAL_INPUT)
     };
-    static const BITNAMES fileModes[] =
-    {
-	DATA(_O_TEXT),
-	DATA(_O_BINARY),
-	DATA(_O_WTEXT),
-	DATA(_O_U16TEXT),
-	DATA(_O_U8TEXT)
-    };
 	
     buf = _nc_trace_buf(0,
                         14 + sizeof(dwFlagsOut) +
                         14 + sizeof(dwFlagsIn)  +
-			14 + sizeof(fileModes   + 
-			24));
+						24);
     if (buf != NULL) {
 	_nc_STRCAT(buf, "\n", TRACE_BUF_SIZE(0));
         lookup_bits(buf, dwFlagsIn, "dwFlagIn", tty->dwFlagIn);
 	_nc_STRCAT(buf, "\n", TRACE_BUF_SIZE(0));
         lookup_bits(buf, dwFlagsOut, "dwFlagOut", tty->dwFlagOut);
 	_nc_STRCAT(buf, "\n", TRACE_BUF_SIZE(0));
-	lookup_bits(buf, fileModes , "InFileMode", (tty->InFileMode));
-	_nc_STRCAT(buf, "\n", TRACE_BUF_SIZE(0));
-	lookup_bits(buf, fileModes , "OutFileMode", (tty->OutFileMode));
-	_nc_STRCAT(buf, "\n", TRACE_BUF_SIZE(0));
-	_nc_STRCAT(buf, ", setfMode=", TRACE_BUF_SIZE(0));
-	_nc_STRCAT(buf, tty->setfMode ? "TRUE" : "FALSE", TRACE_BUF_SIZE(0));
     }
  #else
     /* reference: ttcompat(4M) on SunOS 4.1 */

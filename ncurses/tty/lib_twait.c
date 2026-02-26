@@ -142,16 +142,15 @@ _nc_eventlist_timeout(_nc_eventlist * evl)
 }
 #endif /* NCURSES_WGETCH_EVENTS */
 
-#if (USE_FUNC_POLL || HAVE_SELECT)
+#if (USE_FUNC_POLL || HAVE_SELECT || defined(_NC_WINDOWS_NATIVE))
 #  define MAYBE_UNUSED
 #else
 #  define MAYBE_UNUSED GCC_UNUSED
 #endif
 
-#if (USE_FUNC_POLL || HAVE_SELECT)
-#  define MAYBE_UNUSED
-#else
-#  define MAYBE_UNUSED GCC_UNUSED
+#if defined(_NC_WINDOWS_NATIVE)
+#define pollfd pty_pollfd
+#define poll WINCONSOLE.poll
 #endif
 
 /*
@@ -183,14 +182,8 @@ _nc_timed_wait(const SCREEN *sp MAYBE_UNUSED,
     int result = TW_NONE;
     TimeType t0;
 
-#if defined(_NC_WINDOWS_NATIVE)
-    /* WIN32_CONPTY specific timeout handling - delegate to specialized function */
-    return WINCONSOLE.twait(sp, mode, milliseconds, timeleft, (long (*)(void *, int))
-_nc_gettime EVENTLIST_2nd(evl));
-    
-#else /* Unix/Linux implementation */
 
-#if (USE_FUNC_POLL || HAVE_SELECT)
+#if (USE_FUNC_POLL || HAVE_SELECT || defined(_NC_WINDOWS_NATIVE))
     int fd;
 #endif
 
@@ -199,7 +192,7 @@ _nc_gettime EVENTLIST_2nd(evl));
     int n;
 #endif
 
-#if USE_FUNC_POLL
+#if USE_FUNC_POLL || defined(_NC_WINDOWS_NATIVE)
 #define MIN_FDS 2
     struct pollfd fd_list[MIN_FDS];
     struct pollfd *fds = fd_list;
@@ -248,7 +241,7 @@ _nc_gettime EVENTLIST_2nd(evl));
 	evl->result_flags = 0;
 #endif
 
-#if USE_FUNC_POLL
+#if USE_FUNC_POLL || defined(_NC_WINDOWS_NATIVE)
     memset(fd_list, 0, sizeof(fd_list));
 
 #ifdef NCURSES_WGETCH_EVENTS
@@ -499,7 +492,7 @@ _nc_gettime EVENTLIST_2nd(evl));
     if (result != 0) {
 	if (result > 0) {
 	    result = 0;
-#if USE_FUNC_POLL
+#if USE_FUNC_POLL || defined(_NC_WINDOWS_NATIVE)
 	    for (count = 0; count < MIN_FDS; count++) {
 		if ((mode & (1 << count))
 		    && (fds[count].revents & POLLIN)) {
@@ -525,14 +518,12 @@ _nc_gettime EVENTLIST_2nd(evl));
 	result |= TW_EVENT;
 #endif
 
-#if USE_FUNC_POLL
+#if USE_FUNC_POLL || defined(_NC_WINDOWS_NATIVE)
 #ifdef NCURSES_WGETCH_EVENTS
     if (fds != fd_list)
 	free((char *) fds);
 #endif
 #endif
-
-#endif /* _NC_WINDOWS_NATIVE */
 
     return (result);
 }
