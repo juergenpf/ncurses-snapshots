@@ -265,7 +265,7 @@ fifo_push(SCREEN *sp EVENTLIST_2nd(_nc_eventlist * evl))
     {				/* Can block... */
 #if defined(_NC_WINDOWS_NATIVE)
 	/* Use UTF-8 assembly for WIN32_CONPTY */
-	n = WINCONSOLE.read(sp, &ch);
+	n = WINCONSOLE.read(sp->_ifd, &ch);
 #else
 	unsigned char c2 = 0;
 

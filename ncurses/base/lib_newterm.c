@@ -94,6 +94,7 @@ _nc_initscr(NCURSES_SP_DCL0)
 		| ENABLE_PROCESSED_OUTPUT 
 		| ENABLE_WRAP_AT_EOL_OUTPUT 
 		| DISABLE_NEWLINE_AUTO_RETURN);
+		buf.kind = TTY_MODE_PROGRAM;
 #else
 	memset(&buf, 0, sizeof(buf));
 #endif

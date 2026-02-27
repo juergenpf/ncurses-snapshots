@@ -63,10 +63,6 @@ NCURSES_SP_NAME(endwin) (NCURSES_SP_DCL0)
 	if (NCURSES_SP_NAME(reset_shell_mode) (NCURSES_SP_ARG) == ERR)
 	    code = ERR;
     }
-
-#if defined(_NC_WINDOWS_NATIVE)
-	code = WINCONSOLE.stop_input_subsystem();
-#endif
     returnCode(code);
 }
 

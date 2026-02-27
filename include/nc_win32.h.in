@@ -95,12 +95,13 @@ extern "C" {
 #define TTY_MODE_UNSPECIFIED 0
 #define TTY_MODE_SHELL 1
 #define TTY_MODE_PROGRAM 2
+#define TTY_MODE_AUTO 3
 // This is our equivalent to termios (aka TTY)
 typedef struct
 {
     DWORD dwFlagIn;        /* Input Handle Console mode flags */
     DWORD dwFlagOut;       /* Output Handle Console mode flags */
-    uint8_t kind;          /* 0=unspecified, 1=shell, 2=prog */
+    uint8_t kind;          /* 0=unspecified, 1=shell, 2=prog, 3=auto */
 } ConsoleMode;
 
 #if defined(CURSES_PRIV_H) || defined(TEST_PRIV_H) || 1
@@ -166,9 +167,9 @@ typedef struct {
     BOOL (*check_resize)(void);                          /* Return TRUE if the console has been resized */
     int (*setmode)(int fd, const ConsoleMode *arg);      /* Our SET_TTY implementation */
     int (*getmode)(int fd, ConsoleMode *arg);            /* Our GET_TTY implementation */
-    int (*defmode )(ConsoleMode *arg, BOOL isShell);     /* Used by shell-/prog-mode handling to manage file mides of the I/O streams */
+    int (*defmode )(ConsoleMode *arg, short kind);       /* Used by shell-/prog-mode handling to manage start/stop of the I/O subsystem of ncurses */
     int (*flush)(int fd);                                /* flush the console I/O stream denoted by the file descriptor */
-    int (*read)(const SCREEN *sp, int *result);          /* Read bytes from the input stream. If wide characters are used, the UTF-8 assembly is done here */
+    int (*read)(int fd, int *result);                    /* Read bytes from the input stream. If wide characters are used, the UTF-8 assembly is done here */
     int (*write)(int fd, const void *buf, size_t count); /* Write bytes to the output stream. If wide characters are used, the UTF-8 encoding is done here */
     int (*start_input_subsystem)(void);                  /* In prog mode, we control the input stream */
     int (*stop_input_subsystem)(void);                   /* In shell mode, we leave it to the C runtime */

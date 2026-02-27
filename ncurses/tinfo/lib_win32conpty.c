@@ -48,21 +48,22 @@ MODULE_ID("$Id$")
 #include <wchar.h>
 #endif
 
-// Prototypes of static function we want to use in initializers
-static BOOL pty_init(int fdOut, int fdIn);
-static void pty_size(int *Lines, int *Cols);
-static BOOL pty_check_resize(void);
-static int pty_setmode(int fd, const TTY *arg);
-static int pty_getmode(int fd, TTY *arg);
-static int pty_defmode(TTY *arg, BOOL isShell);
-static int pty_flush(int fd);
-static int pty_read(const SCREEN *sp, int *result);
-static int pty_write(int fd, const void *buf, size_t count);
-static int start_input_subsystem(void);
-static int stop_input_subsystem(void);
-static int pty_poll(struct pty_pollfd *fds, nfds_t nfds, int timeout_ms);
+#define DispatchMethod(name) pty_##name
+#define METHOD(name,type) static type DispatchMethod(name)
 
-static unsigned __stdcall input_thread(LPVOID param);
+// Prototypes of static function we want to use in initializers
+METHOD(init,BOOL)(int fdOut, int fdIn);
+METHOD(size,void)(int *Lines, int *Cols);
+METHOD(check_resize,BOOL)(void);
+METHOD(setmode,int)(int fd, const TTY *arg);
+METHOD(getmode,int)(int fd, TTY *arg);
+METHOD(defmode,int)(TTY *arg, short kind);
+METHOD(flush,int)(int fd);
+METHOD(read,int)(int fd, int *result);
+METHOD(write,int)(int fd, const void *buf, size_t count);
+METHOD(start_input_subsystem,int)(void);
+METHOD(stop_input_subsystem,int)(void);
+METHOD(poll,int)(struct pty_pollfd *fds, nfds_t nfds, int timeout_ms);
 
 /*   A process can only have a single console, so it is safe
 	 to maintain all the information about it in a single
@@ -71,23 +72,24 @@ static unsigned __stdcall input_thread(LPVOID param);
 static ConsoleInfo defaultCONSOLE = {
     .initialized = FALSE,
     .conhost_flags = 0,
-    .ttyflags = {0, 0, 0},
+    .ttyflags = {0, 0, TTY_MODE_UNSPECIFIED},
     .ConsoleHandleIn = INVALID_HANDLE_VALUE,
     .ConsoleHandleOut = INVALID_HANDLE_VALUE,
     .sbi_lines = -1,
     .sbi_cols = -1,
-    .init = pty_init,
-    .size = pty_size,
-    .check_resize = pty_check_resize,
-    .setmode = pty_setmode,
-    .getmode = pty_getmode,
-    .defmode = pty_defmode,
-    .flush = pty_flush,
-    .read = pty_read,
-    .write = pty_write,
-    .start_input_subsystem = start_input_subsystem,
-	.stop_input_subsystem = stop_input_subsystem,
-	.poll = pty_poll
+
+	.init = DispatchMethod(init),
+    .size = DispatchMethod(size),
+    .check_resize = DispatchMethod(check_resize),
+    .setmode = DispatchMethod(setmode),
+    .getmode = DispatchMethod(getmode),
+    .defmode = DispatchMethod(defmode),
+    .flush = DispatchMethod(flush),
+    .read = DispatchMethod(read),
+    .write = DispatchMethod(write),
+    .start_input_subsystem = DispatchMethod(start_input_subsystem),
+	.stop_input_subsystem  = DispatchMethod(stop_input_subsystem),
+	.poll = DispatchMethod(poll)
 };
 
 /*
@@ -133,6 +135,9 @@ static HANDLE g_input_available_event = NULL; // Signal: "Daten liegen im Ringbu
 static HANDLE g_shutdown_event = NULL;        // Signal: "System beenden"
 // Our handle is always the consoles input handle.
 #define g_stdin_handle defaultCONSOLE.ConsoleHandleIn
+
+/* Forward declaration of the input reader thread */
+static unsigned __stdcall input_thread(LPVOID param);
 
 // ---------------------------------------------------------------------------------------
 
@@ -324,8 +329,7 @@ which is a requirement for the Windows Console backend of ncurses. This is becau
 ConPTY, the Windows Console does not provide the necessary capabilities for ncurses and
 escpecially the terminfo layer to function properly.
 */
-static BOOL
-pty_init(int fdOut, int fdIn)
+METHOD(init,BOOL)(int fdOut, int fdIn)
 {
 	BOOL result = FALSE;
 	BOOL check;
@@ -454,15 +458,14 @@ pty_init(int fdOut, int fdIn)
  * This provides SIGWINCH-like functionality for Windows ConPTY.
  * Returns TRUE if a resize was detected.
  */
-static BOOL
-pty_check_resize(void)
+METHOD(check_resize,BOOL)(void)	
 {
 	int current_lines, current_cols;
 	bool resized = FALSE;
 
 	T((T_CALLED("lib_win32conpty::pty_check_resize()")));
 
-	pty_size(&current_lines, &current_cols);
+	DispatchMethod(size)(&current_lines, &current_cols);
 
 	if (defaultCONSOLE.sbi_lines == -1 || defaultCONSOLE.sbi_cols == -1)
 	{
@@ -494,8 +497,7 @@ pty_check_resize(void)
  * This method can be safely called before the Console is initialized,
  * because we can fallback to query the standard handles.x
  */
-static void
-pty_size(int *Lines, int *Cols)
+METHOD(size,void)(int *Lines, int *Cols)
 {
 	T((T_CALLED("lib_win32conpty::pty_size(lines=%p, cols=%p)"), Lines, Cols));
 
@@ -544,8 +546,7 @@ pty_size(int *Lines, int *Cols)
 * input. We initialize the necessary synchronization primitives and start the input thread, 
 * which will block on reading from the console input handle.
 */
-static int 
-start_input_subsystem(void)
+METHOD(start_input_subsystem,int)(void)	
 {
 	T((T_CALLED("lib_win32conpty::start_input_subsystem()")));
 	if (g_input_thread != NULL) 
@@ -593,8 +594,7 @@ start_input_subsystem(void)
 * We then wait for the thread to exit. Finally, we clean up all the resources and reset the 
 * global variables to their initial state.
 */
-static int 
-stop_input_subsystem(void)
+METHOD(stop_input_subsystem,int)(void)
 {
 	T((T_CALLED("lib_win32conpty::stop_input_subsystem()")));
 	if (g_input_thread==NULL) 
@@ -826,8 +826,7 @@ poll_input(DWORD timeout_ms)
  * to the original UNIX based des, and we can also support the standard ncurses polling 
  * mechanism in a way that is consistent with the rest of the Windows Console backend design.
  */
-static int 
-pty_poll(struct pty_pollfd *fds, nfds_t nfds, int timeout_ms) 
+METHOD(poll,int)(struct pty_pollfd *fds, nfds_t nfds, int timeout_ms) 
 {
 	T((T_CALLED("lib_win32conpty::pty_poll(fds=%p, nfds=%zu, timeout_ms=%d)"), fds, nfds, timeout_ms));
 
@@ -852,12 +851,11 @@ pty_poll(struct pty_pollfd *fds, nfds_t nfds, int timeout_ms)
  * blocks until input is available, and then it returns the byte that was read. If there is an 
  * error, it returns -1.
  */
-static int
-pty_read(const SCREEN *sp, int *result)
+METHOD(read,int)(int fd GCC_UNUSED, int *result)
 {
 	uint8_t byte;
 
-	T((T_CALLED("lib_win32conpty::pty_read(SCREEN*=%p, result=%p)"), sp, result));
+	T((T_CALLED("lib_win32conpty::pty_read(fd=%d, result=%p)"), fd, result));
 
 	if (!result)
 		return -1;
@@ -884,7 +882,7 @@ pty_read(const SCREEN *sp, int *result)
  * wants to write output to the console. The function takes a buffer and a count of bytes to 
  * write, and it returns the number of bytes that were actually written, or -1 on error.
  */
-static int pty_write(int fd GCC_UNUSED, const void *buf, size_t count)
+METHOD(write,int)(int fd GCC_UNUSED, const void *buf, size_t count)
 {
 	HANDLE hOut = defaultCONSOLE.ConsoleHandleOut;
 	DWORD written = 0;
@@ -904,8 +902,7 @@ static int pty_write(int fd GCC_UNUSED, const void *buf, size_t count)
  * This function flushes the console input buffer. It is called by the main thread when it 
  * wants to discard any pending input in the console. The function returns OK on success.
  */
-static int
-pty_flush(int fd GCC_UNUSED)
+METHOD(flush,int)(int fd GCC_UNUSED)
 {
 	int code = OK;
 	T((T_CALLED("lib_win32conpty::pty_flush(fd=%d)"), fd));
@@ -920,8 +917,7 @@ pty_flush(int fd GCC_UNUSED)
  * It is also responsible for detecting switches between shell mode and program mode, and starting or 
  * stopping the input subsystem accordingly.
  */
-static int
-pty_setmode(int fd GCC_UNUSED, const TTY *arg)
+METHOD(setmode,int)(int fd GCC_UNUSED, const TTY *arg)
 {
 	HANDLE input_target = defaultCONSOLE.ConsoleHandleIn;
 	HANDLE output_target = defaultCONSOLE.ConsoleHandleOut;
@@ -1004,12 +1000,12 @@ pty_setmode(int fd GCC_UNUSED, const TTY *arg)
 	if (arg->kind == TTY_MODE_SHELL)
 	{
 		T(("Shell mode set"));
-		stop_input_subsystem();
+		DispatchMethod(stop_input_subsystem)();
 	}
 	else if (arg->kind == TTY_MODE_PROGRAM)
 	{
 		T(("Program mode set"));
-		start_input_subsystem();
+		DispatchMethod(start_input_subsystem)();
 	}
 
 	// Handle errors
@@ -1029,26 +1025,29 @@ pty_setmode(int fd GCC_UNUSED, const TTY *arg)
 * expensive and may cause issues with some C runtimes on Windows if called too frequently or 
 * with incompatible modes.
 */
-static int
-pty_defmode(TTY *arg, BOOL isShell)
+METHOD(defmode,int)(TTY *arg, short kind)
 {
-	T((T_CALLED("lib_win32conpty::pty_defmode(TTY*=%p, isShell=%d)"), arg, isShell));
+	short realMode = kind;
+
+	T((T_CALLED("lib_win32conpty::pty_defmode(TTY*=%p, kind=%d)"), arg, kind));
 
 	if (NULL == arg)
 		returnCode(ERR);
 
-	if (isShell)
+	if (realMode == TTY_MODE_AUTO)
+		realMode = (g_input_thread != NULL) ? TTY_MODE_PROGRAM : TTY_MODE_SHELL;
+
+	if (realMode == TTY_MODE_SHELL)
 	{
 		arg->dwFlagIn &= ~(ENABLE_VIRTUAL_TERMINAL_INPUT);
 		arg->dwFlagOut |= ENABLE_VIRTUAL_TERMINAL_PROCESSING;
-		arg->kind = TTY_MODE_SHELL;
 	}
-	else
+	else if (realMode == TTY_MODE_PROGRAM)
 	{
 		arg->dwFlagIn |= ENABLE_VIRTUAL_TERMINAL_INPUT;
 		arg->dwFlagOut |= ENABLE_VIRTUAL_TERMINAL_PROCESSING;
-		arg->kind = TTY_MODE_PROGRAM;
 	}
+	arg->kind = realMode;
 	returnCode(OK);
 }
 
@@ -1061,8 +1060,7 @@ pty_defmode(TTY *arg, BOOL isShell)
 * By that approach the Windows specific filemode handling is finally reduced to the calls
 * in the lib_ttyflag.c functions. 
 */
-static int
-pty_getmode(int fd GCC_UNUSED, TTY *arg)
+METHOD(getmode,int)(int fd GCC_UNUSED, TTY *arg)
 {
 	T((T_CALLED("lib_win32conpty::pty_getmode(fd=%d, TTY*=%p)"), fd, arg));
 
