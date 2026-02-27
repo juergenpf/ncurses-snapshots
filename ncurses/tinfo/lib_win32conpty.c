@@ -157,18 +157,18 @@ encoding_init(void)
 	char *newlocale = NULL;
 #endif
 	char *cur_loc = NULL;
-	/* We query the system for the default ANSI code page */
-	WCHAR buf[16];
 	char localebuf[16];
 	UINT cp;
+#if USE_WIDEC_SUPPORT
+	cp = UTF8_CP;
+#else
+	WCHAR buf[16];
+	/* We query the system for the default ANSI code page */
 	int len = GetLocaleInfoEx(
     		LOCALE_NAME_SYSTEM_DEFAULT,
     		LOCALE_IDEFAULTANSICODEPAGE,
     		buf,
     		16);
-#if USE_WIDEC_SUPPORT
-	cp = UTF8_CP;
-#else
 	if (len > 0)
 		cp = (UINT)_wtoi(buf);
 	else
@@ -195,9 +195,11 @@ encoding_init(void)
 #else
 	T(("conpty: Not using UCRT - relying on current locale for code page handling"));
 #endif /* defined(_UCRT	) */
+	
 	SetConsoleCP(cp);
 	SetConsoleOutputCP(cp);
 }
+
 
 #define REQUIRED_MAJOR_V (DWORD)10
 #define REQUIRED_MINOR_V (DWORD)0
@@ -574,7 +576,7 @@ METHOD(start_input_subsystem,int)(void)
 
 	InitializeCriticalSection(&g_input_buffer.lock);
 
-    g_input_thread =(HANDLE) _beginthreadex(NULL, 0, input_thread, &g_input_buffer, 0, NULL);
+    g_input_thread =(HANDLE)(uintptr_t) _beginthreadex(NULL, 0, input_thread, &g_input_buffer, 0, NULL);
 	if (g_input_thread == NULL) 
 	{
 		CloseHandle(g_read_request_event);
@@ -645,10 +647,11 @@ METHOD(stop_input_subsystem,int)(void)
 static int 
 input_available_count(InputBuffer *pbuf) 
 {
+	int avail;
 	T((T_CALLED("lib_win32conpty::input_available_count(pbuf=%p)"), pbuf));
 	assert(g_input_thread != NULL);
     EnterCriticalSection(&pbuf->lock);
-    int avail = (pbuf->head - pbuf->tail + INPUT_BUFFER_SIZE) % INPUT_BUFFER_SIZE;
+    avail = (pbuf->head - pbuf->tail + INPUT_BUFFER_SIZE) % INPUT_BUFFER_SIZE;
     LeaveCriticalSection(&pbuf->lock);
 	returnCode(avail);
 }
@@ -706,9 +709,9 @@ input_thread(LPVOID param)
     InputBuffer *pbuf = (InputBuffer*)param;
     uint8_t tmp[256];
     DWORD n;
+    HANDLE wait_handles[2] = { g_shutdown_event, g_read_request_event };
 
 	T((T_CALLED("lib_win32conpty::input_thread(param=%p)"), param));
-    HANDLE wait_handles[2] = { g_shutdown_event, g_read_request_event };
 
     while (1) {
         DWORD r = WaitForMultipleObjects(2, wait_handles, FALSE, INFINITE);
@@ -748,8 +751,8 @@ input_thread(LPVOID param)
  * could be useful for future extensions or for other parts of the code that want to 
  * check for input without blocking.
  */
-static int 
-get_byte_nonblocking(void) 
+GCC_UNUSED static int 
+get_byte_nonblocking(void)
 {
 	uint8_t byte;
 	T((T_CALLED("lib_win32conpty::get_byte_nonblocking()")));
@@ -835,7 +838,7 @@ METHOD(poll,int)(struct pty_pollfd *fds, nfds_t nfds, int timeout_ms)
 {
 	int code=-1;
 
-	T((T_CALLED("lib_win32conpty::pty_poll(fds=%p, nfds=%zu, timeout_ms=%d)"), fds, nfds, timeout_ms));
+	T((T_CALLED("lib_win32conpty::pty_poll(fds=%p, nfds=%u, timeout_ms=%d)"), fds, (unsigned)nfds, timeout_ms));
 	assert(g_input_thread != NULL && g_stdin_handle != INVALID_HANDLE_VALUE);
 	
 	if (g_input_thread == NULL || g_stdin_handle == INVALID_HANDLE_VALUE)
@@ -890,7 +893,13 @@ METHOD(write,int)(int fd GCC_UNUSED, const void *buf, size_t count)
 	HANDLE hOut = defaultCONSOLE.ConsoleHandleOut;
 	DWORD written = 0;
 
-	T((T_CALLED("lib_win32conpty::pty_write(fd=%d, buf=%p, count=%zu)"), fd, buf, count));
+	T((T_CALLED("lib_win32conpty::pty_write(fd=%d, buf=%p, count=%u)"), fd, buf, (unsigned)count));
+	
+	if (hOut == INVALID_HANDLE_VALUE)
+		return -1;
+	
+	if (!buf || count == 0)
+		return 0;
 
 	if (!WriteFile(hOut, buf, (DWORD)count, &written, NULL))
 	{
