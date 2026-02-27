@@ -884,7 +884,6 @@ pty_read(const SCREEN *sp, int *result)
  * wants to write output to the console. The function takes a buffer and a count of bytes to 
  * write, and it returns the number of bytes that were actually written, or -1 on error.
  */
-*/
 static int pty_write(int fd GCC_UNUSED, const void *buf, size_t count)
 {
 	HANDLE hOut = defaultCONSOLE.ConsoleHandleOut;
