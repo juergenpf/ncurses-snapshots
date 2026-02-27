@@ -132,16 +132,16 @@ NCURSES_EXPORT(int) _nc_assemble_utf8_input(unsigned char byte, wchar_t *wch);
 
 // --- Poll-Events ---
 #ifndef POLLIN
-#define POLLIN  0x0001  // Input verfügbar
-#define POLLOUT 0x0004  // Output verfügbar (für stdout/pipe, optional)
-#define POLLERR 0x0008  // Fehler
+#define POLLIN  0x0001  // Input available (for stdin/pipe)
+#define POLLOUT 0x0004  // Output available (for stdout/pipe, optional)
+#define POLLERR 0x0008  // Error condition (for stdin/pipe)
 #endif
 
-// --- Struktur wie unter UNIX ---
+// --- Structure similar to UNIX ---
 struct pty_pollfd {
-    int fd;         // nur 0 (STDIN) unterstützt)
-    short events;   // zu prüfende Events
-    short revents;  // zurückgegebene Events
+    int fd;         // only 0 (STDIN) supported)
+    short events;   // events to check
+    short revents;  // returned events
 };
 
 // --- Typ für Anzahl der FDs ---
@@ -162,19 +162,18 @@ typedef struct {
     int sbi_cols;                    /* Cached console size */
 
   // Metods
-    BOOL (*init)(int fdOut, int fdIn);                   /* Initialize with I/O file descriptors. fdIn maybe -1 in first call */
-    void (*size)(int *Lines, int *Cols);                 /* Query console size. Safe to be called before init */ 
-    BOOL (*check_resize)(void);                          /* Return TRUE if the console has been resized */
-    int (*setmode)(int fd, const ConsoleMode *arg);      /* Our SET_TTY implementation */
-    int (*getmode)(int fd, ConsoleMode *arg);            /* Our GET_TTY implementation */
-    int (*defmode )(ConsoleMode *arg, short kind);       /* Used by shell-/prog-mode handling to manage start/stop of the I/O subsystem of ncurses */
-    int (*flush)(int fd);                                /* flush the console I/O stream denoted by the file descriptor */
-    int (*read)(int fd, int *result);                    /* Read bytes from the input stream. If wide characters are used, the UTF-8 assembly is done here */
-    int (*write)(int fd, const void *buf, size_t count); /* Write bytes to the output stream. If wide characters are used, the UTF-8 encoding is done here */
-    int (*start_input_subsystem)(void);                  /* In prog mode, we control the input stream */
-    int (*stop_input_subsystem)(void);                   /* In shell mode, we leave it to the C runtime */
-    /* No, not the full poll. Just the signature and a minimal implementation to poll the console input stream */
-    int (*poll)(struct pty_pollfd *fds, nfds_t nfds, int timeout_ms); 
+    BOOL (*init)(int fdOut, int fdIn);                                /* Initialize with I/O file descriptors. fdIn maybe -1 in first call */
+    void (*size)(int *Lines, int *Cols);                              /* Query console size. Safe to be called before init */ 
+    BOOL (*check_resize)(void);                                       /* Return TRUE if the console has been resized */
+    int (*setmode)(int fd, const ConsoleMode *arg);                   /* Our SET_TTY implementation */
+    int (*getmode)(int fd, ConsoleMode *arg);                         /* Our GET_TTY implementation */
+    int (*defmode )(ConsoleMode *arg, short kind);                    /* Used by shell-/prog-mode handling to manage start/stop of the I/O subsystem of ncurses */
+    int (*flush)(int fd);                                             /* flush the console I/O stream denoted by the file descriptor */
+    int (*read)(int fd, int *result);                                 /* Read bytes from the input stream. If wide characters are used, the UTF-8 assembly is done here */
+    int (*write)(int fd, const void *buf, size_t count);              /* Write bytes to the output stream. If wide characters are used, the UTF-8 encoding is done here */
+    int (*start_input_subsystem)(void);                               /* In prog mode, we control the input stream */
+    int (*stop_input_subsystem)(void);                                /* In shell mode, we leave it to the C runtime */
+    int (*poll)(struct pty_pollfd *fds, nfds_t nfds, int timeout_ms); /* Minimalistic clone of UNIX poll, just polling stdin console input */
   } ConsoleInfo;
 
 // Guaranteed to be statically initialzed.

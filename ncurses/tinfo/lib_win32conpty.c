@@ -744,6 +744,9 @@ input_thread(LPVOID param)
  * It is called by the main thread when it wants to read input that has been stored
  * in the buffer by the input thread. The function returns immediately if no input
  * is available.
+ * It is here fur mere completeness, the ncurses code actually doesn't use it, but it 
+ * could be useful for future extensions or for other parts of the code that want to 
+ * check for input without blocking.
  */
 static int 
 get_byte_nonblocking(void) 
@@ -832,7 +835,7 @@ METHOD(poll,int)(struct pty_pollfd *fds, nfds_t nfds, int timeout_ms)
 
 	int code = -1;
 	// We only support polling stdin
-    if (nfds != 1 || fds[0].fd != 0) 
+    if (nfds != 1 || fds[0].fd != fileno(stdin)) 
 		return -1;;
 
 	code = poll_input(timeout_ms);
