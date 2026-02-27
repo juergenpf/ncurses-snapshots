@@ -828,24 +828,31 @@ poll_input(DWORD timeout_ms)
  * We implement it that way, so that we can use it in module lib_twait.c with minimal changes 
  * to the original UNIX based des, and we can also support the standard ncurses polling 
  * mechanism in a way that is consistent with the rest of the Windows Console backend design.
+ * 
+ * The basic assumption is, that this will only be called when in prog mode.
  */
 METHOD(poll,int)(struct pty_pollfd *fds, nfds_t nfds, int timeout_ms) 
 {
-	T((T_CALLED("lib_win32conpty::pty_poll(fds=%p, nfds=%zu, timeout_ms=%d)"), fds, nfds, timeout_ms));
+	int code=-1;
 
-	int code = -1;
+	T((T_CALLED("lib_win32conpty::pty_poll(fds=%p, nfds=%zu, timeout_ms=%d)"), fds, nfds, timeout_ms));
+	assert(g_input_thread != NULL && g_stdin_handle != INVALID_HANDLE_VALUE);
+	
+	if (g_input_thread == NULL || g_stdin_handle == INVALID_HANDLE_VALUE)
+		returnCode(code);
+
 	// We only support polling stdin
     if (nfds != 1 || fds[0].fd != fileno(stdin)) 
-		return -1;;
+		returnCode(code);
 
 	code = poll_input(timeout_ms);
 	if (code < 0)
-		return -1;
-	if (code == 0)
+		returnCode(code);
+	if (code == 0) 
 		fds[0].revents = 0;
 	else
 		fds[0].revents = POLLIN;
-	return 1;
+	returnCode(code);
 }
 
 /**
@@ -853,30 +860,23 @@ METHOD(poll,int)(struct pty_pollfd *fds, nfds_t nfds, int timeout_ms)
  * it wants to read input that has been stored in the buffer by the input thread. The function 
  * blocks until input is available, and then it returns the byte that was read. If there is an 
  * error, it returns -1.
+ * 
+ * The basic assumption is, that this will only be called when in prog mode.
  */
 METHOD(read,int)(int fd GCC_UNUSED, int *result)
 {
-	uint8_t byte;
-
+	int byte;
 	T((T_CALLED("lib_win32conpty::pty_read(fd=%d, result=%p)"), fd, result));
+	assert(g_input_thread != NULL && g_stdin_handle != INVALID_HANDLE_VALUE);
 
-	if (!result)
+	if (!result || g_input_thread == NULL || g_stdin_handle == INVALID_HANDLE_VALUE)
 		return -1;
 
-	if (g_input_thread == NULL) {
-		// If the input thread is not running, we are likely in a non-ncurses context,  
-		// so we can read directly from the console handle.
-		HANDLE hIn = defaultCONSOLE.ConsoleHandleIn;
-		DWORD n;
-		if (!ReadFile(hIn, &byte, sizeof(byte), &n, NULL) || n == 0)
-			return -1;
-	} else {
-		// If the input thread is running, we read from the ring buffer it fills
-		byte = get_byte_blocking();
-		if (byte == (uint8_t)-1)
-			return -1;
-	}
-	*result = (int)byte;
+	// If the input thread is running, we read from the ring buffer it fills
+	byte = get_byte_blocking();
+	if (byte == -1)
+		return -1;
+	*result = byte;
 	return 1;
 }
 
