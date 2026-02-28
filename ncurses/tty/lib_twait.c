@@ -193,7 +193,12 @@ _nc_timed_wait(const SCREEN *sp MAYBE_UNUSED,
 #endif
 
 #if USE_FUNC_POLL || defined(_NC_WINDOWS_NATIVE)
+#if defined(_NC_WINDOWS_NATIVE)
+/* In Windows we only poll on input */
+#define MIN_FDS 1
+#else
 #define MIN_FDS 2
+#endif
     struct pollfd fd_list[MIN_FDS];
     struct pollfd *fds = fd_list;
 #elif defined(__BEOS__)
@@ -258,12 +263,15 @@ _nc_timed_wait(const SCREEN *sp MAYBE_UNUSED,
 	fds[count].events = POLLIN;
 	count++;
     }
+#if !defined(_NC_WINDOWS_NATIVE)
     if ((mode & TW_MOUSE)
 	&& (fd = sp->_mouse_fd) >= 0) {
 	fds[count].fd = fd;
 	fds[count].events = POLLIN;
 	count++;
     }
+#endif
+
 #ifdef NCURSES_WGETCH_EVENTS
     if ((mode & TW_EVENT) && evl) {
 	for (n = 0; n < evl->count; ++n) {

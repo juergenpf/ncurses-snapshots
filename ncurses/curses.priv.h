@@ -1239,13 +1239,6 @@ typedef struct screen {
 	int		_sysmouse_new_buttons;
 #endif
 
-#if USE_NAMED_PIPES
-	MEVENT		_drv_mouse_fifo[FIFO_SIZE];
-	int		_drv_mouse_head;
-	int		_drv_mouse_tail;
-	int		_drv_mouse_old_buttons;
-	int		_drv_mouse_new_buttons;
-#endif
 	/*
 	 * This supports automatic resizing
 	 */
