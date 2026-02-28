@@ -178,7 +178,8 @@ Eric S. Raymond:
 
 Juergen Pfeifer
 	The menu and form libraries, C++ bindings for ncurses, menus, forms
-	and panels, as well as the Ada95 binding.  Ongoing support for panel.
+	and panels, as well as the Ada95 binding.  Ongoing support for panel
+	and the Windows port.
 
 CONTRIBUTORS:
 

@@ -60,6 +60,10 @@
 #  define WINVER 0x0600
 #endif
 
+# if NCURSES_SP_FUNCS
+# error SP functions are not supported on Windows
+#endif
+
 #include <windows.h>
 
 #if HAVE_SYS_TIME_H
@@ -113,18 +117,19 @@ extern NCURSES_EXPORT(int) _nc_gettimeofday(struct timeval *, void *);
 #define gettimeofday(tv,tz) _nc_gettimeofday(tv,tz)
 #endif
 
-#if USE_WIDEC_SUPPORT && !defined(_UCRT)
 #ifndef UTF8_MAX_BYTES
 #define UTF8_MAX_BYTES 4 /* Maximum bytes in UTF-8 sequence */
 #endif
-extern NCURSES_EXPORT(size_t) _nc_wchar_to_utf8(wchar_t wc, char utf8[UTF8_MAX_BYTES]);
+
+#if USE_WIDEC_SUPPORT && !defined(_UCRT)
 NCURSES_EXPORT(int) _nc_assemble_utf8_input(unsigned char byte, wchar_t *wch);
 #endif /* USE_WIDEC_SUPPORT && !defined(_UCRT) */
 
 // This is for future use in an implementation that may make use of the Windows Console API 
 // in a more direct way, and is not intended to be a public documentation at the moment.
-#define NC_CONHOST_FLAG_SUPPORT_EVENTS 0x0001
-#define NC_CONHOST_FLAG_MASK (NC_CONHOST_FLAG_SUPPORT_EVENTS)
+#define NCF_MSVCRT_OUTPUT_TRANSLATION 0x0001 /* Use the C runtime for output   handling (shell mode) */
+#define NCF_MSVCRT_INPUT_TRANSLATION  0x0002 /* Use the C runtime for input handling (shell mode) */
+#define NCF_MASK (NCF_MSVCRT_INPUT_TRANSLATION | NCF_MSVCRT_OUTPUT_TRANSLATION)
 
 #ifndef EVENTLIST_2nd
  #define EVENTLIST_2nd(param) /* nothing */
@@ -151,7 +156,7 @@ typedef struct {
   // Properties
     BOOL initialized;                /* Whether the console has been initialized */
 
-    unsigned int conhost_flags;      /* Host configuration flags */
+    unsigned int conpty_flags;      /* Host configuration flags */
     
     ConsoleMode ttyflags;            /* The desired state of the console  */
     
@@ -171,6 +176,7 @@ typedef struct {
     int (*flush)(int fd);                                             /* flush the console I/O stream denoted by the file descriptor */
     int (*read)(int fd, unsigned char* result, size_t count);         /* Read bytes from the input stream. If wide characters are used, the UTF-8 assembly is done here */
     int (*write)(int fd, const void *buf, size_t count);              /* Write bytes to the output stream. If wide characters are used, the UTF-8 encoding is done here */
+    int (*outch_ex)(int ch);                                          /* A special version of outch for wide-character support in the Windows Console when using msvcrt */
     int (*start_input_subsystem)(void);                               /* In prog mode, we control the input stream */
     int (*stop_input_subsystem)(void);                                /* In shell mode, we leave it to the C runtime */
     int (*poll)(struct pty_pollfd *fds, nfds_t nfds, int timeout_ms); /* Minimalistic clone of UNIX poll, just polling stdin console input */

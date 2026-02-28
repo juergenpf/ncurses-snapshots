@@ -235,60 +235,6 @@ NCURSES_SP_NAME(_nc_outch)(NCURSES_SP_DCLx int ch)
 	return rc;
 }
 
-#if defined(_NC_WINDOWS_NATIVE) && USE_WIDEC_SUPPORT && !defined(_UCRT)
-/*
-* When using msvcrt, because we have to operate the Windows Console Output 
-* stream in _O_BINARY mode, so no UTF-8 translation is performed by the OS. 
-* Therefore we have to encode UTF-8 characters ourselves.
-*
-* This routine is only used by the PUTC macro in the core update function of 
-* tty_updat.c
-*/
-NCURSES_EXPORT(int)
-NCURSES_SP_NAME(_nc_outch_ex)(NCURSES_SP_DCLx int ch)
-{
-	int rc = OK;
-	int len;
-	int i;
-	char utf8[UTF8_MAX_BYTES];
-
-	COUNT_OUTCHARS(1);
-
-	/*
-	In Windows wchar_t is an unsigned short, so it requires strange operations
-	to get a negative value when propagating to an int. The only plausible
-	scenario on Windows that ch could be negative is, that it was propagated
-	from a char to an int. So the follwing is safe.
-	*/
-	if (ch < 0) ch &= 0xFF;
-	
-	len = _nc_wchar_to_utf8((wchar_t)ch, utf8);
-	if (len == 0)
-		return ERR; // conversion error
-
-	if (HasTInfoTerminal(SP_PARM) && SP_PARM != NULL)
-	{
-		if (SP_PARM->out_buffer != NULL)
-		{
-			if (SP_PARM->out_inuse + len >= SP_PARM->out_limit)
-				NCURSES_SP_NAME(_nc_flush)(NCURSES_SP_ARG);
-			for(i=0; i<len; i++) {
-				SP_PARM->out_buffer[SP_PARM->out_inuse++] = utf8[i];
-			}
-		}
-		else
-		{
-			if (write(fileno(NC_OUTPUT(SP_PARM)), utf8, (size_t)len) == -1)
-				rc = ERR;
-		}
-	} else {
-		if (write(fileno(stdout), utf8, (size_t)len) == -1)
-			rc = ERR;		
-	}
-	return rc;
-}
-#endif
-
 #if NCURSES_SP_FUNCS
 NCURSES_EXPORT(int)
 _nc_outch(int ch)
@@ -296,13 +242,6 @@ _nc_outch(int ch)
 	return NCURSES_SP_NAME(_nc_outch)(CURRENT_SCREEN, ch);
 }
 
-#if defined(_NC_WINDOWS_NATIVE) && USE_WIDEC_SUPPORT && !defined(_UCRT)
-NCURSES_EXPORT(int)
-_nc_outch_ex(int ch)
-{
-	return NCURSES_SP_NAME(_nc_outch_ex)(CURRENT_SCREEN, ch);
-}
-#endif
 #endif
 
 /*

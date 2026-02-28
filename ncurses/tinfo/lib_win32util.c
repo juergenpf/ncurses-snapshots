@@ -59,23 +59,6 @@ _nc_gettimeofday(struct timeval *tv, void *tz GCC_UNUSED)
 
 #if USE_WIDEC_SUPPORT
 #if !defined(_UCRT)
-/* This is only needed when using msvcrt, because UCRT has native UTF-8 support 
- * when the locale is set to .UTF-8, so in that case we can rely on the C runtime 
- * to do the decoding for us and just return the raw bytes directly.  
-*/
-NCURSES_EXPORT(size_t)
-_nc_wchar_to_utf8(wchar_t wc, char utf8[UTF8_MAX_BYTES])
-{
-	wchar_t wstr[2] = {wc, L'\0'};
-	int result;
-
-	result = WideCharToMultiByte(CP_UTF8, 0, wstr, 1, utf8, 4, NULL, NULL);
-	if (result > 0)
-		return (size_t)result;
-	else
-		return 0; // signals error
-}
-
 typedef struct
 {
 	unsigned char buffer[UTF8_MAX_BYTES]; /* Buffer for incomplete UTF-8 sequence */
