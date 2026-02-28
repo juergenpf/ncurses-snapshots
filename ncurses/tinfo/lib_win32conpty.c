@@ -860,6 +860,12 @@ METHOD(poll,int)(struct pty_pollfd *fds, nfds_t nfds, int timeout_ms)
 	returnCode(code);
 }
 
+#if USE_WIDEC_SUPPORT && !defined(_UCRT)
+#define MAYBE_UNUSED
+#else
+#define MAYBE_UNUSED GCC_UNUSED
+#endif
+
 /**
  * This function reads a byte of input from the console. It is called by the main thread when 
  * it wants to read input that has been stored in the buffer by the input thread. The function 
@@ -868,7 +874,7 @@ METHOD(poll,int)(struct pty_pollfd *fds, nfds_t nfds, int timeout_ms)
  * 
  * The basic assumption is, that this will only be called when in prog mode.
  */
-METHOD(read,int)(int fd GCC_UNUSED, unsigned char* result, size_t count)
+METHOD(read,int)(int fd MAYBE_UNUSED, unsigned char* result, size_t count)
 {
 	int byte;
 	size_t i;
@@ -888,6 +894,23 @@ METHOD(read,int)(int fd GCC_UNUSED, unsigned char* result, size_t count)
 		byte = get_byte_blocking();
 		if (byte == -1)
 			return (int)i; // Return the number of bytes read so far, which may be 0 if we fail on the first byte
+#if USE_WIDEC_SUPPORT && !defined(_UCRT)
+		if (defaultCONSOLE.conpty_flags & NCF_MSVCRT_INPUT_TRANSLATION)
+		{
+			wchar_t wch;
+			int ch = _nc_assemble_utf8_input(byte, &wch);
+			if (ch > 0)
+			{
+				/* Complete UTF-8 character assembled */
+				byte = ch;
+			}
+			else if (ch == 0)
+			{
+				/* Need more bytes - recursively read next byte */
+				return DispatchMethod(read)(fd, &result[i],1);
+			}
+		}
+#endif			
 		result[i] = (unsigned char)byte;
 	}
 	return (int)count;
