@@ -262,19 +262,20 @@ fifo_push(SCREEN *sp EVENTLIST_2nd(_nc_eventlist * evl))
 	sp->_extended_key = (ch == 0);
     } else
 #endif
-    {				/* Can block... */
 #if defined(_NC_WINDOWS_NATIVE)
-	/* Use UTF-8 assembly for WIN32_CONPTY */
-	n = WINCONSOLE.read(sp->_ifd, &ch);
-#else
+#define read(fd,buf,len) WINCONSOLE.read(fd, buf, len)
+#endif
+    {				/* Can block... */
 	unsigned char c2 = 0;
 
 	_nc_set_read_thread(TRUE);
 	n = (int) read(sp->_ifd, &c2, (size_t) 1);
 	_nc_set_read_thread(FALSE);
 	ch = c2;
-#endif
     }
+#if defined(_NC_WINDOWS_NATIVE)
+#undef read
+#endif
 
     if ((n == -1) || (n == 0)) {
 	TR(TRACE_IEVENT, ("read(%d,&ch,1)=%d, errno=%d", sp->_ifd, n, errno));
@@ -535,7 +536,7 @@ _nc_wgetch(WINDOW *win,
 
 #if defined(_NC_WINDOWS_NATIVE)
     /* Check for console resize events after getting input */
-    if (WINCONSOLE.check_resize()) {
+    if (WINCONSOLE.size_changed()) {
 	/* Resize detected - preserve the triggering character */
 	safe_ungetch(sp, ch);
     }
@@ -563,7 +564,7 @@ _nc_wgetch(WINDOW *win,
       check_sigwinch:
 #if defined(_NC_WINDOWS_NATIVE)
 	/* Check for console resize events before SIGWINCH handling */
-	WINCONSOLE.check_resize();
+	WINCONSOLE.size_changed();
 #endif
 #if USE_SIZECHANGE
 	if (_nc_handle_sigwinch(sp)) {

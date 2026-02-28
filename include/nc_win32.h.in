@@ -164,12 +164,12 @@ typedef struct {
   // Metods
     BOOL (*init)(int fdOut, int fdIn);                                /* Initialize with I/O file descriptors. fdIn maybe -1 in first call */
     void (*size)(int *Lines, int *Cols);                              /* Query console size. Safe to be called before init */ 
-    BOOL (*check_resize)(void);                                       /* Return TRUE if the console has been resized */
+    BOOL (*size_changed)(void);                                       /* Return TRUE if the console has been resized */
     int (*setmode)(int fd, const ConsoleMode *arg);                   /* Our SET_TTY implementation */
     int (*getmode)(int fd, ConsoleMode *arg);                         /* Our GET_TTY implementation */
     int (*defmode )(ConsoleMode *arg, short kind);                    /* Used by shell-/prog-mode handling to manage start/stop of the I/O subsystem of ncurses */
     int (*flush)(int fd);                                             /* flush the console I/O stream denoted by the file descriptor */
-    int (*read)(int fd, int *result);                                 /* Read bytes from the input stream. If wide characters are used, the UTF-8 assembly is done here */
+    int (*read)(int fd, unsigned char* result, size_t count);         /* Read bytes from the input stream. If wide characters are used, the UTF-8 assembly is done here */
     int (*write)(int fd, const void *buf, size_t count);              /* Write bytes to the output stream. If wide characters are used, the UTF-8 encoding is done here */
     int (*start_input_subsystem)(void);                               /* In prog mode, we control the input stream */
     int (*stop_input_subsystem)(void);                                /* In shell mode, we leave it to the C runtime */

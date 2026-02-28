@@ -1813,6 +1813,7 @@ NCURSES_SP_NAME(getmouse) (NCURSES_SP_DCLx MEVENT * aevent)
 	    SP_PARM->_mouse_readp = NEXT(readp);
 	    result = OK;
 	} else {
+		TR(TRACE_IEVENT, ("getmouse: no valid event in queue"));
 	    /* Reset the provided event */
 	    aevent->bstate = 0;
 	    Invalidate(aevent);

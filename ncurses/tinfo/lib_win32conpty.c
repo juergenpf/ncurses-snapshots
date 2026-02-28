@@ -54,12 +54,12 @@ MODULE_ID("$Id$")
 // Prototypes of static function we want to use in initializers
 METHOD(init,BOOL)(int fdOut, int fdIn);
 METHOD(size,void)(int *Lines, int *Cols);
-METHOD(check_resize,BOOL)(void);
+METHOD(size_changed,BOOL)(void);
 METHOD(setmode,int)(int fd, const TTY *arg);
 METHOD(getmode,int)(int fd, TTY *arg);
 METHOD(defmode,int)(TTY *arg, short kind);
 METHOD(flush,int)(int fd);
-METHOD(read,int)(int fd, int *result);
+METHOD(read,int)(int fd, unsigned char* result, size_t count);
 METHOD(write,int)(int fd, const void *buf, size_t count);
 METHOD(start_input_subsystem,int)(void);
 METHOD(stop_input_subsystem,int)(void);
@@ -80,7 +80,7 @@ static ConsoleInfo defaultCONSOLE = {
 
 	.init = DispatchMethod(init),
     .size = DispatchMethod(size),
-    .check_resize = DispatchMethod(check_resize),
+    .size_changed = DispatchMethod(size_changed),
     .setmode = DispatchMethod(setmode),
     .getmode = DispatchMethod(getmode),
     .defmode = DispatchMethod(defmode),
@@ -460,12 +460,12 @@ METHOD(init,BOOL)(int fdOut, int fdIn)
  * This provides SIGWINCH-like functionality for Windows ConPTY.
  * Returns TRUE if a resize was detected.
  */
-METHOD(check_resize,BOOL)(void)	
+METHOD(size_changed,BOOL)(void)	
 {
 	int current_lines, current_cols;
 	bool resized = FALSE;
 
-	T((T_CALLED("lib_win32conpty::pty_check_resize()")));
+	T((T_CALLED("lib_win32conpty::pty_size_changed()")));
 
 	DispatchMethod(size)(&current_lines, &current_cols);
 
@@ -866,21 +866,29 @@ METHOD(poll,int)(struct pty_pollfd *fds, nfds_t nfds, int timeout_ms)
  * 
  * The basic assumption is, that this will only be called when in prog mode.
  */
-METHOD(read,int)(int fd GCC_UNUSED, int *result)
+METHOD(read,int)(int fd GCC_UNUSED, unsigned char* result, size_t count)
 {
 	int byte;
+	size_t i;
+
 	T((T_CALLED("lib_win32conpty::pty_read(fd=%d, result=%p)"), fd, result));
 	assert(g_input_thread != NULL && g_stdin_handle != INVALID_HANDLE_VALUE);
 
 	if (!result || g_input_thread == NULL || g_stdin_handle == INVALID_HANDLE_VALUE)
 		return -1;
 
+	if (count==0)
+		return 0;
+
 	// If the input thread is running, we read from the ring buffer it fills
-	byte = get_byte_blocking();
-	if (byte == -1)
-		return -1;
-	*result = byte;
-	return 1;
+	for(i=0; i<count; i++)
+	{
+		byte = get_byte_blocking();
+		if (byte == -1)
+			return (int)i; // Return the number of bytes read so far, which may be 0 if we fail on the first byte
+		result[i] = (unsigned char)byte;
+	}
+	return (int)count;
 }
 
 /*
