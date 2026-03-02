@@ -588,18 +588,14 @@ typedef union {
 
 #endif /* NCURSES_EXT_COLORS */
 
-#if USE_WIDEC_SUPPORT && defined(_NC_WINDOWS_NATIVE) && !defined(_UCRT)
-#define NCURSES_OUTC_FUNC WINCONSOLE.outch_ex
-#else
-#define NCURSES_OUTC_FUNC NCURSES_SP_NAME(_nc_outch)
-#endif
-#define NCURSES_PUTP2(name,value) NCURSES_SP_NAME(_nc_putp)(NCURSES_SP_ARGx name, value)
+#define NCURSES_OUTC_FUNC               NCURSES_SP_NAME(_nc_outch)
+#define NCURSES_PUTP2(name,value)       NCURSES_SP_NAME(_nc_putp)(NCURSES_SP_ARGx name, value)
 #define NCURSES_PUTP2_FLUSH(name,value) NCURSES_SP_NAME(_nc_putp_flush)(NCURSES_SP_ARGx name, value)
 
 #if NCURSES_NO_PADDING
-#define GetNoPadding(sp)	((sp) ? (sp)->_no_padding : _nc_prescreen._no_padding)
-#define SetNoPadding(sp)	_nc_set_no_padding(sp)
-extern NCURSES_EXPORT(void)     _nc_set_no_padding(SCREEN *);
+#define GetNoPadding(sp)	 ((sp) ? (sp)->_no_padding : _nc_prescreen._no_padding)
+#define SetNoPadding(sp)	 _nc_set_no_padding(sp)
+extern NCURSES_EXPORT(void)  _nc_set_no_padding(SCREEN *);
 #else
 #define GetNoPadding(sp)	FALSE
 #define SetNoPadding(sp)	/*nothing*/

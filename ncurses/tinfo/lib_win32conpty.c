@@ -61,7 +61,6 @@ METHOD(defmode,int)(TTY *arg, short kind);
 METHOD(flush,int)(int fd);
 METHOD(read,int)(int fd, unsigned char* result, size_t count);
 METHOD(write,int)(int fd, const void *buf, size_t count);
-METHOD(outch_ex,int)(int ch);
 METHOD(start_input_subsystem,int)(void);
 METHOD(stop_input_subsystem,int)(void);
 METHOD(poll,int)(struct pty_pollfd *fds, nfds_t nfds, int timeout_ms);
@@ -72,7 +71,6 @@ METHOD(poll,int)(struct pty_pollfd *fds, nfds_t nfds, int timeout_ms);
  */
 static ConsoleInfo defaultCONSOLE = {
     .initialized = FALSE,
-    .conpty_flags = 0,
     .ttyflags = {0, 0, TTY_MODE_UNSPECIFIED},
     .ConsoleHandleIn = INVALID_HANDLE_VALUE,
     .ConsoleHandleOut = INVALID_HANDLE_VALUE,
@@ -88,7 +86,6 @@ static ConsoleInfo defaultCONSOLE = {
     .flush = DispatchMethod(flush),
     .read = DispatchMethod(read),
     .write = DispatchMethod(write),
-	.outch_ex = DispatchMethod(outch_ex),
     .start_input_subsystem = DispatchMethod(start_input_subsystem),
 	.stop_input_subsystem  = DispatchMethod(stop_input_subsystem),
 	.poll = DispatchMethod(poll)
@@ -357,7 +354,6 @@ METHOD(init,BOOL)(int fdOut, int fdIn)
 			| DISABLE_NEWLINE_AUTO_RETURN 
 			| ENABLE_WRAP_AT_EOL_OUTPUT);
 
-		const char *env_flags = getenv("NC_CONPTY_FLAGS");
 		DWORD dwFlag;
 
 		HANDLE stdin_hdl  = GetStdHandle(STD_INPUT_HANDLE);
@@ -376,18 +372,6 @@ METHOD(init,BOOL)(int fdOut, int fdIn)
 		}
 
 		encoding_init();
-
-		// The NC_CONPTY_FLAGS environment variable is for future use.
-		defaultCONSOLE.conpty_flags = 0;
-		if (env_flags && *env_flags)
-		{
-			char *endptr;
-			long flags_val = strtol(env_flags, &endptr, 0);
-			if (*endptr == '\0' && flags_val >= 0)
-			{
-				defaultCONSOLE.conpty_flags = (unsigned int)(flags_val & NCF_MASK);
-			}
-		}
 
 		if (stdout_hdl == INVALID_HANDLE_VALUE || GetConsoleMode(stdout_hdl, &dwFlag) == 0)
 		{
@@ -860,12 +844,6 @@ METHOD(poll,int)(struct pty_pollfd *fds, nfds_t nfds, int timeout_ms)
 	returnCode(code);
 }
 
-#if USE_WIDEC_SUPPORT && !defined(_UCRT)
-#define MAYBE_UNUSED
-#else
-#define MAYBE_UNUSED GCC_UNUSED
-#endif
-
 /**
  * This function reads a byte of input from the console. It is called by the main thread when 
  * it wants to read input that has been stored in the buffer by the input thread. The function 
@@ -874,7 +852,7 @@ METHOD(poll,int)(struct pty_pollfd *fds, nfds_t nfds, int timeout_ms)
  * 
  * The basic assumption is, that this will only be called when in prog mode.
  */
-METHOD(read,int)(int fd MAYBE_UNUSED, unsigned char* result, size_t count)
+METHOD(read,int)(int fd GCC_UNUSED, unsigned char* result, size_t count)
 {
 	int byte;
 	size_t i;
@@ -894,23 +872,6 @@ METHOD(read,int)(int fd MAYBE_UNUSED, unsigned char* result, size_t count)
 		byte = get_byte_blocking();
 		if (byte == -1)
 			return (int)i; // Return the number of bytes read so far, which may be 0 if we fail on the first byte
-#if USE_WIDEC_SUPPORT && !defined(_UCRT)
-		if (defaultCONSOLE.conpty_flags & NCF_MSVCRT_INPUT_TRANSLATION)
-		{
-			wchar_t wch;
-			int ch = _nc_assemble_utf8_input(byte, &wch);
-			if (ch > 0)
-			{
-				/* Complete UTF-8 character assembled */
-				byte = ch;
-			}
-			else if (ch == 0)
-			{
-				/* Need more bytes - recursively read next byte */
-				return DispatchMethod(read)(fd, &result[i],1);
-			}
-		}
-#endif			
 		result[i] = (unsigned char)byte;
 	}
 	return (int)count;
@@ -943,68 +904,6 @@ METHOD(write,int)(int fd GCC_UNUSED, const void *buf, size_t count)
 	return (int)written;
 }
 
-
-/*
-* In case of a build for MSVCRT, we use this as the outch method, which is used by 
-* the nurses runtime when writing single characters to the console. We evaluate the 
-* conpty flags to determine if UTF-8 output is enabled, and if so we convert the 
-* character to UTF-8 bytes before writing it. If UTF-8 output is not enabled, we 
-* write the character as a single byte. This allows us to support both UTF-8 and 
-* non-UTF-8 output modes in a way that is compatible with the various C runtimes on 
-* Windows.
-*/
-METHOD(outch_ex,int)(int ch)
-{
-	int rc = OK;
-	int len;
-	int i;
-	char utf8[UTF8_MAX_BYTES];
-	wchar_t wstr[2] = { (wchar_t)ch, L'\0' };
-
-	COUNT_OUTCHARS(1);
-
-	/*
-	In Windows wchar_t is an unsigned short, so it requires strange operations
-	to get a negative value when propagating to an int. The only plausible
-	scenario on Windows that ch could be negative is, that it was propagated
-	from a char to an int. So the follwing is safe.
-	*/
-	if (ch < 0) ch &= 0xFF;
-	
-	if (defaultCONSOLE.conpty_flags & NCF_MSVCRT_OUTPUT_TRANSLATION)
-	{
-		// If UTF-8 output is enabled, we can write the character directly as UTF-8 bytes
-		len = WideCharToMultiByte(CP_UTF8, 0, wstr, 1, utf8, UTF8_MAX_BYTES, NULL, NULL);
-		if (len <= 0)
-			return ERR; // conversion error
-	}
-	else
-	{
-		len = 1;
-		utf8[0] = (char)ch; // Just write the byte as is, without any conversion
-	}
-
-	if (SP != NULL)
-	{
-		if (SP->out_buffer != NULL)
-		{
-			if (SP->out_inuse + len >= SP->out_limit)
-				_nc_flush();
-			for(i=0; i<len; i++) {
-				SP->out_buffer[SP->out_inuse++] = utf8[i];
-			}
-		}
-		else
-		{	
-			if (DispatchMethod(write)(fileno(stdout), utf8, (size_t)len) == -1)
-				rc = ERR;
-		}
-	} else {
-		if (DispatchMethod(write)(fileno(stdout), utf8, (size_t)len) == -1)
-			rc = ERR;		
-	}
-	return rc;
-}
 
 /**
  * This function flushes the console input buffer. It is called by the main thread when it 
