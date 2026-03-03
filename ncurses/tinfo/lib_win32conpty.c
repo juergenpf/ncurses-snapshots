@@ -1026,12 +1026,18 @@ METHOD(setmode,int)(int fd GCC_UNUSED, const TTY *arg)
 }
 
 /*
-* The defmode function is only called from def_shell_mode and def_prog_mode, and it's only
-* purpose is to set the setfMode flag to true. If this flag is set, the setmode function
-* above will actually apply the file mode settings to the console streams.
-* This approach should help to avoid excessive unnecessary calls to _setmode, which can be 
-* expensive and may cause issues with some C runtimes on Windows if called too frequently or 
-* with incompatible modes.
+* The defmode function is only called from def_shell_mode, def_prog_mode, and savetty. 
+* It's only purpose is to set the kind field in the TTY structure and to set the 
+* REQUIRED console mode flags for shell mode and program mode.
++ The design idea is this: the three mentioned calls are the only ones used to get the
+* TTY structure in order to store it and later on use it to restore the console to the
+* desired state. TTY changing calls like raw() or cbreak() don't do that. The implementation
+* of the getmode function will always set the kind field to TTY_MODE_UNSPECIFIED, which means 
+* that if that TTY is later used in a setmode call, the setmode function will know that it 
+* should not change the status of the input subsystem. Only the def_shell_mode, def_prog_mode, 
+* and savetty functions will set the kind field to a specific mode, which means that the setmode 
+* function will know that it should apply the necessary changes to the input subsystem when 
+* restoring that TTY. 
 */
 METHOD(defmode,int)(TTY *arg, short kind)
 {
@@ -1060,13 +1066,16 @@ METHOD(defmode,int)(TTY *arg, short kind)
 }
 
 /*
-* getmode always sets the setfMode flag to FALSE. The trick is, that def_shell_mode and
-* def_prog_mode will call abov method defmode to set the flag right after getting it.
-* So only calls to reset_shell_mode and reset_prog_mode will have the setfMode flag 
-* set to TRUE, which means that the next call to setmode will apply any file mode changes 
-* to the console streams.
-* By that approach the Windows specific filemode handling is finally reduced to the calls
-* in the lib_ttyflag.c functions. 
+* getmode always sets the kind field to TTY_MODE_UNSPECIFIED. The trick is, that 
+* def_shell_mode, def_prog_mode and savetty will call above method defmode to 
+* set the field right after getting it.
+* So only calls to reset_shell_mode, reset_prog_mode and resetty will have the kind 
+* field in the TTY structure set to a specific mode, which means that the setmode 
+* function will know that it should apply the necessary changes to the input subsystem 
+* when restoring that TTY. All other calls to setmode will have the kind field in the 
+* TTY structure set to TTY_MODE_UNSPECIFIED, which means that the setmode function 
+* will know that it should not change the status of the input subsystem when restoring 
+* that TTY. 
 */
 METHOD(getmode,int)(int fd GCC_UNUSED, TTY *arg)
 {
