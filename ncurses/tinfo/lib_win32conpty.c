@@ -49,6 +49,7 @@ MODULE_ID("$Id$")
 #endif
 
 #define DispatchMethod(name) pty_##name
+#define Dispatch(name) .name = DispatchMethod(name)
 #define METHOD(name,type) static type DispatchMethod(name)
 
 // Prototypes of static function we want to use in initializers
@@ -77,18 +78,18 @@ static ConsoleInfo defaultCONSOLE = {
     .sbi_lines = -1,
     .sbi_cols = -1,
 
-	.init = DispatchMethod(init),
-    .size = DispatchMethod(size),
-    .size_changed = DispatchMethod(size_changed),
-    .setmode = DispatchMethod(setmode),
-    .getmode = DispatchMethod(getmode),
-    .defmode = DispatchMethod(defmode),
-    .flush = DispatchMethod(flush),
-    .read = DispatchMethod(read),
-    .write = DispatchMethod(write),
-    .start_input_subsystem = DispatchMethod(start_input_subsystem),
-	.stop_input_subsystem  = DispatchMethod(stop_input_subsystem),
-	.poll = DispatchMethod(poll)
+	Dispatch(init),
+	Dispatch(size),
+    Dispatch(size_changed),
+    Dispatch(setmode),
+    Dispatch(getmode),
+    Dispatch(defmode),
+    Dispatch(flush),
+    Dispatch(read),
+    Dispatch(write),
+    Dispatch(start_input_subsystem),
+	Dispatch(stop_input_subsystem),
+	Dispatch(poll)
 };
 
 /*
