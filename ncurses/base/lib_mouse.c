@@ -1065,9 +1065,6 @@ decode_X10_bstate(SCREEN *sp, MEVENT * eventp, unsigned intro)
  * Wheel mice may return buttons 4 and 5 when the wheel is turned.  We encode
  * those as button presses.
  */
-#if defined(_NC_WINDOWS_NATIVE)
-#define read(fd,buf,len) WINCONSOLE.read(fd,buf,len)
-#endif
 static bool
 decode_xterm_X10(SCREEN *sp, MEVENT * eventp)
 {
@@ -1081,7 +1078,7 @@ decode_xterm_X10(SCREEN *sp, MEVENT * eventp)
     for (grabbed = 0; grabbed < MAX_KBUF; grabbed += (size_t) res) {
 
 	/* For VIO mouse we add extra bit 64 to disambiguate button-up. */
-	res = (int) read(
+	res = (int) NC_READ(
 #if USE_EMX_MOUSE
 			    (M_FD(sp) >= 0) ? M_FD(sp) : sp->_ifd,
 #else
@@ -1129,7 +1126,7 @@ decode_xterm_1005(SCREEN *sp, MEVENT * eventp)
     for (grabbed = 0; grabbed < limit;) {
 	int res;
 
-	res = (int) read(
+	res = (int) NC_READ(
 #if USE_EMX_MOUSE
 			    (M_FD(sp) >= 0) ? M_FD(sp) : sp->_ifd,
 #else
@@ -1207,7 +1204,7 @@ read_SGR(const SCREEN *sp, SGR_DATA * result)
     do {
 	int res;
 
-	res = (int) read(
+	res = (int) NC_READ(
 #if USE_EMX_MOUSE
 			    (M_FD(sp) >= 0) ? M_FD(sp) : sp->_ifd,
 #else
@@ -1274,9 +1271,6 @@ read_SGR(const SCREEN *sp, SGR_DATA * result)
        ("_nc_mouse_inline sees the following xterm data: '%s'", kbuf));
     return (grabbed > 0) && (result->nerror == 0);
 }
-#if defined(_NC_WINDOWS_NATIVE)
-#undef read
-#endif
 
 static bool
 decode_xterm_SGR1006(SCREEN *sp, MEVENT * eventp)

@@ -262,20 +262,14 @@ fifo_push(SCREEN *sp EVENTLIST_2nd(_nc_eventlist * evl))
 	sp->_extended_key = (ch == 0);
     } else
 #endif
-#if defined(_NC_WINDOWS_NATIVE)
-#define read(fd,buf,len) WINCONSOLE.read(fd, buf, len)
-#endif
     {				/* Can block... */
 	unsigned char c2 = 0;
 
 	_nc_set_read_thread(TRUE);
-	n = (int) read(sp->_ifd, &c2, (size_t) 1);
+	n = (int) NC_READ(sp->_ifd, &c2, (size_t) 1);
 	_nc_set_read_thread(FALSE);
 	ch = c2;
     }
-#if defined(_NC_WINDOWS_NATIVE)
-#undef read
-#endif
 
     if ((n == -1) || (n == 0)) {
 	TR(TRACE_IEVENT, ("read(%d,&ch,1)=%d, errno=%d", sp->_ifd, n, errno));

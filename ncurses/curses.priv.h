@@ -588,6 +588,12 @@ typedef union {
 
 #endif /* NCURSES_EXT_COLORS */
 
+#if defined(_NC_WINDOWS_NATIVE)
+#define NC_READ(fd, buf, count)	WINCONSOLE.read(fd,buf,count)
+#else
+#define NC_READ(fd, buf, count)	read(fd, buf, count)
+#endif
+
 #define NCURSES_OUTC_FUNC               NCURSES_SP_NAME(_nc_outch)
 #define NCURSES_PUTP2(name,value)       NCURSES_SP_NAME(_nc_putp)(NCURSES_SP_ARGx name, value)
 #define NCURSES_PUTP2_FLUSH(name,value) NCURSES_SP_NAME(_nc_putp_flush)(NCURSES_SP_ARGx name, value)
