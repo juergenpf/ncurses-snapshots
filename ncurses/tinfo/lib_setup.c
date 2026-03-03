@@ -650,15 +650,6 @@ _nc_update_screensize(SCREEN *sp)
 		 */
 		if (sp->_resize != NULL)
 		{
-#if defined(_NC_WINDOWS_NATIVE)
-			/* On Windows ConPTY, always push KEY_RESIZE if SIGWINCH flag is set */
-			if (sp->_sig_winch && (sp->_ungetch != NULL)) {
-				sp->_ungetch(SP_PARM, KEY_RESIZE);
-			} else if ((new_lines != old_lines) || (new_cols != old_cols)) {
-				sp->_resize(NCURSES_SP_ARGx new_lines, new_cols);
-			}
-#else
-			/* Original Unix logic */
 			if ((new_lines != old_lines) || (new_cols != old_cols))
 			{
 				sp->_resize(NCURSES_SP_ARGx new_lines, new_cols);
@@ -667,7 +658,6 @@ _nc_update_screensize(SCREEN *sp)
 			{
 				sp->_ungetch(SP_PARM, KEY_RESIZE); /* so application can know this */
 			}
-#endif
 			sp->_sig_winch = FALSE;
 		}
 	}

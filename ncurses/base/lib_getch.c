@@ -556,10 +556,6 @@ _nc_wgetch(WINDOW *win,
 
     if (ch == ERR) {
       check_sigwinch:
-#if defined(_NC_WINDOWS_NATIVE)
-	/* Check for console resize events before SIGWINCH handling */
-	WINCONSOLE.size_changed();
-#endif
 #if USE_SIZECHANGE
 	if (_nc_handle_sigwinch(sp)) {
 	    _nc_update_screensize(sp);

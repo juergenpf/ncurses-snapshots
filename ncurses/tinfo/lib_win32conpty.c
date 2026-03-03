@@ -517,12 +517,13 @@ METHOD(size,void)(int *Lines, int *Cols)
 					*Cols = (int)(csbi.srWindow.Right + 1 - csbi.srWindow.Left);
 				}
 				else
-					// Fallback to cached values or defaults if we can't get the console size
-					// We assume Windows Terminal is our host, it has modern default size of
-					// 120x30, but if the cached values are set we use those instead to reflect
-					// the actual size of the console.
-					*Lines = defaultCONSOLE.sbi_lines != -1 ? defaultCONSOLE.sbi_lines : 120;
-				*Cols = defaultCONSOLE.sbi_cols != -1 ? defaultCONSOLE.sbi_cols : 30;
+				{
+					// Fallback to cached values or defaults if we can't get the console size.
+					// Windows Terminal default size is 120 columns x 30 rows.
+					// If cached values are set we use those instead to reflect the actual size.
+					*Lines = defaultCONSOLE.sbi_lines != -1 ? defaultCONSOLE.sbi_lines : 30;
+					*Cols  = defaultCONSOLE.sbi_cols  != -1 ? defaultCONSOLE.sbi_cols  : 120;
+				}
 			}
 		}
 	}
