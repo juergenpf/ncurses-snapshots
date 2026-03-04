@@ -213,7 +213,7 @@ set_tabsize(int value)
 #endif
 #endif /* NCURSES_EXT_FUNCS */
 
-#if USE_SIGWINCH
+#if USE_SIGWINCH || defined(CONPTY_BUFFER_RESIZE_EVENT)
 /*
  * If we have a pending SIGWINCH, set the flag in each screen.
  */

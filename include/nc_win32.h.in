@@ -110,6 +110,11 @@ typedef struct
 
 #if defined(CURSES_PRIV_H) || defined(TEST_PRIV_H) || 1
 
+// Undefine that if you want to use polling instead.
+#ifndef CONPTY_BUFFER_RESIZE_EVENT
+#define CONPTY_BUFFER_RESIZE_EVENT 1
+#endif
+
 #if !HAVE_CLOCK_GETTIME && !HAVE_GETTIMEOFDAY
 extern NCURSES_EXPORT(int) _nc_gettimeofday(struct timeval *, void *);
 #undef HAVE_GETTIMEOFDAY
@@ -147,13 +152,17 @@ typedef struct {
     HANDLE ConsoleHandleIn;          /* Console Handle actually used for input operations */
     HANDLE ConsoleHandleOut;         /* Console Handle actually used for output operations */
 
+#if !defined(CONPTY_BUFFER_RESIZE_EVENT)
     int sbi_lines;                   /* Cached console size */
     int sbi_cols;                    /* Cached console size */
+#endif
 
   // Metods
     BOOL (*init)(int fdOut, int fdIn);                                /* Initialize with I/O file descriptors. fdIn maybe -1 in first call */
     void (*size)(int *Lines, int *Cols);                              /* Query console size. Safe to be called before init */ 
+#if !defined(CONPTY_BUFFER_RESIZE_EVENT)
     BOOL (*size_changed)(void);                                       /* Return TRUE if the console has been resized */
+#endif  
     int (*setmode)(int fd, const ConsoleMode *arg);                   /* Our SET_TTY implementation */
     int (*getmode)(int fd, ConsoleMode *arg);                         /* Our GET_TTY implementation */
     int (*defmode )(ConsoleMode *arg, short kind);                    /* Used by shell-/prog-mode handling to manage start/stop of the I/O subsystem of ncurses */
