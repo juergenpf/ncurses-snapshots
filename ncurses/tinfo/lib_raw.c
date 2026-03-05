@@ -97,7 +97,6 @@ NCURSES_SP_NAME(raw) (NCURSES_SP_DCL0)
 	buf.c_cc[VMIN] = 1;
 	buf.c_cc[VTIME] = 0;
 #elif defined(_NC_WINDOWS_NATIVE)
- 	// JPF buf.dwFlagIn |= (ENABLE_PROCESSED_INPUT|ENABLE_LINE_INPUT);
 	buf.dwFlagIn &= (unsigned long) ~(ENABLE_PROCESSED_INPUT|ENABLE_LINE_INPUT);
 #else
 	buf.sg_flags |= RAW;
@@ -154,7 +153,6 @@ NCURSES_SP_NAME(cbreak) (NCURSES_SP_DCL0)
 	buf.c_cc[VMIN] = 1;
 	buf.c_cc[VTIME] = 0;
 #elif defined(_NC_WINDOWS_NATIVE)
- 	// JPF buf.dwFlagIn |= (ENABLE_PROCESSED_INPUT|ENABLE_LINE_INPUT);
 	buf.dwFlagIn &= (unsigned long) ~(ENABLE_PROCESSED_INPUT|ENABLE_LINE_INPUT);
 #else
 	buf.sg_flags |= CBREAK;
