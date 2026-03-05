@@ -443,6 +443,54 @@ METHOD(init,BOOL)(int fdOut, int fdIn)
 	returnBool(result);
 }
 
+static BOOL
+try_get_sbi(CONSOLE_SCREEN_BUFFER_INFO *csbi) 
+{
+	HANDLE test_handles[] = {defaultCONSOLE.ConsoleHandleOut, GetStdHandle(STD_OUTPUT_HANDLE), GetStdHandle(STD_ERROR_HANDLE)};
+	HANDLE hdl;
+
+	for (size_t i = 0; i < sizeof(test_handles) / sizeof(test_handles[0]); ++i)
+	{
+		hdl = test_handles[i];
+		if (hdl != INVALID_HANDLE_VALUE && GetConsoleScreenBufferInfo(hdl, csbi))
+		{
+			return TRUE;
+		}
+	}
+	return FALSE;
+}
+
+/*
+ * Get the current size of the Windows Console in lines and columns.
+ * This method must not alter the cached values stored in ConsoleInfo.
+ * It should report the result from the GetConsoleScreenBufferInfo 
+ * API call directly. It may use the cached values as a fallback if the 
+ * API call fails. The use of this API call is non-destructive in the 
+ * API context.
+ * This method can be safely called before the Console is initialized,
+ * because we can fallback to query the standard handles.x
+ */
+METHOD(size,void)(int *Lines, int *Cols)
+{
+	T((T_CALLED("lib_win32conpty::pty_size(lines=%p, cols=%p)"), Lines, Cols));
+
+	if (Lines != NULL && Cols != NULL)
+	{
+		CONSOLE_SCREEN_BUFFER_INFO csbi;
+		if (try_get_sbi(&csbi))
+		{
+			*Lines = (int)(csbi.srWindow.Bottom + 1 - csbi.srWindow.Top);
+			*Cols = (int)(csbi.srWindow.Right + 1 - csbi.srWindow.Left);
+			return;
+		}
+		// Fallback to cached values or defaults if we can't get the console size.
+		// Windows Terminal default size is 120 columns x 30 rows.
+		// If cached values are set we use those instead to reflect the actual size.
+		*Lines = defaultCONSOLE.sbi_lines != -1 ? defaultCONSOLE.sbi_lines : 30;
+		*Cols  = defaultCONSOLE.sbi_cols  != -1 ? defaultCONSOLE.sbi_cols  : 120;
+	}
+}
+
 /*
  * Check if the Windows Console has been resized.
  * This provides SIGWINCH-like functionality for Windows ConPTY.
@@ -473,44 +521,6 @@ METHOD(size_changed,BOOL)(void)
 		}
 	}
 	returnBool(resized);
-}
-
-/*
- * Get the current size of the Windows Console in lines and columns.
- * This method must not alter the cached values stored in ConsoleInfo.
- * It should report the result from the GetConsoleScreenBufferInfo 
- * API call directly. It may use the cached values as a fallback if the 
- * API call fails. The use of this API call is non-destructive in the 
- * API context.
- * This method can be safely called before the Console is initialized,
- * because we can fallback to query the standard handles.x
- */
-METHOD(size,void)(int *Lines, int *Cols)
-{
-	T((T_CALLED("lib_win32conpty::pty_size(lines=%p, cols=%p)"), Lines, Cols));
-
-	if (Lines != NULL && Cols != NULL)
-	{
-		CONSOLE_SCREEN_BUFFER_INFO csbi;
-		HANDLE test_handles[] = {defaultCONSOLE.ConsoleHandleOut, GetStdHandle(STD_OUTPUT_HANDLE), GetStdHandle(STD_ERROR_HANDLE)};
-		HANDLE hdl;
-
-		for (size_t i = 0; i < sizeof(test_handles) / sizeof(test_handles[0]); ++i)
-		{
-			hdl = test_handles[i];
-			if (hdl != INVALID_HANDLE_VALUE && GetConsoleScreenBufferInfo(hdl, &csbi))
-			{
-				*Lines = (int)(csbi.srWindow.Bottom + 1 - csbi.srWindow.Top);
-				*Cols = (int)(csbi.srWindow.Right + 1 - csbi.srWindow.Left);
-				return;
-			}
-		}
-		// Fallback to cached values or defaults if we can't get the console size.
-		// Windows Terminal default size is 120 columns x 30 rows.
-		// If cached values are set we use those instead to reflect the actual size.
-		*Lines = defaultCONSOLE.sbi_lines != -1 ? defaultCONSOLE.sbi_lines : 30;
-		*Cols  = defaultCONSOLE.sbi_cols  != -1 ? defaultCONSOLE.sbi_cols  : 120;
-	}
 }
 
 // ---------------------------------------------------------------------------------------
