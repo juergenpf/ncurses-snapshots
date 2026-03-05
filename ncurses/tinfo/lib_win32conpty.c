@@ -461,19 +461,17 @@ METHOD(size_changed,BOOL)(void)
 	{
 		defaultCONSOLE.sbi_lines = current_lines;
 		defaultCONSOLE.sbi_cols = current_cols;
-		returnBool(FALSE);
+	} else {
+		if (current_lines != defaultCONSOLE.sbi_lines || current_cols != defaultCONSOLE.sbi_cols)
+		{
+			defaultCONSOLE.sbi_lines = current_lines;
+			defaultCONSOLE.sbi_cols = current_cols;
+
+			_nc_globals.have_sigwinch = 1;
+
+			resized = TRUE;
+		}
 	}
-
-	if (current_lines != defaultCONSOLE.sbi_lines || current_cols != defaultCONSOLE.sbi_cols)
-	{
-		defaultCONSOLE.sbi_lines = current_lines;
-		defaultCONSOLE.sbi_cols = current_cols;
-
-		_nc_globals.have_sigwinch = 1;
-
-		resized = TRUE;
-	}
-
 	returnBool(resized);
 }
 
@@ -494,40 +492,24 @@ METHOD(size,void)(int *Lines, int *Cols)
 	if (Lines != NULL && Cols != NULL)
 	{
 		CONSOLE_SCREEN_BUFFER_INFO csbi;
-		HANDLE hdl_out = defaultCONSOLE.ConsoleHandleOut;
+		HANDLE test_handles[] = {defaultCONSOLE.ConsoleHandleOut, GetStdHandle(STD_OUTPUT_HANDLE), GetStdHandle(STD_ERROR_HANDLE)};
+		HANDLE hdl;
 
-		if (hdl_out != INVALID_HANDLE_VALUE && GetConsoleScreenBufferInfo(hdl_out, &csbi))
+		for (size_t i = 0; i < sizeof(test_handles) / sizeof(test_handles[0]); ++i)
 		{
-			*Lines = (int)(csbi.srWindow.Bottom + 1 - csbi.srWindow.Top);
-			*Cols = (int)(csbi.srWindow.Right + 1 - csbi.srWindow.Left);
-		}
-		else
-		{
-			HANDLE hOut = GetStdHandle(STD_OUTPUT_HANDLE);
-			if (hOut != INVALID_HANDLE_VALUE && GetConsoleScreenBufferInfo(hOut, &csbi))
+			hdl = test_handles[i];
+			if (hdl != INVALID_HANDLE_VALUE && GetConsoleScreenBufferInfo(hdl, &csbi))
 			{
 				*Lines = (int)(csbi.srWindow.Bottom + 1 - csbi.srWindow.Top);
 				*Cols = (int)(csbi.srWindow.Right + 1 - csbi.srWindow.Left);
-			}
-			else
-			{ // Maybe stderr works...
-				HANDLE hErr = GetStdHandle(STD_ERROR_HANDLE);
-				if (hErr != INVALID_HANDLE_VALUE && GetConsoleScreenBufferInfo(hErr, &csbi))
-				{
-					*Lines = (int)(csbi.srWindow.Bottom + 1 - csbi.srWindow.Top);
-					*Cols = (int)(csbi.srWindow.Right + 1 - csbi.srWindow.Left);
-				}
-				else
-				{
-					// Fallback to cached values or defaults if we can't get the console size.
-					// Windows Terminal default size is 120 columns x 30 rows.
-					// If cached values are set we use those instead to reflect the actual size.
-
-					*Lines = defaultCONSOLE.sbi_lines != -1 ? defaultCONSOLE.sbi_lines : 30;
-					*Cols  = defaultCONSOLE.sbi_cols  != -1 ? defaultCONSOLE.sbi_cols  : 120;
-				}
+				return;
 			}
 		}
+		// Fallback to cached values or defaults if we can't get the console size.
+		// Windows Terminal default size is 120 columns x 30 rows.
+		// If cached values are set we use those instead to reflect the actual size.
+		*Lines = defaultCONSOLE.sbi_lines != -1 ? defaultCONSOLE.sbi_lines : 30;
+		*Cols  = defaultCONSOLE.sbi_cols  != -1 ? defaultCONSOLE.sbi_cols  : 120;
 	}
 }
 
