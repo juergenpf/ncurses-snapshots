@@ -499,7 +499,6 @@ METHOD(size,void)(int *Lines, int *Cols)
 	}
 }
 
-#define MIN_CHECK_INTERVAL_MS 100
 /*
  * Check if the Windows Console has been resized.
  * This provides SIGWINCH-like functionality for Windows ConPTY.
@@ -514,7 +513,7 @@ METHOD(size_changed,BOOL)(void)
 
 	T((T_CALLED("lib_win32conpty::pty_size_changed()")));
 
-	if (now -lastCheck < MIN_CHECK_INTERVAL_MS)
+	if (now -lastCheck < RESIZE_CHECK_THROTTLING_MS)
 		returnBool(FALSE);
 
 	DispatchMethod(size)(&current_lines, &current_cols);

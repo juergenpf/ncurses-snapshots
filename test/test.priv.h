@@ -1109,12 +1109,17 @@ extern int TABSIZE;
 #define EXIT_FAILURE 1
 #endif
 
-#undef _NC_WINDOWS_NATIVE
-#if (defined(_WIN32) || defined(_WIN64))
-#define _NC_WINDOWS_NATIVE 1
+#undef _NC_WINDOWS
+#if (defined(_WIN32) || defined(_WIN64__) || defined(__MSYS__))
+#define _NC_WINDOWS
 #endif
 
-#if defined(_NC_WINDOWS_NATIVE)
+#undef _NC_WINDOWS_NATIVE
+#if (defined(_WIN32) || defined(_WIN64))
+#define _NC_WINDOWS_NATIVE
+#endif
+
+#if defined(_NC_WINDOWS)
 
 #if defined(PDCURSES)
 #ifdef WINVER
@@ -1139,7 +1144,7 @@ extern int TABSIZE;
 #include <nc_win32.h>
 #endif
 
-#endif /* PDCURSES */
+#endif /* !PDCURSES */
 
 #define getlogin() "username"
 
@@ -1155,7 +1160,7 @@ extern int TABSIZE;
 #undef large
 #undef small
 
-#endif /* WIN32... */
+#endif /* defined(_NC_WINDOWS) */
 
 #ifdef NEED_TIME_H
 #if TIME_WITH_SYS_TIME

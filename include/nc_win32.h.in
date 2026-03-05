@@ -116,6 +116,13 @@ typedef struct
 
 #if defined(CURSES_PRIV_H) || defined(TEST_PRIV_H) || 1
 
+/*
+* Milliseconds to wait between checks for console resize events. 
+* We don't want to check too often, as that would be wasteful, but we 
+* also don't want to check too rarely, as that would make the UI feel 
+* unresponsive when resizing the console window.
+*/
+#define RESIZE_CHECK_THROTTLING_MS 100
 
 #if !HAVE_CLOCK_GETTIME && !HAVE_GETTIMEOFDAY
 extern NCURSES_EXPORT(int) _nc_gettimeofday(struct timeval *, void *);
