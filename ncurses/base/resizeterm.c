@@ -480,7 +480,7 @@ NCURSES_SP_NAME(resizeterm)(NCURSES_SP_DCLx int ToLines, int ToCols)
 
 		if (NCURSES_SP_NAME(is_term_resized)(NCURSES_SP_ARGx ToLines, ToCols))
 		{
-#if USE_SIGWINCH || defined(CONPTY_BUFFER_RESIZE_EVENT)
+#if USE_SIGWINCH
 			T(("resizeterm: check slk"));
 			ripoff_t *rop;
 			bool slk_visible = (SP_PARM != NULL && SP_PARM->_slk != NULL && !(SP_PARM->_slk->hidden));
@@ -492,7 +492,7 @@ NCURSES_SP_NAME(resizeterm)(NCURSES_SP_DCLx int ToLines, int ToCols)
 #endif
 			result = NCURSES_SP_NAME(resize_term)(NCURSES_SP_ARGx ToLines, ToCols);
 
-#if USE_SIGWINCH || defined(CONPTY_BUFFER_RESIZE_EVENT)
+#if USE_SIGWINCH
 			clearok(CurScreen(SP_PARM), TRUE); /* screen contents are unknown */
 
 			/* ripped-off lines are a special case: if we did not lengthen
@@ -524,7 +524,7 @@ NCURSES_SP_NAME(resizeterm)(NCURSES_SP_DCLx int ToLines, int ToCols)
 			}
 #endif
 		}
-#if USE_SIGWINCH || defined(CONPTY_BUFFER_RESIZE_EVENT)
+#if USE_SIGWINCH
 		T(("resizeterm: ungetch KEY_RESIZE"));
 		safe_ungetch(SP_PARM, KEY_RESIZE); /* so application can know this */
 #endif

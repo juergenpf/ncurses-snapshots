@@ -55,9 +55,7 @@ MODULE_ID("$Id$")
 // Prototypes of static function we want to use in initializers
 METHOD(init,BOOL)(int fdOut, int fdIn);
 METHOD(size,void)(int *Lines, int *Cols);
-#if !defined(CONPTY_BUFFER_RESIZE_EVENT)
 METHOD(size_changed,BOOL)(void);
-#endif
 METHOD(setmode,int)(int fd, const TTY *arg);
 METHOD(getmode,int)(int fd, TTY *arg);
 METHOD(defmode,int)(TTY *arg, short kind);
@@ -78,16 +76,12 @@ static ConsoleInfo defaultCONSOLE = {
     .ConsoleHandleIn = INVALID_HANDLE_VALUE,
     .ConsoleHandleOut = INVALID_HANDLE_VALUE,
 
-#if !defined(CONPTY_BUFFER_RESIZE_EVENT)
     .sbi_lines = -1,
     .sbi_cols = -1,
-#endif
 
 	Dispatch(init),
 	Dispatch(size),
-#if !defined(CONPTY_BUFFER_RESIZE_EVENT)
     Dispatch(size_changed),
-#endif
     Dispatch(setmode),
     Dispatch(getmode),
     Dispatch(defmode),
@@ -145,26 +139,6 @@ static HANDLE g_shutdown_event = NULL;        // Signal: "System beenden"
 
 /* Forward declaration of the input reader thread */
 static unsigned __stdcall input_thread(LPVOID param);
-
-// ---------------------------------------------------------------------------------------
-/*
-* This is what we need for our SIGWINCH replacement. We will run a thread that will wait
-* for console buffer resize events.
-*/
-#if defined(CONPTY_BUFFER_RESIZE_EVENT)
-typedef struct {
-    HANDLE hInput;
-    int lastWidth;
-    int lastHeight;
-    volatile BOOL running;
-} ConsoleSizeWatcher;
-
-static HANDLE g_size_watcher_thread = NULL;
-static ConsoleSizeWatcher g_size_watcher = {0};
-
-// Forward declaration of the size watcher thread
-static unsigned __stdcall SizeWatcherThread(void* arg);
-#endif /* CONPTY_BUFFER_RESIZE_EVENT */
 
 // ---------------------------------------------------------------------------------------
 
@@ -436,18 +410,7 @@ METHOD(init,BOOL)(int fdOut, int fdIn)
 			returnBool(FALSE);
 		}
 		defaultCONSOLE.ttyflags.dwFlagIn = dwFlagIn;
-#if defined(CONPTY_BUFFER_RESIZE_EVENT)
-		g_size_watcher.hInput = stdin_hdl;
-		DispatchMethod(size)(&g_size_watcher.lastHeight, &g_size_watcher.lastWidth);
-		g_size_watcher	.running = TRUE;
 
-		g_size_watcher_thread = (HANDLE)(uintptr_t)_beginthreadex(NULL, 0, SizeWatcherThread, &g_size_watcher, 0, NULL);
-		 if (g_size_watcher_thread == NULL) 
-		 {
-			 T(("Failed to create size watcher thread"));
-			 returnBool(FALSE);
-		 }
-#endif
 		defaultCONSOLE.initialized = TRUE;
 		result = TRUE;
 	}
@@ -481,77 +444,6 @@ METHOD(init,BOOL)(int fdOut, int fdIn)
 }
 
 /*
-* There is one golden rule when writing POSIX-like ConPTY slave site programs:
-* NEVER USE ReadConsoleInput or any of the related console input APIs, because 
-* they will steal the bytes from your input stream and cause your main thread to 
-* miss them, which will lead to dysfunction of the input handling in your program. 
-* But no rule without exception: there are three event types: key events, 
-* mouse events and window buffer size events. The first two are the ones that will 
-* cause problems if we consume them in the watcher thread, because they will steal 
-* the input from the main thread or the input thread. But we may consume the buffer
-* size events, because they are not relevant for the main thread and they do not carry
-* any input data that the main thread needs to process..
-*/
-#if defined(CONPTY_BUFFER_RESIZE_EVENT)
-static unsigned __stdcall SizeWatcherThread(void* arg) {
-    ConsoleSizeWatcher* csw = (ConsoleSizeWatcher*)arg;
-    
-	T((T_CALLED("lib_win32conpy::SizeWatcherThread started")));
-    while (csw->running) {
-        DWORD waitResult = WaitForSingleObject(csw->hInput, INFINITE);
-        
-        if (waitResult == WAIT_OBJECT_0) {
-            DWORD numEvents = 0;
-            GetNumberOfConsoleInputEvents(csw->hInput, &numEvents);
-            
-            if (numEvents > 0) {
-                INPUT_RECORD ir;
-                DWORD read;
-                if (PeekConsoleInput(csw->hInput, &ir, 1, &read)) {
-                    if (ir.EventType == WINDOW_BUFFER_SIZE_EVENT) {
-                        CONSOLE_SCREEN_BUFFER_INFO csbi;
-                        if (GetConsoleScreenBufferInfo(GetStdHandle(STD_OUTPUT_HANDLE), &csbi)) {
-                            int newWidth = csbi.srWindow.Right - csbi.srWindow.Left + 1;
-                            int newHeight = csbi.srWindow.Bottom - csbi.srWindow.Top + 1;
-                            
-                            if (newWidth != csw->lastWidth || newHeight != csw->lastHeight) {
-                                csw->lastWidth = newWidth;
-                                csw->lastHeight = newHeight;
-								T(("SizeWatcherThread: Detected console resize event, new size: %d cols x %d lines", newWidth, newHeight));
-								_nc_globals.have_sigwinch = 1;
-                            }
-                        }
-                        /* 
-						* We must consume the resize event here, otherwise the console will not send any 
-						* more events and our watcher thread will stop working until the next resize event 
-						* occurs, which could lead to a situation where the console becomes unresponsive 
-						* to input until the user resizes the window again. By consuming the event here, we 
-						* ensure that we continue to receive events and can detect subsequent resizes without 
-						* relying on another resize to trigger the event loop again. This is a quirk of how 
-						* the Windows Console handles input events, and if we don't consume the resize event, 
-						* it can cause our watcher thread to stop receiving events altogether until another 
-						* resize happens, which is not desirable. By consuming it immediately, we ensure that 
-						* our watcher thread continues to function properly and can detect future resizes 
-						* without any issues.
-						*/
-                        ReadConsoleInput(csw->hInput, &ir, 1, &read);
-                    } else {
-                        /*
-						* IMPORTANT: If it was not a resize event (e.g. a key press),
-						* the watcher must NOT consume the event with ReadConsoleInput,
-						* otherwise your main thread (fread/read) will lose this data!
-						* You could work with FlushConsoleInputBuffer here or simply ignore the
-						* event if the main thread is reading anyway.
-						*/
-					}
-				}
-			}
-		}
-    }
-    return 0;
-}
-#else
-/*
  * Check if the Windows Console has been resized.
  * This provides SIGWINCH-like functionality for Windows ConPTY.
  * Returns TRUE if a resize was detected.
@@ -584,7 +476,6 @@ METHOD(size_changed,BOOL)(void)
 
 	returnBool(resized);
 }
-#endif
 
 /*
  * Get the current size of the Windows Console in lines and columns.
@@ -631,13 +522,9 @@ METHOD(size,void)(int *Lines, int *Cols)
 					// Fallback to cached values or defaults if we can't get the console size.
 					// Windows Terminal default size is 120 columns x 30 rows.
 					// If cached values are set we use those instead to reflect the actual size.
-#if defined(CONPTY_BUFFER_RESIZE_EVENT)
-					*Lines = g_size_watcher.lastHeight != -1 ? g_size_watcher.lastHeight : 30;
-					*Cols  = g_size_watcher.lastWidth  != -1 ? g_size_watcher.lastWidth  : 120;
-#else
+
 					*Lines = defaultCONSOLE.sbi_lines != -1 ? defaultCONSOLE.sbi_lines : 30;
 					*Cols  = defaultCONSOLE.sbi_cols  != -1 ? defaultCONSOLE.sbi_cols  : 120;
-#endif
 				}
 			}
 		}

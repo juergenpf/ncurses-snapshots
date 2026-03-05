@@ -528,11 +528,11 @@ _nc_wgetch(WINDOW *win,
 	ch = fifo_pull(sp);
     }
 
-#if defined(_NC_WINDOWS_NATIVE) && !defined(CONPTY_BUFFER_RESIZE_EVENT)
+#if defined(_NC_WINDOWS_NATIVE) 
     /* Check for console resize events after getting input */
     if (WINCONSOLE.size_changed()) {
-	/* Resize detected - preserve the triggering character */
-	safe_ungetch(sp, ch);
+		/* Resize detected - preserve the triggering character */
+		safe_ungetch(sp, ch);
     }
 #endif
 

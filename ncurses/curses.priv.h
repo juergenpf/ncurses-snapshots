@@ -2118,7 +2118,7 @@ extern NCURSES_EXPORT(int)    _nc_ripoffline(int, int(*)(WINDOW*, int));
 					}
 
 /* lib_tstp.c */
-#if USE_SIGWINCH || defined(CONPTY_BUFFER_RESIZE_EVENT)
+#if USE_SIGWINCH
 extern NCURSES_EXPORT(int) _nc_handle_sigwinch(SCREEN *);
 #else
 #define _nc_handle_sigwinch(a) /* nothing */
