@@ -443,8 +443,16 @@ METHOD(init,BOOL)(int fdOut, int fdIn)
 	returnBool(result);
 }
 
+/*
+* Helper routine for getting the console size. We try to get the console size from 
+* multiple handles, because in some cases (like when running in Windows Terminal) 
+* the standard output handle might not be the one that actually provides the console 
+* size information, but another handle does. This routine tries to get the console 
+* size from the main output handle, and if that fails, it tries the standard output 
+* and standard error handles as well. If all attempts fail, it returns FALSE.
+*/
 static BOOL
-try_get_sbi(CONSOLE_SCREEN_BUFFER_INFO *csbi) 
+get_sbi(CONSOLE_SCREEN_BUFFER_INFO *csbi) 
 {
 	HANDLE test_handles[] = {defaultCONSOLE.ConsoleHandleOut, GetStdHandle(STD_OUTPUT_HANDLE), GetStdHandle(STD_ERROR_HANDLE)};
 	HANDLE hdl;
@@ -477,7 +485,7 @@ METHOD(size,void)(int *Lines, int *Cols)
 	if (Lines != NULL && Cols != NULL)
 	{
 		CONSOLE_SCREEN_BUFFER_INFO csbi;
-		if (try_get_sbi(&csbi))
+		if (get_sbi(&csbi))
 		{
 			*Lines = (int)(csbi.srWindow.Bottom + 1 - csbi.srWindow.Top);
 			*Cols = (int)(csbi.srWindow.Right + 1 - csbi.srWindow.Left);
@@ -486,11 +494,12 @@ METHOD(size,void)(int *Lines, int *Cols)
 		// Fallback to cached values or defaults if we can't get the console size.
 		// Windows Terminal default size is 120 columns x 30 rows.
 		// If cached values are set we use those instead to reflect the actual size.
-		*Lines = defaultCONSOLE.sbi_lines != -1 ? defaultCONSOLE.sbi_lines : 30;
-		*Cols  = defaultCONSOLE.sbi_cols  != -1 ? defaultCONSOLE.sbi_cols  : 120;
+		*Lines = defaultCONSOLE.sbi_lines != -1 ? defaultCONSOLE.sbi_lines : DEFAULT_CONSOLE_LINES;
+		*Cols  = defaultCONSOLE.sbi_cols  != -1 ? defaultCONSOLE.sbi_cols  : DEFAULT_CONSOLE_COLS;
 	}
 }
 
+#define MIN_CHECK_INTERVAL_MS 100
 /*
  * Check if the Windows Console has been resized.
  * This provides SIGWINCH-like functionality for Windows ConPTY.
@@ -498,10 +507,15 @@ METHOD(size,void)(int *Lines, int *Cols)
  */
 METHOD(size_changed,BOOL)(void)	
 {
+	static ULONGLONG lastCheck = 0;
 	int current_lines, current_cols;
+	ULONGLONG now = GetTickCount64();
 	bool resized = FALSE;
 
 	T((T_CALLED("lib_win32conpty::pty_size_changed()")));
+
+	if (now -lastCheck < MIN_CHECK_INTERVAL_MS)
+		returnBool(FALSE);
 
 	DispatchMethod(size)(&current_lines, &current_cols);
 
@@ -520,6 +534,7 @@ METHOD(size_changed,BOOL)(void)
 			resized = TRUE;
 		}
 	}
+	lastCheck = GetTickCount64();
 	returnBool(resized);
 }
 

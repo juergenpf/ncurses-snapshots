@@ -108,6 +108,12 @@ typedef struct
     uint8_t kind;          /* 0=unspecified, 1=shell, 2=prog, 3=auto */
 } ConsoleMode;
 
+// This are the "modern" defaults Windows Terminal uses
+#ifndef DEFAULT_CONSOLE_LINES
+#define DEFAULT_CONSOLE_LINES 30
+#define DEFAULT_CONSOLE_COLS  120
+#endif
+
 #if defined(CURSES_PRIV_H) || defined(TEST_PRIV_H) || 1
 
 
