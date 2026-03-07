@@ -30,47 +30,40 @@
 -- Author: Juergen Pfeifer
 -------------------------------------------------------------------------------
 
-This is work in progress, but it is in a state where one can see it
-works at least on the Windows Console.
-
-Before we dive into the details how to build and test ncurses for Windows, let
-me set expectations. The current MinGW based port to Windows has been started
+Before I dive into the details how to build and test ncurses for Windows, let
+me set expectations. The original MinGW based port to Windows has been started
 at a time, where virtual terminal processing and pseudo console wasn't
-available in Windows. Therefore we developed an alternative driver concept
+available in Windows. Therefore I developed an alternative driver concept
 that could use other mechanisms than traditional terminfo to manipulate the
-terminal. For Windows we used the classical console API to directly manipulate
+terminal. For Windows I used the classical console API to directly manipulate
 the console screen buffer. 
 
-When virtual terminal became available, we decided to keep support for legacy
-Windows in the code and built support for virtual terminal support into that
-already exisitng codebase. This led to a mixture of code for the new and the 
-old world that suffers when it comes to readability, clarity of concept and 
-correctness. Our future plan is to drop legacy support and to only support 
-Windows versions with virtuale console and pseudo terminal support 
-(Windows 10.0 build 17763, released in 2018).
+When virtual terminal became available, I decided to keep support for legacy
+Windows in the code and built support for virtual terminal into that already 
+exisitng codebase. This led to a mixture of code for the new and the  old 
+world that suffers when it comes to readability, clarity of concept and 
+correctness. 
 
-In the legacy Windows code for versions older than the above mentioned, there is
-no terminfo support. We have just support for the classical ncurses, panel, menu
-and form library. This is important to notice, because there are some programs who
-use and link against ncurses, but actually are using terminfo functionality. these
-programs won't run like expected on legacy Windows.
-
-In current Windows version we have full support for terminfo.
+Therefore I dropped legacy support and do only support Windows versions with 
+virtuale console and pseudo terminal support (Windows 10.0 build 17763, released 
+in October 2018). I have completely redesigned the implementation to use the
+new Pseudo-Console implementation (aka ConPTY) of the Windows Console API.
 
 But now let's talk about building and testing the libraries.
 
 I recommend using one of the Linux distributions that supports the MinGW
-cross-build packages. Because we develop for Windows, it's nice to be able
+cross-build packages. Because I develop for Windows, it's nice to be able
 to develop on Windows using WSL2 to host a Linux subsystem.
-The author is using Ubuntu under WSL2, not because it's a preference but it
-is the most common WSL2 distribution, well supported by the partners Canonical
-and Microsoft and most tips and tricks you'll find are using Ubuntu as an example.
-Please make sure that you set the default version of your WSL subsystem to 2.
-For all details how to install and start with WSL2, see this link:
+I am using Ubuntu under WSL2, not because it's a preference but it is the 
+most common WSL2 distribution, well supported by the partners Canonical
+and Microsoft and most tips and tricks you'll find are using Ubuntu as an 
+example. Please make sure that you set the default version of your WSL 
+subsystem to 2. For all details how to install and start with WSL2, see 
+this link:
 
 	https://learn.microsoft.com/en-us/windows/wsl/install
 
-Ifyou have installed Ubuntu, just install the mingw-w64 package:
+If you have installed Ubuntu, just install the mingw-w64 package:
 
 $ sudo apt update
 $ sudo apt install mingw-w64 
@@ -122,19 +115,17 @@ use MSYS2. See below how to get it.
 To build a decent but still small footprint ncurses that provides
 hooks for interop, I recommend using these options:
 
-	--without-libtool
 	--disable-home-terminfo
 	--enable-database
 	--disable-termcap
 	--disable-sp-funcs
-	--enable-term-driver
 	--enable-named-pipes
 	--enable-interop
 
-One Remark: we use --disable-sp-funcs for Windows, because in Windows we always have
+One Remark: I use --disable-sp-funcs for Windows, because in Windows we always have
 exactly one Console in a process that we manipulate. There are no real other
 character devices. Ok, one might attach a terminal to a COM: port and want to
-talk to that using ncurses, but at least for the moment we don't support that. So
+talk to that using ncurses, but at least for the moment I don't support that. So
 there is no need for the sp functions which were designed to ease concurrent access
 from ncurses to multiple terminals from within one process.
 
@@ -328,7 +319,16 @@ if you write new code for Terminal apps with ncurses on Windows. The whole OS
 and the runtime are centered around Unicode, and the wide version of ncurses
 build against UCRT works quite nicely in that environment.
 
-If want to give UCRT a try or don't want to do cross-builds. you can get MSYS2 from
+In the meantime, to better support the development of ncurses for the Windows
+platform, I've created a devcontainer and some support files to do cross builds
+for Windows, including the Windows on ARM platform. It can build for MSVCRT and
+UCRT.
+
+Take a look here:
+
+	https://github.com/juergenpf/Wincurses
+
+	If want to give UCRT a try or don't want to do cross-builds. you can get MSYS2 from
 
 	https://www.msys2.org/
 
