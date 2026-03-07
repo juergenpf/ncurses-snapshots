@@ -158,8 +158,8 @@ typedef struct {
     
     ConsoleMode ttyflags;            /* The desired state of the console  */
     
-    HANDLE ConsoleHandleIn;          /* Console Handle actually used for input operations */
-    HANDLE ConsoleHandleOut;         /* Console Handle actually used for output operations */
+    HANDLE ConsoleHandleIn;          /* Pseudo-Console Handle actually used for input operations */
+    HANDLE ConsoleHandleOut;         /* Pseudo-Console Handle actually used for output operations */
 
     int sbi_lines;                   /* Cached console size */
     int sbi_cols;                    /* Cached console size */
@@ -171,9 +171,9 @@ typedef struct {
     int (*setmode)(int fd, const ConsoleMode *arg);                   /* Our SET_TTY implementation */
     int (*getmode)(int fd, ConsoleMode *arg);                         /* Our GET_TTY implementation */
     int (*defmode )(ConsoleMode *arg, short kind);                    /* Used by shell-/prog-mode handling to manage start/stop of the I/O subsystem of ncurses */
-    int (*flush)(int fd);                                             /* flush the console I/O stream denoted by the file descriptor */
-    int (*read)(int fd, unsigned char* result, size_t count);         /* Read bytes from the input stream. If wide characters are used, the UTF-8 assembly is done here */
-    int (*write)(int fd, const void *buf, size_t count);              /* Write bytes to the output stream. If wide characters are used, the UTF-8 encoding is done here */
+    int (*flush)(int fd);                                             /* flush the console I/O stream denoted by the file descriptor. Actualy, we only flush the input. */
+    int (*read)(int fd, unsigned char* result, size_t count);         /* Read bytes from the input stream. */
+    int (*write)(int fd, const void *buf, size_t count);              /* Write bytes to the output stream. */
     int (*start_input_subsystem)(void);                               /* In prog mode, we control the input stream */
     int (*stop_input_subsystem)(void);                                /* In shell mode, we leave it to the C runtime */
     int (*poll)(struct pty_pollfd *fds, nfds_t nfds, int timeout_ms); /* Minimalistic clone of UNIX poll, just polling stdin console input */
