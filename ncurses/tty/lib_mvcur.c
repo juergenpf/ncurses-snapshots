@@ -184,10 +184,10 @@ static unsigned long xmits;
 
 /* these override lib_tputs.c */
 static int
-NCURSES_SP_NAME(TestTPUTS)(NCURSES_SP_DCLx
-			   const char *string,
-			   int affcnt GCC_UNUSED,
-			   NCURSES_SP_OUTC outc)
+  NCURSES_SP_NAME(TestTPUTS) (NCURSES_SP_DCLx
+			      const char *string,
+			      int affcnt GCC_UNUSED,
+			      NCURSES_SP_OUTC outc)
 /* stub tputs() that dumps sequences in a visible form */
 {
     (void) SP_PARM;
@@ -1352,7 +1352,8 @@ main(int argc GCC_UNUSED, char *argv[]GCC_UNUSED)
 		 * transmission both. Transmission time is an estimate
 		 * assuming 9 bits/char, 8 bits + 1 stop bit.
 		 */
-		double totalest = cumtime + (double) xmits * 9 * 1e6 / speeds[i];
+		double totalest = cumtime + (double) xmits * 9 * 1e6 /
+		speeds[i];
 
 		/*
 		 * Per-character optimization overhead in character transmits

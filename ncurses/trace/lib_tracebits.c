@@ -240,19 +240,19 @@ _nc_trace_ttymode(const TTY * tty)
 	DATA(ENABLE_AUTO_POSITION),
 	DATA(ENABLE_VIRTUAL_TERMINAL_INPUT)
     };
-	
+
     buf = _nc_trace_buf(0,
-                        14 + sizeof(dwFlagsOut) +
-                        14 + sizeof(dwFlagsIn)  +
-						24);
+			14 + sizeof(dwFlagsOut) +
+			14 + sizeof(dwFlagsIn) +
+			24);
     if (buf != NULL) {
 	_nc_STRCAT(buf, "\n", TRACE_BUF_SIZE(0));
-        lookup_bits(buf, dwFlagsIn, "dwFlagIn", tty->dwFlagIn);
+	lookup_bits(buf, dwFlagsIn, "dwFlagIn", tty->dwFlagIn);
 	_nc_STRCAT(buf, "\n", TRACE_BUF_SIZE(0));
-        lookup_bits(buf, dwFlagsOut, "dwFlagOut", tty->dwFlagOut);
+	lookup_bits(buf, dwFlagsOut, "dwFlagOut", tty->dwFlagOut);
 	_nc_STRCAT(buf, "\n", TRACE_BUF_SIZE(0));
     }
- #else
+#else
     /* reference: ttcompat(4M) on SunOS 4.1 */
 #ifndef EVENP
 #define EVENP 0

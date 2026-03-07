@@ -385,7 +385,7 @@ handle_sysmouse(int sig GCC_UNUSED)
 }
 #endif /* USE_SYSMOUSE */
 
-#if 1 /* USE_XTERM_MOUSE */
+#if 1				/* USE_XTERM_MOUSE */
 #define xterm_kmous "\033[M"
 
 static void
@@ -1080,11 +1080,11 @@ decode_xterm_X10(SCREEN *sp, MEVENT * eventp)
 	/* For VIO mouse we add extra bit 64 to disambiguate button-up. */
 	res = (int) NC_READ(
 #if USE_EMX_MOUSE
-			    (M_FD(sp) >= 0) ? M_FD(sp) : sp->_ifd,
+			       (M_FD(sp) >= 0) ? M_FD(sp) : sp->_ifd,
 #else
-			    sp->_ifd,
+			       sp->_ifd,
 #endif
-			    kbuf + grabbed, (size_t) (MAX_KBUF - (int) grabbed));
+			       kbuf + grabbed, (size_t) (MAX_KBUF - (int) grabbed));
 	if (res < 0)
 	    break;
     }
@@ -1128,11 +1128,11 @@ decode_xterm_1005(SCREEN *sp, MEVENT * eventp)
 
 	res = (int) NC_READ(
 #if USE_EMX_MOUSE
-			    (M_FD(sp) >= 0) ? M_FD(sp) : sp->_ifd,
+			       (M_FD(sp) >= 0) ? M_FD(sp) : sp->_ifd,
 #else
-			    sp->_ifd,
+			       sp->_ifd,
 #endif
-			    (kbuf + grabbed), (size_t) 1);
+			       (kbuf + grabbed), (size_t) 1);
 	if (res < 0)
 	    break;
 	grabbed += (size_t) res;
@@ -1206,11 +1206,11 @@ read_SGR(const SCREEN *sp, SGR_DATA * result)
 
 	res = (int) NC_READ(
 #if USE_EMX_MOUSE
-			    (M_FD(sp) >= 0) ? M_FD(sp) : sp->_ifd,
+			       (M_FD(sp) >= 0) ? M_FD(sp) : sp->_ifd,
 #else
-			    sp->_ifd,
+			       sp->_ifd,
 #endif
-			    (kbuf + grabbed), (size_t) 1);
+			       (kbuf + grabbed), (size_t) 1);
 	if (res < 0)
 	    break;
 	if ((grabbed + MAX_KBUF) >= (int) sizeof(kbuf)) {
@@ -1833,7 +1833,7 @@ NCURSES_SP_NAME(getmouse) (NCURSES_SP_DCLx MEVENT * aevent)
 	    SP_PARM->_mouse_read++;
 	    result = OK;
 	} else {
-		TR(TRACE_IEVENT, ("getmouse: no valid event in queue"));
+	    TR(TRACE_IEVENT, ("getmouse: no valid event in queue"));
 	    /* Reset the provided event */
 	    aevent->bstate = 0;
 	    Invalidate(aevent);

@@ -97,7 +97,7 @@ NCURSES_SP_NAME(raw) (NCURSES_SP_DCL0)
 	buf.c_cc[VMIN] = 1;
 	buf.c_cc[VTIME] = 0;
 #elif defined(_NC_WINDOWS_NATIVE)
-	buf.dwFlagIn &= (unsigned long) ~(ENABLE_PROCESSED_INPUT|ENABLE_LINE_INPUT);
+	buf.dwFlagIn &= (unsigned long) ~(ENABLE_PROCESSED_INPUT | ENABLE_LINE_INPUT);
 #else
 	buf.sg_flags |= RAW;
 #endif
@@ -153,7 +153,7 @@ NCURSES_SP_NAME(cbreak) (NCURSES_SP_DCL0)
 	buf.c_cc[VMIN] = 1;
 	buf.c_cc[VTIME] = 0;
 #elif defined(_NC_WINDOWS_NATIVE)
-	buf.dwFlagIn &= (unsigned long) ~(ENABLE_PROCESSED_INPUT|ENABLE_LINE_INPUT);
+	buf.dwFlagIn &= (unsigned long) ~(ENABLE_PROCESSED_INPUT | ENABLE_LINE_INPUT);
 #else
 	buf.sg_flags |= CBREAK;
 #endif
@@ -230,7 +230,7 @@ NCURSES_SP_NAME(noraw) (NCURSES_SP_DCL0)
 	    (termp->Ottyb.c_lflag & IEXTEN);
 	buf.c_iflag |= COOKED_INPUT;
 #elif defined(_NC_WINDOWS_NATIVE)
-	buf.dwFlagIn |= (ENABLE_PROCESSED_INPUT|ENABLE_LINE_INPUT);
+	buf.dwFlagIn |= (ENABLE_PROCESSED_INPUT | ENABLE_LINE_INPUT);
 #else
 	buf.sg_flags &= ~(RAW | CBREAK);
 #endif
@@ -284,7 +284,7 @@ NCURSES_SP_NAME(nocbreak) (NCURSES_SP_DCL0)
 	buf.c_lflag |= ICANON;
 	buf.c_iflag |= ICRNL;
 #elif defined(_NC_WINDOWS_NATIVE)
-	buf.dwFlagIn |= (ENABLE_LINE_INPUT | ENABLE_PROCESSED_INPUT|ENABLE_LINE_INPUT);
+	buf.dwFlagIn |= (ENABLE_LINE_INPUT | ENABLE_PROCESSED_INPUT | ENABLE_LINE_INPUT);
 #else
 	buf.sg_flags &= ~CBREAK;
 #endif

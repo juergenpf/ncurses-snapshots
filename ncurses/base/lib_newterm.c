@@ -85,16 +85,16 @@ _nc_initscr(NCURSES_SP_DCL0)
 #elif HAVE_SGTTY_H
 	buf.sg_flags &= ~(ECHO | CRMOD);
 #elif defined(_NC_WINDOWS_NATIVE)
-        buf.dwFlagIn  = (ENABLE_VIRTUAL_TERMINAL_INPUT 
-		| ENABLE_PROCESSED_INPUT 
-		| ENABLE_QUICK_EDIT_MODE 
-		| ENABLE_EXTENDED_FLAGS);
-		
-        buf.dwFlagOut = (ENABLE_VIRTUAL_TERMINAL_PROCESSING 
-		| ENABLE_PROCESSED_OUTPUT 
-		| ENABLE_WRAP_AT_EOL_OUTPUT 
-		| DISABLE_NEWLINE_AUTO_RETURN);
-		buf.kind = TTY_MODE_PROGRAM;
+	buf.dwFlagIn = (ENABLE_VIRTUAL_TERMINAL_INPUT
+			| ENABLE_PROCESSED_INPUT
+			| ENABLE_QUICK_EDIT_MODE
+			| ENABLE_EXTENDED_FLAGS);
+
+	buf.dwFlagOut = (ENABLE_VIRTUAL_TERMINAL_PROCESSING
+			 | ENABLE_PROCESSED_OUTPUT
+			 | ENABLE_WRAP_AT_EOL_OUTPUT
+			 | DISABLE_NEWLINE_AUTO_RETURN);
+	buf.kind = TTY_MODE_PROGRAM;
 #else
 	memset(&buf, 0, sizeof(buf));
 #endif
@@ -238,103 +238,103 @@ NCURSES_SP_NAME(newterm) (NCURSES_SP_DCLx
 	    int value;
 	    int cols;
 #if defined(_NC_WINDOWS_NATIVE)
-	    if (!WINCONSOLE.init(fileno(_ofp), fileno(_ifp)))
-	    {
+	    if (!WINCONSOLE.init(fileno(_ofp), fileno(_ifp))) {
 		_nc_set_screen(current);
 		returnSP(NULL);
 	    } else {
 #endif
 #if !NCURSES_SP_FUNCS
-	    _nc_set_screen(CURRENT_SCREEN);
+		_nc_set_screen(CURRENT_SCREEN);
 #endif
-	    assert(SP_PARM != NULL);
-	    cols = *(ptrCols(SP_PARM));
-	    /*
-	     * In setupterm() we did a set_curterm(), but it was before we set
-	     * CURRENT_SCREEN.  So the "current" screen's terminal pointer was
-	     * overwritten with a different terminal.  Later, in
-	     * _nc_setupscreen(), we set CURRENT_SCREEN and the terminal
-	     * pointer in the new screen.
-	     *
-	     * Restore the terminal-pointer for the pre-existing screen, if
-	     * any.
-	     */
-	    if (current)
-		current->_term = its_term;
+		assert(SP_PARM != NULL);
+		cols = *(ptrCols(SP_PARM));
+		/*
+		 * In setupterm() we did a set_curterm(), but it was before we set
+		 * CURRENT_SCREEN.  So the "current" screen's terminal pointer was
+		 * overwritten with a different terminal.  Later, in
+		 * _nc_setupscreen(), we set CURRENT_SCREEN and the terminal
+		 * pointer in the new screen.
+		 *
+		 * Restore the terminal-pointer for the pre-existing screen, if
+		 * any.
+		 */
+		if (current)
+		    current->_term = its_term;
 
-	    new_term = SP_PARM->_term;
+		new_term = SP_PARM->_term;
 
-	    /* allow user to set maximum escape delay from the environment */
-	    if ((value = _nc_getenv_num("ESCDELAY")) >= 0) {
-		value = Min(value, MAX_DELAY_MSECS);
+		/* allow user to set maximum escape delay from the environment */
+		if ((value = _nc_getenv_num("ESCDELAY")) >= 0) {
+		    value = Min(value, MAX_DELAY_MSECS);
 #if NCURSES_EXT_FUNCS
-		NCURSES_SP_NAME(set_escdelay) (NCURSES_SP_ARGx value);
+		    NCURSES_SP_NAME(set_escdelay) (NCURSES_SP_ARGx value);
 #else
-		ESCDELAY = value;
+		    ESCDELAY = value;
 #endif
-	    }
+		}
 
-	    /* if the terminal type has real soft labels, set those up */
-	    if (slk_format && NumLabels > 0 && SLK_STDFMT(slk_format))
-		_nc_slk_initialize(StdScreen(SP_PARM), cols);
+		/* if the terminal type has real soft labels, set those up */
+		if (slk_format && NumLabels > 0 && SLK_STDFMT(slk_format))
+		    _nc_slk_initialize(StdScreen(SP_PARM), cols);
 
-	    SP_PARM->_ifd = fileno(_ifp);
-	    NCURSES_SP_NAME(typeahead) (NCURSES_SP_ARGx fileno(_ifp));
+		SP_PARM->_ifd = fileno(_ifp);
+		NCURSES_SP_NAME(typeahead) (NCURSES_SP_ARGx fileno(_ifp));
 #ifdef TERMIOS
-	    SP_PARM->_use_meta = ((new_term->Ottyb.c_cflag & CSIZE) == CS8 &&
-				  !(new_term->Ottyb.c_iflag & ISTRIP)) ||
-		USE_KLIBC_KBD;
+		SP_PARM->_use_meta = ((new_term->Ottyb.c_cflag & CSIZE) ==
+				      CS8 &&
+				      !(new_term->Ottyb.c_iflag & ISTRIP)) ||
+		    USE_KLIBC_KBD;
 #else
-	    SP_PARM->_use_meta = FALSE;
+		SP_PARM->_use_meta = FALSE;
 #endif
-	    SP_PARM->_endwin = ewInitial;
-	    /*
-	     * Check whether we can optimize scrolling under dumb terminals in
-	     * case we do not have any of these capabilities, scrolling
-	     * optimization will be useless.
-	     */
-	    SP_PARM->_scrolling = ((scroll_forward && scroll_reverse) ||
-				   ((parm_rindex ||
-				     parm_insert_line ||
-				     insert_line) &&
-				    (parm_index ||
-				     parm_delete_line ||
-				     delete_line)));
+		SP_PARM->_endwin = ewInitial;
+		/*
+		 * Check whether we can optimize scrolling under dumb terminals in
+		 * case we do not have any of these capabilities, scrolling
+		 * optimization will be useless.
+		 */
+		SP_PARM->_scrolling = ((scroll_forward && scroll_reverse) ||
+				       ((parm_rindex ||
+					 parm_insert_line ||
+					 insert_line) &&
+					(parm_index ||
+					 parm_delete_line ||
+					 delete_line)));
 
-	    NCURSES_SP_NAME(baudrate) (NCURSES_SP_ARG);		/* sets a field in the screen structure */
+		NCURSES_SP_NAME(baudrate) (NCURSES_SP_ARG);	/* sets a field in the screen structure */
 
-	    SP_PARM->_keytry = NULL;
+		SP_PARM->_keytry = NULL;
 
-	    /* compute movement costs so we can do better move optimization */
-	    /*
-	     * Check for mismatched graphic-rendition capabilities.  Most SVr4
-	     * terminfo trees contain entries that have rmul or rmso equated to
-	     * sgr0 (Solaris curses copes with those entries).  We do this only
-	     * for curses, since many termcap applications assume that
-	     * smso/rmso and smul/rmul are paired, and will not function
-	     * properly if we remove rmso or rmul.  Curses applications
-	     * shouldn't be looking at this detail.
-	     */
+		/* compute movement costs so we can do better move optimization */
+		/*
+		 * Check for mismatched graphic-rendition capabilities.  Most SVr4
+		 * terminfo trees contain entries that have rmul or rmso equated to
+		 * sgr0 (Solaris curses copes with those entries).  We do this only
+		 * for curses, since many termcap applications assume that
+		 * smso/rmso and smul/rmul are paired, and will not function
+		 * properly if we remove rmso or rmul.  Curses applications
+		 * shouldn't be looking at this detail.
+		 */
 #define SGR0_TEST(mode) (mode != NULL) && (exit_attribute_mode == NULL || strcmp(mode, exit_attribute_mode))
-	    SP_PARM->_use_rmso = SGR0_TEST(exit_standout_mode);
-	    SP_PARM->_use_rmul = SGR0_TEST(exit_underline_mode);
+		SP_PARM->_use_rmso = SGR0_TEST(exit_standout_mode);
+		SP_PARM->_use_rmul = SGR0_TEST(exit_underline_mode);
 #if USE_ITALIC
-	    SP_PARM->_use_ritm = SGR0_TEST(exit_italics_mode);
+		SP_PARM->_use_ritm = SGR0_TEST(exit_italics_mode);
 #endif
 
-	    /* compute movement costs so we can do better move optimization */
-	    _nc_mvcur_init();
+		/* compute movement costs so we can do better move optimization */
+		_nc_mvcur_init();
 
-	    /* initialize terminal to a sane state */
-	    _nc_screen_init();
+		/* initialize terminal to a sane state */
+		_nc_screen_init();
 
-	    /* Initialize the terminal line settings. */
-	    _nc_initscr(NCURSES_SP_ARG);
+		/* Initialize the terminal line settings. */
+		_nc_initscr(NCURSES_SP_ARG);
 
-	    _nc_signal_handler(TRUE);
-	    result = SP_PARM;
+		_nc_signal_handler(TRUE);
+		result = SP_PARM;
 #if defined(_NC_WINDOWS_NATIVE)
-	}
+	    }
 #endif
 	}
     }

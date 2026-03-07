@@ -187,8 +187,11 @@ extern NCURSES_EXPORT_VAR(ConsoleInfo*) _nc_currentCONSOLE;
 
 #if !HAVE_WCWIDTH
 #undef wcwidth
+#undef wcswidth
 #define wcwidth(ucs) _nc_wcwidth((wchar_t)(ucs))
+#define wcswidth(pwcs, n) _nc_wcswidth((pwcs), (n))
 extern NCURSES_EXPORT(int) _nc_wcwidth(uint32_t);
+extern NCURSES_EXPORT(int) _nc_wcswidth(const uint32_t *pwcs, size_t n);
 #endif
 
 #ifdef __cplusplus

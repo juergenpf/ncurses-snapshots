@@ -464,73 +464,67 @@ resize_term(int ToLines, int ToCols)
  * invoked directly from the signal handler.
  */
 NCURSES_EXPORT(int)
-NCURSES_SP_NAME(resizeterm)(NCURSES_SP_DCLx int ToLines, int ToCols)
+NCURSES_SP_NAME(resizeterm) (NCURSES_SP_DCLx int ToLines, int ToCols)
 {
-	int result = ERR;
+    int result = ERR;
 
-	T((T_CALLED("resizeterm(%p, %d,%d) old(%d,%d)"),
-	   (void *)SP_PARM, ToLines, ToCols,
-	   (SP_PARM == NULL) ? -1 : screen_lines(SP_PARM),
-	   (SP_PARM == NULL) ? -1 : screen_columns(SP_PARM)));
+    T((T_CALLED("resizeterm(%p, %d,%d) old(%d,%d)"),
+       (void *) SP_PARM, ToLines, ToCols,
+       (SP_PARM == NULL) ? -1 : screen_lines(SP_PARM),
+       (SP_PARM == NULL) ? -1 : screen_columns(SP_PARM)));
 
-	if (SP_PARM != NULL && ToLines > 0 && ToCols > 0)
-	{
-		result = OK;
-		SP_PARM->_sig_winch = FALSE;
+    if (SP_PARM != NULL && ToLines > 0 && ToCols > 0) {
+	result = OK;
+	SP_PARM->_sig_winch = FALSE;
 
-		if (NCURSES_SP_NAME(is_term_resized)(NCURSES_SP_ARGx ToLines, ToCols))
-		{
+	if (NCURSES_SP_NAME(is_term_resized) (NCURSES_SP_ARGx ToLines, ToCols)) {
 #if USE_SIGWINCH
-			T(("resizeterm: check slk"));
-			ripoff_t *rop;
-			bool slk_visible = (SP_PARM != NULL && SP_PARM->_slk != NULL && !(SP_PARM->_slk->hidden));
+	    T(("resizeterm: check slk"));
+	    ripoff_t *rop;
+	    bool slk_visible = (SP_PARM != NULL && SP_PARM->_slk != NULL && !(SP_PARM->_slk->hidden));
 
-			if (slk_visible)
-			{
-				slk_clear();
-			}
+	    if (slk_visible) {
+		slk_clear();
+	    }
 #endif
-			result = NCURSES_SP_NAME(resize_term)(NCURSES_SP_ARGx ToLines, ToCols);
+	    result = NCURSES_SP_NAME(resize_term) (NCURSES_SP_ARGx ToLines, ToCols);
 
 #if USE_SIGWINCH
-			clearok(CurScreen(SP_PARM), TRUE); /* screen contents are unknown */
+	    clearok(CurScreen(SP_PARM), TRUE);	/* screen contents are unknown */
 
-			/* ripped-off lines are a special case: if we did not lengthen
-			 * them, we haven't moved them either.  repaint them, too.
-			 *
-			 * for the rest - stdscr and other windows - the client has to
-			 * decide which to repaint, since without panels, ncurses does
-			 * not know which are really on top.
-			 */
-			for (each_ripoff(rop))
-			{
-				if (rop->win != StdScreen(SP_PARM) && rop->win != NULL && rop->line < 0)
-				{
+	    /* ripped-off lines are a special case: if we did not lengthen
+	     * them, we haven't moved them either.  repaint them, too.
+	     *
+	     * for the rest - stdscr and other windows - the client has to
+	     * decide which to repaint, since without panels, ncurses does
+	     * not know which are really on top.
+	     */
+	    for (each_ripoff(rop)) {
+		if (rop->win != StdScreen(SP_PARM) && rop->win != NULL &&
+		    rop->line < 0) {
 
-					if (rop->hook != _nc_slk_initialize)
-					{
-						touchwin(rop->win);
-						wnoutrefresh(rop->win);
-					}
-				}
-			}
-
-			/* soft-keys are a special case: we _know_ how to repaint them */
-			if (slk_visible)
-			{
-				NCURSES_SP_NAME(slk_restore)(NCURSES_SP_ARG);
-				NCURSES_SP_NAME(slk_touch)(NCURSES_SP_ARG);
-				NCURSES_SP_NAME(slk_refresh)(NCURSES_SP_ARG);
-			}
-#endif
+		    if (rop->hook != _nc_slk_initialize) {
+			touchwin(rop->win);
+			wnoutrefresh(rop->win);
+		    }
 		}
-#if USE_SIGWINCH
-		T(("resizeterm: ungetch KEY_RESIZE"));
-		safe_ungetch(SP_PARM, KEY_RESIZE); /* so application can know this */
+	    }
+
+	    /* soft-keys are a special case: we _know_ how to repaint them */
+	    if (slk_visible) {
+		NCURSES_SP_NAME(slk_restore) (NCURSES_SP_ARG);
+		NCURSES_SP_NAME(slk_touch) (NCURSES_SP_ARG);
+		NCURSES_SP_NAME(slk_refresh) (NCURSES_SP_ARG);
+	    }
 #endif
 	}
+#if USE_SIGWINCH
+	T(("resizeterm: ungetch KEY_RESIZE"));
+	safe_ungetch(SP_PARM, KEY_RESIZE);	/* so application can know this */
+#endif
+    }
 
-	returnCode(result);
+    returnCode(result);
 }
 
 #if NCURSES_SP_FUNCS

@@ -920,7 +920,7 @@ _nc_tgetent(char *bp, char **sourcename, int *lineno, const char *name)
 	if ((the_source = strdup(temp)) != NULL)
 	    *sourcename = the_source;
 #else
-        if ((the_source = strdup(pathvec[i])) != NULL)
+	if ((the_source = strdup(pathvec[i])) != NULL)
 	    *sourcename = the_source;
 #endif
     }

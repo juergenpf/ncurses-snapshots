@@ -7812,20 +7812,20 @@ main_menu(bool top)
 	for (;;) {
 #if USE_WIDEC_SUPPORT
 #if defined(_WIN32) || defined(_NC_WINDOWS_NATIVE)
-            /* Use fgetc for Windows - wide char input is problematic */
-            int ch_int = fgetc(stdin);
-            wint_t ch = (ch_int == EOF) ? WEOF : (wint_t)ch_int;
-            if (ch == WEOF) {
+	    /* Use fgetc for Windows - wide char input is problematic */
+	    int ch_int = fgetc(stdin);
+	    wint_t ch = (ch_int == EOF) ? WEOF : (wint_t) ch_int;
+	    if (ch == WEOF) {
 #else
-            wint_t ch = 0;
-            errno = 0;  /* Clear any stale error */
-            if ( (ch = fgetwc(stdin)) == WEOF) {
+	    wint_t ch = 0;
+	    errno = 0;		/* Clear any stale error */
+	    if ((ch = fgetwc(stdin)) == WEOF) {
 #endif
 #else
-            int ch_int = fgetc(stdin);
-            char ch = (ch_int == EOF) ? '\0' : (char) ch_int;
-            errno = 0;  /* Clear any stale error */
-            if (ch_int == EOF) {
+	    int ch_int = fgetc(stdin);
+	    char ch = (ch_int == EOF) ? '\0' : (char) ch_int;
+	    errno = 0;		/* Clear any stale error */
+	    if (ch_int == EOF) {
 #endif
 		int save_err = errno;
 		perror("\nOOPS");

@@ -634,9 +634,9 @@ NCURSES_SP_NAME(_nc_setupscreen) (
     sp->newhash = NULL;
 
 #if defined(_NC_WINDOWS_NATIVE)
-    assert(NULL!= output);
+    assert(NULL != output);
     // ConPTY can have exactly one console with output on stdout
-    assert(fileno(output)==STDOUT_FILENO);
+    assert(fileno(output) == STDOUT_FILENO);
 #endif
 
     T(("creating newscr"));

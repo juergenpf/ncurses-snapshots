@@ -184,7 +184,7 @@ static NCURSES_INLINE int
 fifo_pull(SCREEN *sp)
 {
     int ch = (head >= 0) ? sp->_fifo[head] : ERR;
-    
+
     TR(TRACE_IEVENT, ("pulling %s from %d", _nc_tracechar(sp, ch), head));
 
     if (peek == head) {
@@ -278,7 +278,7 @@ fifo_push(SCREEN *sp EVENTLIST_2nd(_nc_eventlist * evl))
     TR(TRACE_IEVENT, ("read %d characters", n));
 
     sp->_fifo[tail] = ch;
-    
+
     sp->_fifohold = 0;
     if (head == -1)
 	head = peek = tail;
@@ -392,7 +392,7 @@ _nc_wgetch(WINDOW *win,
     if (cooked_key_in_fifo()) {
 	recur_wrefresh(win);
 	*result = fifo_pull(sp);
-	
+
 	returnCode(*result >= KEY_MIN ? KEY_CODE_YES : OK);
     }
 #ifdef NCURSES_WGETCH_EVENTS
@@ -528,11 +528,11 @@ _nc_wgetch(WINDOW *win,
 	ch = fifo_pull(sp);
     }
 
-#if defined(_NC_WINDOWS_NATIVE) 
+#if defined(_NC_WINDOWS_NATIVE)
     /* Check for console resize events after getting input */
     if (WINCONSOLE.size_changed()) {
-		/* Resize detected - preserve the triggering character */
-		safe_ungetch(sp, ch);
+	/* Resize detected - preserve the triggering character */
+	safe_ungetch(sp, ch);
     }
 #endif
 
@@ -651,7 +651,7 @@ wgetch(WINDOW *win)
 		      EVENTLIST_2nd((_nc_eventlist *) 0));
     if (code != ERR)
 	code = value;
-	
+
     returnCode(code);
 }
 

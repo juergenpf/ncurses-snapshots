@@ -182,7 +182,6 @@ _nc_timed_wait(const SCREEN *sp MAYBE_UNUSED,
     int result = TW_NONE;
     TimeType t0;
 
-
 #if (USE_FUNC_POLL || HAVE_SELECT || defined(_NC_WINDOWS_NATIVE))
     int fd;
 #endif
