@@ -330,7 +330,7 @@ NCURSES_EXPORT(void)
 NCURSES_SP_NAME(_nc_mvcur_resume) (NCURSES_SP_DCL0)
 /* what to do at initialization time and after each shellout */
 {
-    if (!SP_PARM || !IsTermInfo(SP_PARM))
+    if (!SP_PARM)
 	return;
 
     /* initialize screen for cursor access */
@@ -512,7 +512,7 @@ NCURSES_EXPORT(void)
 NCURSES_SP_NAME(_nc_mvcur_wrap) (NCURSES_SP_DCL0)
 /* wrap up cursor-addressing mode */
 {
-    if (!SP_PARM || !IsTermInfo(SP_PARM))
+    if (!SP_PARM)
 	return;
 
     /* leave cursor at screen bottom */
