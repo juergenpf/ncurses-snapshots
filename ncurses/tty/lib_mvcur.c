@@ -160,7 +160,7 @@
 #define CUR SP_TERMTYPE
 #endif
 
-MODULE_ID("$Id: lib_mvcur.c,v 1.168 2026/01/13 08:43:39 tom Exp $")
+MODULE_ID("$Id: lib_mvcur.c,v 1.169 2026/03/06 09:08:25 tom Exp $")
 
 #define WANT_CHAR(sp, y, x) NewScreen(sp)->_line[y].text[x]	/* desired state */
 
@@ -184,10 +184,10 @@ static unsigned long xmits;
 
 /* these override lib_tputs.c */
 static int
-  NCURSES_SP_NAME(TestTPUTS) (NCURSES_SP_DCLx
-			      const char *string,
-			      int affcnt GCC_UNUSED,
-			      NCURSES_SP_OUTC outc)
+NCURSES_SP_NAME(TestTPUTS) (NCURSES_SP_DCLx
+			    const char *string,
+			    int affcnt GCC_UNUSED,
+			    NCURSES_SP_OUTC outc)
 /* stub tputs() that dumps sequences in a visible form */
 {
     (void) SP_PARM;
@@ -330,7 +330,7 @@ NCURSES_EXPORT(void)
 NCURSES_SP_NAME(_nc_mvcur_resume) (NCURSES_SP_DCL0)
 /* what to do at initialization time and after each shellout */
 {
-    if (!SP_PARM)
+    if (!SP_PARM || !IsTermInfo(SP_PARM))
 	return;
 
     /* initialize screen for cursor access */
@@ -512,7 +512,7 @@ NCURSES_EXPORT(void)
 NCURSES_SP_NAME(_nc_mvcur_wrap) (NCURSES_SP_DCL0)
 /* wrap up cursor-addressing mode */
 {
-    if (!SP_PARM)
+    if (!SP_PARM || !IsTermInfo(SP_PARM))
 	return;
 
     /* leave cursor at screen bottom */
@@ -1116,6 +1116,27 @@ _nc_mvcur(int yold, int xold,
 }
 #endif
 
+#if USE_TERM_DRIVER
+/*
+ * The terminal driver does not support the external "mvcur()".
+ */
+NCURSES_EXPORT(int)
+TINFO_MVCUR(NCURSES_SP_DCLx int yold, int xold, int ynew, int xnew)
+{
+    int rc;
+    rc = _nc_real_mvcur(NCURSES_SP_ARGx
+			yold, xold,
+			ynew, xnew,
+			NCURSES_SP_NAME(_nc_outch),
+			TRUE);
+    if ((SP_PARM != NULL) && (SP_PARM->_endwin == ewInitial))
+	NCURSES_SP_NAME(_nc_flush) (NCURSES_SP_ARG);
+    NCURSES_SP_NAME(_nc_flush) (NCURSES_SP_ARG);
+    return rc;
+}
+
+#else /* !USE_TERM_DRIVER */
+
 /*
  * These entrypoints support users of the library.
  */
@@ -1137,6 +1158,7 @@ mvcur(int yold, int xold, int ynew, int xnew)
     return NCURSES_SP_NAME(mvcur) (CURRENT_SCREEN, yold, xold, ynew, xnew);
 }
 #endif
+#endif /* USE_TERM_DRIVER */
 
 #if defined(TRACE) || defined(NCURSES_TEST)
 NCURSES_EXPORT_VAR(int) _nc_optimize_enable = OPTIMIZE_ALL;
@@ -1352,8 +1374,8 @@ main(int argc GCC_UNUSED, char *argv[]GCC_UNUSED)
 		 * transmission both. Transmission time is an estimate
 		 * assuming 9 bits/char, 8 bits + 1 stop bit.
 		 */
-		double totalest = cumtime + (double) xmits * 9 * 1e6 /
-		speeds[i];
+		double totalest = (cumtime
+				   + (double) xmits * 9 * 1e6 / speeds[i]);
 
 		/*
 		 * Per-character optimization overhead in character transmits

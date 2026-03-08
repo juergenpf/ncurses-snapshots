@@ -1,5 +1,5 @@
 /****************************************************************************
- * Copyright 2018-2023,2025 Thomas E. Dickey                                *
+ * Copyright 2018-2025,2026 Thomas E. Dickey                                *
  * Copyright 1998-2016,2017 Free Software Foundation, Inc.                  *
  *                                                                          *
  * Permission is hereby granted, free of charge, to any person obtaining a  *
@@ -57,7 +57,7 @@
 #include <sys/types.h>
 #include <tic.h>
 
-MODULE_ID("$Id: read_termcap.c,v 1.107 2025/12/25 18:20:22 tom Exp $")
+MODULE_ID("$Id: read_termcap.c,v 1.108 2026/03/06 09:06:26 tom Exp $")
 
 #if !PURE_TERMINFO
 

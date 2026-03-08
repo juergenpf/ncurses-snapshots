@@ -57,7 +57,6 @@ _nc_gettimeofday(struct timeval *tv, void *tz GCC_UNUSED)
 #endif // HAVE_GETTIMEOFDAY == 2
 
 #if USE_WIDEC_SUPPORT
-
 #define mk_wcwidth(ucs)          _nc_wcwidth(ucs)
 #define mk_wcswidth(pwcs, n)     _nc_wcswidth(pwcs, n)
 #define mk_wcwidth_cjk(ucs)      _nc_wcwidth_cjk(ucs)
@@ -72,18 +71,14 @@ typedef enum {
     ,WcEmojiFullwidth = 4	/* Emojis are fullwidth */
 } WcModes;
 
-NCURSES_EXPORT(int)
-mk_wcwidth_init(int);
-NCURSES_EXPORT(int)
-mk_wcwidth(uint32_t);
-NCURSES_EXPORT(int)
-mk_wcswidth(const uint32_t *, size_t);
-NCURSES_EXPORT(int)
-mk_wcwidth_cjk(uint32_t);
-NCURSES_EXPORT(int)
-mk_wcswidth_cjk(const uint32_t *, size_t);
-NCURSES_EXPORT(int)
-mk_is_emoji(wchar_t ucs);
+/* *INDENT-OFF* */
+NCURSES_EXPORT(int) mk_wcwidth_init(int);
+NCURSES_EXPORT(int) mk_wcwidth(uint32_t);
+NCURSES_EXPORT(int) mk_wcswidth(const uint32_t *, size_t);
+NCURSES_EXPORT(int) mk_wcwidth_cjk(uint32_t);
+NCURSES_EXPORT(int) mk_wcswidth_cjk(const uint32_t *, size_t);
+NCURSES_EXPORT(int) mk_is_emoji(wchar_t ucs);
+/* *INDENT-ON* */
 
 #include <wcwidth.h>
 #else
