@@ -48,6 +48,10 @@
 
 #include <ctype.h>
 
+#if defined(__APPLE__) && defined(__MACH__) && defined(__clang__)
+#include <sys/fcntl.h>
+#endif
+
 MODULE_ID("$Id: lib_trace.c,v 1.110 2026/03/07 18:00:16 tom Exp $")
 
 NCURSES_EXPORT_VAR(unsigned) _nc_tracing = 0; /* always define this */
