@@ -131,6 +131,8 @@ extern NCURSES_EXPORT(int) _nc_gettimeofday(struct timeval *, void *);
 #define gettimeofday(tv,tz) _nc_gettimeofday(tv,tz)
 #endif
 
+extern NCURSES_EXPORT(BOOL) _nc_conpty_supported(void);
+
 #ifndef EVENTLIST_2nd
  #define EVENTLIST_2nd(param) /* nothing */
 #endif

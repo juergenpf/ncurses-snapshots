@@ -38,7 +38,6 @@ MODULE_ID("$Id$")
 #include <locale.h>
 #include <stdio.h>
 #include <string.h>
-#include <winternl.h>
 #include <io.h>
 #include <fcntl.h>
 #include <process.h>
@@ -201,71 +200,6 @@ encoding_init(void)
     SetConsoleOutputCP(cp);
 }
 
-/* AKA Windows 10 version 1809, which is the first version that introduced ConPTY.
- * We check for this version or higher to ensure that ConPTY is available, which is
- * a requirement for the Windows Console backend of ncurses. This is because without
- * ConPTY, the Windows Console does not provide the necessary capabilities for
- * ncurses and especially the terminfo layer to function properly. */
-#define REQUIRED_MAJOR_V (DWORD)10
-#define REQUIRED_MINOR_V (DWORD)0
-#define REQUIRED_BUILD (DWORD)17763
-
-typedef NTSTATUS(WINAPI * RtlGetVersionPtr) (PRTL_OSVERSIONINFOW);
-
-static bool
-get_real_windows_version(DWORD * major, DWORD * minor, DWORD * build)
-{
-    HMODULE ntdll = GetModuleHandle(TEXT("ntdll.dll"));
-    if (ntdll) {
-	FARPROC proc = GetProcAddress(ntdll, "RtlGetVersion");
-	union {
-	    FARPROC proc;
-	    RtlGetVersionPtr func;
-	} cast;
-	RtlGetVersionPtr RtlGetVersion = NULL;
-	cast.proc = proc;
-	RtlGetVersion = cast.func;
-	if (RtlGetVersion) {
-	    RTL_OSVERSIONINFOW osvi =
-	    {0};
-	    osvi.dwOSVersionInfoSize = sizeof(osvi);
-	    if (RtlGetVersion(&osvi) == 0) {
-		*major = osvi.dwMajorVersion;
-		*minor = osvi.dwMinorVersion;
-		*build = osvi.dwBuildNumber;
-		return true;
-	    }
-	}
-    }
-    return false;
-}
-
-// Check if the current Windows version supports ConPTY.
-static BOOL
-conpty_supported(void)
-{
-    int result = FALSE;
-    DWORD major, minor, build;
-
-    T((T_CALLED("lib_win32conpty::conpty_supported")));
-
-    if (!get_real_windows_version(&major, &minor, &build)) {
-	T(("RtlGetVersion failed"));
-	returnBool(FALSE);
-    }
-    if (major >= REQUIRED_MAJOR_V) {
-	T(("Windows version detected: %d.%d (build %d)", (int) major, (int)
-	   minor, (int) build));
-	if (major == REQUIRED_MAJOR_V) {
-	    if (((minor == REQUIRED_MINOR_V) &&
-		 (build >= REQUIRED_BUILD)) ||
-		((minor > REQUIRED_MINOR_V)))
-		result = TRUE;
-	} else
-	    result = TRUE;
-    }
-    returnBool(result);
-}
 
 /* This initializaton function can be called multiple time, and actually it is called from within
  * setupterm() the first time and potentially if we enter ncurses from newterm() the next time.
@@ -311,7 +245,7 @@ METHOD(init, BOOL) (int fdOut, int fdIn)
 	HANDLE stdin_hdl = GetStdHandle(STD_INPUT_HANDLE);
 	HANDLE stdout_hdl = GetStdHandle(STD_OUTPUT_HANDLE);
 
-	if (!conpty_supported()) {
+	if (!_nc_conpty_supported()) {
 	    T(("Windows version does not support ConPTY"));
 	    returnBool(FALSE);
 	}
