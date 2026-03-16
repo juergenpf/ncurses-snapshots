@@ -36,7 +36,8 @@
 
 MODULE_ID("$Id: lib_win32util.c,v 1.7 2025/06/28 16:58:13 tom Exp $")
 
-#ifdef _NC_WINDOWS_NATIVE
+#if (defined(_NC_WINDOWS_NATIVE) || defined(_WIN32) || defined(_WIN64))
+
 #include <winternl.h>
 
 #if HAVE_GETTIMEOFDAY == 2
