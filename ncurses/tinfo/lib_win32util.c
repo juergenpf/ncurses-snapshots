@@ -129,7 +129,16 @@ get_real_windows_version(DWORD * major, DWORD * minor, DWORD * build)
     return false;
 }
 
-// Check if the current Windows version supports ConPTY.
+/* Check if the current Windows version supports ConPTY.
+ * We check for Windows 10 version 1809 or higher, which is the first version that introduced ConPTY.
+ * If the version check passes, we also verify that the standard output handle is a console and that
+ * it supports virtual terminal processing, which is necessary for ncurses to function properly on
+ * the Windows Console backend. If any of these checks fail, we return FALSE to indicate that
+ * ConPTY is not supported in the current environment.
+ * Even if the Windows version supports conpty, the environment may have disabled it, for example by 
+ * setting the registry key HKCU\Console\VirtualTerminalLevel to 0. In this case, we also return FALSE 
+ * to indicate that ConPTY is not supported.
+ */
 NCURSES_EXPORT(BOOL)
 _nc_conpty_supported(void)
 {
@@ -153,6 +162,28 @@ _nc_conpty_supported(void)
 	} else
 	    result = TRUE;
     }
+
+    if (result == TRUE) {
+		HANDLE hOut = GetStdHandle(STD_OUTPUT_HANDLE);
+		if (hOut == INVALID_HANDLE_VALUE) {
+	    	T(("GetStdHandle failed with error %lu", GetLastError()));
+	    	result = FALSE;
+		} else {
+	    	DWORD dwFlag;
+	    	if (GetConsoleMode(hOut, &dwFlag) == 0) {
+				T(("Output handle is not a console"));
+				result = FALSE;
+	    	} else {
+	    		if ((dwFlag & ENABLE_VIRTUAL_TERMINAL_PROCESSING) == 0) {
+					dwFlag |= ENABLE_VIRTUAL_TERMINAL_PROCESSING;
+					if (SetConsoleMode(hOut, dwFlag) == 0) {
+		    			T(("SetConsoleMode failed with error %lu", GetLastError()));
+		    			result = FALSE;
+					}
+				}
+	    	}
+		}
+	}	
     returnBool(result);
 }
 
