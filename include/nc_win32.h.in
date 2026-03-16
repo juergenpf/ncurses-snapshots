@@ -100,7 +100,14 @@ extern "C" {
 #define TTY_MODE_SHELL 1
 #define TTY_MODE_PROGRAM 2
 #define TTY_MODE_AUTO 3
-// This is our equivalent to termios (aka TTY)
+/* This is our equivalent to termios (aka TTY).
+* It can be used in ConPTY context as well as with the legacy console API. 
+* The "kind" field is used to manage the differences between shell and program 
+* mode, and is currently only used in the ConPTY implementation, where we have 
+* to manage the I/O subsystem of ncurses differently in shell and program mode.
+* But we should also make use of it in Legacy console mode to improve the
+* mode switching in that scenario as well.
+*/
 typedef struct
 {
     DWORD dwFlagIn;        /* Input Handle Console mode flags */
@@ -134,9 +141,10 @@ extern NCURSES_EXPORT(int) _nc_gettimeofday(struct timeval *, void *);
 extern NCURSES_EXPORT(BOOL) _nc_conpty_supported(void);
 
 #ifndef EVENTLIST_2nd
- #define EVENTLIST_2nd(param) /* nothing */
+#define EVENTLIST_2nd(param) /* nothing */
 #endif
 
+#if USE_CONPTY
 // --- Poll-Events ---
 #ifndef POLLIN
 #define POLLIN  0x0001  // Input available (for stdin/pipe)
@@ -184,6 +192,7 @@ typedef struct {
 // Guaranteed to be statically initialzed.
 extern NCURSES_EXPORT_VAR(ConPtyInterface*) _nc_currentCONPTY;
 #define WINCONPTY (*_nc_currentCONPTY)
+#endif /* USE_CONPTY */
 
 #endif /* defined(CURSES_PRIV_H) || defined(TEST_PRIV_H) */
 
