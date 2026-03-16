@@ -530,7 +530,7 @@ _nc_wgetch(WINDOW *win,
 
 #if defined(_NC_WINDOWS_NATIVE)
     /* Check for console resize events after getting input */
-    if (WINCONSOLE.size_changed()) {
+    if (WINCONPTY.size_changed()) {
 	/* Resize detected - preserve the triggering character */
 	safe_ungetch(sp, ch);
     }

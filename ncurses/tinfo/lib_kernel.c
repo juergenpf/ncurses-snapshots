@@ -157,7 +157,7 @@ flush_input(int fd)
     errno = 0;
     do {
 #if defined(_NC_WINDOWS_NATIVE)
-	WINCONSOLE.flush(fd);
+	WINCONPTY.flush(fd);
 #else
 	ioctl(fd, TIOCFLUSH, 0);
 #endif

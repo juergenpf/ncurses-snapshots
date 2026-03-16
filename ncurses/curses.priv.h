@@ -589,7 +589,7 @@ typedef union {
 #endif /* NCURSES_EXT_COLORS */
 
 #if defined(_NC_WINDOWS_NATIVE)
-#define NC_READ(fd, buf, count)	WINCONSOLE.read(fd,buf,count)
+#define NC_READ(fd, buf, count)	WINCONPTY.read(fd,buf,count)
 #else
 #define NC_READ(fd, buf, count)	read(fd, buf, count)
 #endif

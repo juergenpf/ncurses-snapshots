@@ -166,7 +166,7 @@ typedef struct {
     int sbi_lines;                   /* Cached console size */
     int sbi_cols;                    /* Cached console size */
 
-  // Metods
+  // Methods
     BOOL (*init)(int fdOut, int fdIn);                                /* Initialize with I/O file descriptors. fdIn maybe -1 in first call */
     void (*size)(int *Lines, int *Cols);                              /* Query console size. Safe to be called before init */ 
     BOOL (*size_changed)(void);                                       /* Return TRUE if the console has been resized */
@@ -179,11 +179,11 @@ typedef struct {
     int (*start_input_subsystem)(void);                               /* In prog mode, we control the input stream */
     int (*stop_input_subsystem)(void);                                /* In shell mode, we leave it to the C runtime */
     int (*poll)(struct pty_pollfd *fds, nfds_t nfds, int timeout_ms); /* Minimalistic clone of UNIX poll, just polling stdin console input */
-  } ConsoleInfo;
+  } ConPtyInterface;
 
 // Guaranteed to be statically initialzed.
-extern NCURSES_EXPORT_VAR(ConsoleInfo*) _nc_currentCONSOLE;
-#define WINCONSOLE (*_nc_currentCONSOLE)
+extern NCURSES_EXPORT_VAR(ConPtyInterface*) _nc_currentCONPTY;
+#define WINCONPTY (*_nc_currentCONPTY)
 
 #endif /* defined(CURSES_PRIV_H) || defined(TEST_PRIV_H) */
 

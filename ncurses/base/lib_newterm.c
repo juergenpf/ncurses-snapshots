@@ -238,7 +238,7 @@ NCURSES_SP_NAME(newterm) (NCURSES_SP_DCLx
 	    int value;
 	    int cols;
 #if defined(_NC_WINDOWS_NATIVE)
-	    if (!WINCONSOLE.init(fileno(_ofp), fileno(_ifp))) {
+	    if (!WINCONPTY.init(fileno(_ofp), fileno(_ifp))) {
 		_nc_set_screen(current);
 		returnSP(NULL);
 	    } else {

@@ -66,7 +66,7 @@ METHOD(poll, int) (struct pty_pollfd * fds, nfds_t nfds, int timeout_ms);
 /* A process can only have a single console, so it is safe
  * to maintain all the information about it in a single
  * static structure. */
-static ConsoleInfo defaultCONSOLE =
+static ConPtyInterface defaultCONPTY =
 {
     .initialized = FALSE,
     .ttyflags =
@@ -95,10 +95,10 @@ static ConsoleInfo defaultCONSOLE =
  * which is initialized to point to our default implementation. If in the future we want to
  * support other types of consoles or terminal backends on Windows, we can create additional
  * ConsoleInfo structures with different implementations of the methods, and switch the
- * _nc_currentCONSOLE pointer to point to the appropriate one based on runtime detection
+ * _nc_currentCONPTY pointer to point to the appropriate one based on runtime detection
  * or configuration. */
-NCURSES_EXPORT_VAR (ConsoleInfo *)
-  _nc_currentCONSOLE = &defaultCONSOLE;
+NCURSES_EXPORT_VAR (ConPtyInterface *)
+  _nc_currentCONPTY = &defaultCONPTY;
 
 // ----------------------- The Input Subsystem ----------------------------------------------
 /* In order to stay strictly in the pipe I/O model of the Windows Console, we need to have
@@ -134,7 +134,7 @@ static HANDLE g_shutdown_event = NULL;	// Signal: "Shutdown system"
 /* Our handle is always the consoles input handle (actually a pipe handle provided by
  * ConPTY), which we read from in the input thread. We need it to call ReadFile and to
  * cancel the I/O when shutting down. */
-#define g_stdin_handle defaultCONSOLE.ConsoleHandleIn
+#define g_stdin_handle defaultCONPTY.ConsoleHandleIn
 
 // Forward declaration of the input reader thread
 static unsigned __stdcall input_thread(LPVOID param);
@@ -203,7 +203,7 @@ encoding_init(void)
 
 /* This initializaton function can be called multiple time, and actually it is called from within
  * setupterm() the first time and potentially if we enter ncurses from newterm() the next time.
- * The main purpose is to initialize the defaultCONSOLE structure when called the first time. The
+ * The main purpose is to initialize the defaultCONPTY structure when called the first time. The
  * first call will alway have fdIn set to -1, as setupterm() only cares about output. Please note
  * that setupterm() already handles redirection of stdout and assigns stderr for output if stdout
  * is not a tty.
@@ -222,7 +222,7 @@ METHOD(init, BOOL) (int fdOut, int fdIn)
     T((T_CALLED("lib_win32conpty::pty_init(fdOut=%d, fdIn=%d)"), fdOut, fdIn));
 
     /* initialize once, or not at all */
-    if (!defaultCONSOLE.initialized) {
+    if (!defaultCONPTY.initialized) {
 	/*
 	 * We set the console mode flags to the most basic ones that are required for ConPTY
 	 * to function properly. */
@@ -268,14 +268,14 @@ METHOD(init, BOOL) (int fdOut, int fdIn)
 	    T(("Output handle is not a pseudo-console"));
 	    returnBool(FALSE);
 	}
-	defaultCONSOLE.ConsoleHandleOut = stdout_hdl;
+	defaultCONPTY.ConsoleHandleOut = stdout_hdl;
 
 	if (stdin_hdl == INVALID_HANDLE_VALUE || GetConsoleMode(stdin_hdl,
 								&dwFlag) == 0) {
 	    T(("StdIn handle is not a pseudo-console"));
 	    returnBool(FALSE);
 	}
-	defaultCONSOLE.ConsoleHandleIn = stdin_hdl;
+	defaultCONPTY.ConsoleHandleIn = stdin_hdl;
 
 	SetConsoleMode(stdout_hdl, dwFlagOut);
 	/* We immediately read the console mode back to reflect any changes the
@@ -285,7 +285,7 @@ METHOD(init, BOOL) (int fdOut, int fdIn)
 	    T(("GetConsoleMode() failed for stdout"));
 	    returnBool(FALSE);
 	}
-	defaultCONSOLE.ttyflags.dwFlagOut = dwFlagOut;
+	defaultCONPTY.ttyflags.dwFlagOut = dwFlagOut;
 
 	SetConsoleMode(stdin_hdl, dwFlagIn);
 	/* We immediately read the console mode back to reflect any changes the
@@ -295,27 +295,27 @@ METHOD(init, BOOL) (int fdOut, int fdIn)
 	    T(("GetConsoleMode() failed for stdin"));
 	    returnBool(FALSE);
 	}
-	defaultCONSOLE.ttyflags.dwFlagIn = dwFlagIn;
+	defaultCONPTY.ttyflags.dwFlagIn = dwFlagIn;
 
-	defaultCONSOLE.initialized = TRUE;
+	defaultCONPTY.initialized = TRUE;
 	result = TRUE;
     } else {
 	/* This branch is called from newterm() when fdIn is provided, so we need to validate
 	* that the provided fdIn and fdOut are valid pseudo-console handles, and if so we
-	* update the defaultCONSOLE structure to use the new handles. */
+	* update the defaultCONPTY structure to use the new handles. */
 	DWORD dwFlagOut;
 	DWORD dwFlagIn;
 
-	if (GetConsoleMode(defaultCONSOLE.ConsoleHandleOut, &dwFlagOut) == 0) {
+	if (GetConsoleMode(defaultCONPTY.ConsoleHandleOut, &dwFlagOut) == 0) {
 	    T(("Output handle is not a pseudo-console"));
 	    returnBool(FALSE);
 	}
-	if (GetConsoleMode(defaultCONSOLE.ConsoleHandleIn, &dwFlagIn) == 0) {
+	if (GetConsoleMode(defaultCONPTY.ConsoleHandleIn, &dwFlagIn) == 0) {
 	    T(("Input handle is not a pseudo-console"));
 	    returnBool(FALSE);
 	}
-	defaultCONSOLE.ttyflags.dwFlagOut = dwFlagOut;
-	defaultCONSOLE.ttyflags.dwFlagIn = dwFlagIn;
+	defaultCONPTY.ttyflags.dwFlagOut = dwFlagOut;
+	defaultCONPTY.ttyflags.dwFlagIn = dwFlagIn;
 
 	result = TRUE;
     }
@@ -332,7 +332,7 @@ static BOOL
 get_sbi(CONSOLE_SCREEN_BUFFER_INFO * csbi)
 {
     HANDLE test_handles[] = {
-		defaultCONSOLE.ConsoleHandleOut, 
+		defaultCONPTY.ConsoleHandleOut, 
 		GetStdHandle(STD_OUTPUT_HANDLE),
      		GetStdHandle(STD_ERROR_HANDLE)
 	};
@@ -369,8 +369,8 @@ METHOD(size, void) (int *Lines, int *Cols)
 	/* Fallback to cached values or defaults if we can't get the console size.
 	 * Windows Terminal default size is 120 columns x 30 rows.
 	 * If cached values are set we use those instead to reflect the actual size. */
-	*Lines = defaultCONSOLE.sbi_lines != -1 ? defaultCONSOLE.sbi_lines : DEFAULT_CONSOLE_LINES;
-	*Cols = defaultCONSOLE.sbi_cols != -1 ? defaultCONSOLE.sbi_cols : DEFAULT_CONSOLE_COLS;
+	*Lines = defaultCONPTY.sbi_lines != -1 ? defaultCONPTY.sbi_lines : DEFAULT_CONSOLE_LINES;
+	*Cols = defaultCONPTY.sbi_cols != -1 ? defaultCONPTY.sbi_cols : DEFAULT_CONSOLE_COLS;
     }
 }
 
@@ -396,13 +396,13 @@ METHOD(size_changed, BOOL) (void)
 
     DispatchMethod(size) (&current_lines, &current_cols);
 
-    if (defaultCONSOLE.sbi_lines == -1 || defaultCONSOLE.sbi_cols == -1) {
-	defaultCONSOLE.sbi_lines = current_lines;
-	defaultCONSOLE.sbi_cols  = current_cols;
+    if (defaultCONPTY.sbi_lines == -1 || defaultCONPTY.sbi_cols == -1) {
+	defaultCONPTY.sbi_lines = current_lines;
+	defaultCONPTY.sbi_cols  = current_cols;
     } else {
-	if (current_lines != defaultCONSOLE.sbi_lines || current_cols != defaultCONSOLE.sbi_cols) {
-	    defaultCONSOLE.sbi_lines = current_lines;
-	    defaultCONSOLE.sbi_cols  = current_cols;
+	if (current_lines != defaultCONPTY.sbi_lines || current_cols != defaultCONPTY.sbi_cols) {
+	    defaultCONPTY.sbi_lines = current_lines;
+	    defaultCONPTY.sbi_cols  = current_cols;
 
 	    _nc_globals.have_sigwinch = 1;
 
@@ -762,7 +762,7 @@ METHOD(read, int) (int fd GCC_UNUSED, unsigned char *result, size_t count)
  * UTF-8 output and support for virtual terminal sequences. */
 METHOD(write, int) (int fd GCC_UNUSED, const void *buf, size_t count)
 {
-    HANDLE hOut = defaultCONSOLE.ConsoleHandleOut;
+    HANDLE hOut = defaultCONPTY.ConsoleHandleOut;
     DWORD written = 0;
 
     T((T_CALLED("lib_win32conpty::pty_write(fd=%d, buf=%p, count=%u)"), fd,
@@ -799,8 +799,8 @@ METHOD(flush, int) (int fd GCC_UNUSED)
  * stopping the input subsystem accordingly. */
 METHOD(setmode, int) (int fd GCC_UNUSED, const TTY * arg)
 {
-    HANDLE input_target = defaultCONSOLE.ConsoleHandleIn;
-    HANDLE output_target = defaultCONSOLE.ConsoleHandleOut;
+    HANDLE input_target = defaultCONPTY.ConsoleHandleIn;
+    HANDLE output_target = defaultCONPTY.ConsoleHandleOut;
     BOOL input_ok = FALSE;
     BOOL output_ok = FALSE;
 
@@ -845,9 +845,9 @@ METHOD(setmode, int) (int fd GCC_UNUSED, const TTY * arg)
 	     * ENABLE_PROCESSED_INPUT when VT is requested) */
 	    DWORD realMode;
 	    if (GetConsoleMode(input_target, &realMode)) {
-		defaultCONSOLE.ttyflags.dwFlagIn = realMode;
+		defaultCONPTY.ttyflags.dwFlagIn = realMode;
 	    } else {
-		defaultCONSOLE.ttyflags.dwFlagIn = mode;
+		defaultCONPTY.ttyflags.dwFlagIn = mode;
 	    }
 	} else {
 	    T(("Invalid input file descriptor"));
@@ -863,9 +863,9 @@ METHOD(setmode, int) (int fd GCC_UNUSED, const TTY * arg)
 	     * (e.g. VT output is required for the Windows Console backend) */
 	    DWORD realMode;
 	    if (GetConsoleMode(output_target, &realMode)) {
-		defaultCONSOLE.ttyflags.dwFlagOut = realMode;
+		defaultCONPTY.ttyflags.dwFlagOut = realMode;
 	    } else {
-		defaultCONSOLE.ttyflags.dwFlagOut = mode;
+		defaultCONPTY.ttyflags.dwFlagOut = mode;
 	    }
 	} else {
 	    T(("Invalid output file descriptor"));
@@ -940,7 +940,7 @@ METHOD(getmode, int) (int fd GCC_UNUSED, TTY * arg)
     if (NULL == arg)
 	returnCode(ERR);
 
-    *arg = defaultCONSOLE.ttyflags;
+    *arg = defaultCONPTY.ttyflags;
     arg->kind = TTY_MODE_UNSPECIFIED;
     returnCode(OK);
 }

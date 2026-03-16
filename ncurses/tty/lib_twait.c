@@ -150,7 +150,7 @@ _nc_eventlist_timeout(_nc_eventlist * evl)
 
 #if defined(_NC_WINDOWS_NATIVE)
 #define pollfd pty_pollfd
-#define poll WINCONSOLE.poll
+#define poll WINCONPTY.poll
 #endif
 
 /*
