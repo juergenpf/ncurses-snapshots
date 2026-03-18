@@ -59,6 +59,11 @@
 #include <os2.h>
 #endif
 
+#if USE_NAMED_PIPES
+#include <windows.h>
+#include <io.h>
+#endif
+
 #if USE_FUNC_POLL
 # if HAVE_SYS_TIME_H
 #  include <sys/time.h>
@@ -137,16 +142,15 @@ _nc_eventlist_timeout(_nc_eventlist * evl)
 }
 #endif /* NCURSES_WGETCH_EVENTS */
 
-#if (USE_FUNC_POLL || HAVE_SELECT)
+#if (USE_FUNC_POLL || HAVE_SELECT || USE_NAMED_PIPES)
 #  define MAYBE_UNUSED
 #else
 #  define MAYBE_UNUSED GCC_UNUSED
 #endif
 
-#if (USE_FUNC_POLL || HAVE_SELECT)
-#  define MAYBE_UNUSED
-#else
-#  define MAYBE_UNUSED GCC_UNUSED
+#if USE_NAMED_PIPES
+#define pollfd pty_pollfd
+#define poll WINCONPTY.poll
 #endif
 
 /*
@@ -177,7 +181,7 @@ _nc_timed_wait(const SCREEN *sp MAYBE_UNUSED,
     int count;
     int result = TW_NONE;
     TimeType t0;
-#if (USE_FUNC_POLL || HAVE_SELECT)
+#if (USE_FUNC_POLL || HAVE_SELECT || USE_NAMED_PIPES)
     int fd;
 #endif
 
@@ -186,8 +190,12 @@ _nc_timed_wait(const SCREEN *sp MAYBE_UNUSED,
     int n;
 #endif
 
-#if USE_FUNC_POLL
+#if USE_FUNC_POLL || USE_NAMED_PIPES
+#if USE_NAMED_PIPES
+#define MIN_FDS 1
+#else
 #define MIN_FDS 2
+#endif
     struct pollfd fd_list[MIN_FDS];
     struct pollfd *fds = fd_list;
 #elif defined(__BEOS__)
@@ -235,7 +243,7 @@ _nc_timed_wait(const SCREEN *sp MAYBE_UNUSED,
 	evl->result_flags = 0;
 #endif
 
-#if USE_FUNC_POLL
+#if USE_FUNC_POLL || USE_NAMED_PIPES
     memset(fd_list, 0, sizeof(fd_list));
 
 #ifdef NCURSES_WGETCH_EVENTS
@@ -252,12 +260,14 @@ _nc_timed_wait(const SCREEN *sp MAYBE_UNUSED,
 	fds[count].events = POLLIN;
 	count++;
     }
+#if !USE_NAMED_PIPES
     if ((mode & TW_MOUSE)
 	&& (fd = sp->_mouse_fd) >= 0) {
 	fds[count].fd = fd;
 	fds[count].events = POLLIN;
 	count++;
     }
+#endif
 #ifdef NCURSES_WGETCH_EVENTS
     if ((mode & TW_EVENT) && evl) {
 	for (n = 0; n < evl->count; ++n) {
@@ -486,7 +496,7 @@ _nc_timed_wait(const SCREEN *sp MAYBE_UNUSED,
     if (result != 0) {
 	if (result > 0) {
 	    result = 0;
-#if USE_FUNC_POLL
+#if USE_FUNC_POLL || USE_NAMED_PIPES
 	    for (count = 0; count < MIN_FDS; count++) {
 		if ((mode & (1 << count))
 		    && (fds[count].revents & POLLIN)) {
@@ -512,7 +522,9 @@ _nc_timed_wait(const SCREEN *sp MAYBE_UNUSED,
 	result |= TW_EVENT;
 #endif
 
-#if USE_FUNC_POLL
+#if USE_FUNC_POLL || USE_NAMED_PIPES
+    if (fds != fd_list)
+	free((char *) fds);
 #ifdef NCURSES_WGETCH_EVENTS
     if (fds != fd_list)
 	free((char *) fds);

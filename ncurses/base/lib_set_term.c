@@ -427,7 +427,7 @@ NCURSES_SP_NAME(_nc_setupscreen) (
 #endif
 	T(("filter screensize %dx%d", slines, scolumns));
     }
-#if USE_NAMED_PIPES
+#if USE_NAMED_PIPES && JPF
     T(("setting output mode to binary"));
     fflush(output);
     _setmode(fileno(output), _O_BINARY);
@@ -439,7 +439,7 @@ NCURSES_SP_NAME(_nc_setupscreen) (
     fflush(output);
     sp->_ofd = output ? fileno(output) : -1;
     sp->_ofp = output;
-#if USE_NAMED_PIPES
+#if USE_NAMED_PIPES && JPF
     if (output)
 	_setmode(fileno(output), _O_BINARY);
 #endif

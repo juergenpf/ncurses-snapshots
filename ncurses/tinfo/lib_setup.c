@@ -272,7 +272,7 @@ use_tioctl(bool f)
 }
 #endif
 
-#if !(USE_TERM_DRIVER || USE_NAMED_PIPES)
+#if !(USE_TERM_DRIVER || USE_NAMED_PIPES) // JPF
 static void
 _nc_default_screensize(TERMINAL *termp, int *linep, int *colp)
 {

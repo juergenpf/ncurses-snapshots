@@ -433,7 +433,7 @@ drv_size(TERMINAL_CONTROL_BLOCK * TCB, int *linep, int *colp)
 	useTioctl = _nc_prescreen.use_tioctl;
     }
 
-#ifdef USE_WIN32CON_DRIVER
+#if USE_WINCONMODE && JPF
     /* If we are here, then Windows console is used in terminfo mode.
        We need to figure out the size using the console API
      */
@@ -618,8 +618,8 @@ drv_mode(TERMINAL_CONTROL_BLOCK * TCB, int progFlag, int defFlag)
 	    if ((drv_sgmode(TCB, FALSE, &(_term->Nttyb)) == OK)) {
 #ifdef TERMIOS
 		_term->Nttyb.c_oflag &= (unsigned) ~OFLAGS_TABS;
-#elif defined(USE_WIN32CON_DRIVER)
-		/* noop */
+#elif USE_NAMED_PIPES
+		CORECONSOLE.defmode(&(_term->Nttyb),TTY_MODE_PROGRAM);
 #else
 		_term->Nttyb.sg_flags &= (unsigned) ~XTABS;
 #endif
@@ -632,7 +632,7 @@ drv_mode(TERMINAL_CONTROL_BLOCK * TCB, int progFlag, int defFlag)
 		    if (sp->_keypad_on)
 			_nc_keypad(sp, TRUE);
 		}
-#if defined(USE_WIN32CON_DRIVER)
+#if USE_WINCONMODE && JPF
 		if (!WINCONSOLE.buffered)
 		    _nc_console_set_scrollback(FALSE, &WINCONSOLE.SBI);
 #endif
@@ -649,8 +649,8 @@ drv_mode(TERMINAL_CONTROL_BLOCK * TCB, int progFlag, int defFlag)
 #ifdef TERMIOS
 		if (_term->Ottyb.c_oflag & OFLAGS_TABS)
 		    tab = back_tab = NULL;
-#elif defined(USE_WIN32CON_DRIVER)
-		/* noop */
+#elif USE_NAMED_PIPES
+		CORECONSOLE.defmode(&(_term->Ottyb),TTY_MODE_SHELL);
 #else
 		if (_term->Ottyb.sg_flags & XTABS)
 		    tab = back_tab = NULL;
@@ -664,7 +664,7 @@ drv_mode(TERMINAL_CONTROL_BLOCK * TCB, int progFlag, int defFlag)
 		NCURSES_SP_NAME(_nc_flush) (sp);
 	    }
 	    code = drv_sgmode(TCB, TRUE, &(_term->Ottyb));
-#if defined(USE_WIN32CON_DRIVER)
+#if USE_WINCONMODE && JPF
 	    if (!_nc_console_restore())
 		code = ERR;
 #endif
@@ -961,7 +961,7 @@ drv_testmouse(TERMINAL_CONTROL_BLOCK * TCB,
     } else
 #endif
     {
-#if defined(USE_WIN32CON_DRIVER)
+#if USE_WINCONMODE && JPF
 	rc = _nc_console_testmouse(sp,
 				   _nc_console_handle(sp->_ifd),
 				   delay
@@ -1270,7 +1270,7 @@ drv_twait(TERMINAL_CONTROL_BLOCK * TCB,
 
     AssertTCB();
     SetSP();
-#if defined(USE_WIN32CON_DRIVER)
+#if USE_WINCONMODE && JPF
     return _nc_console_twait(sp,
 			     _nc_console_handle(sp->_ifd),
 			     mode,
@@ -1286,21 +1286,19 @@ drv_read(TERMINAL_CONTROL_BLOCK * TCB, int *buf)
 {
     SCREEN *sp;
     int n;
-#if !defined(USE_WIN32CON_DRIVER)
     unsigned char c2 = 0;
-#endif
 
     AssertTCB();
     assert(buf);
     SetSP();
 
     _nc_set_read_thread(TRUE);
-#if defined(USE_WIN32CON_DRIVER)
+#if USE_WINCONMODE && JPF
     n = _nc_console_read(sp,
 			 _nc_console_handle(sp->_ifd),
 			 buf);
 #else
-    n = (int) read(sp->_ifd, &c2, (size_t) 1);
+    n = (int) NC_READ(sp->_ifd, &c2, (size_t) 1);
 #endif
     _nc_set_read_thread(FALSE);
 #if !defined(USE_WIN32CON_DRIVER)
@@ -1516,7 +1514,7 @@ typedef struct DriverEntry {
 
 static DRIVER_ENTRY DriverTable[] =
 {
-#ifdef USE_WIN32CON_DRIVER
+#if USE_WINCONMODE
     {"win32console", &_nc_WIN_DRIVER},
 #endif
     {"tinfo", &_nc_TINFO_DRIVER}	/* must be last */
@@ -1537,7 +1535,7 @@ _nc_get_driver(TERMINAL_CONTROL_BLOCK * TCB, const char *name, int *errret)
 
     for (i = 0; i < SIZEOF(DriverTable); i++) {
 	res = DriverTable[i].driver;
-#if defined(USE_WIN32CON_DRIVER)
+#if USE_WINCONMODE
 	if ((i + 1) == SIZEOF(DriverTable)) {
 	    /* For Windows >= 10.0.17763 Windows Console interface implements
 	       virtual Terminal functionality.

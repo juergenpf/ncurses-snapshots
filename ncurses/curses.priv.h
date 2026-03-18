@@ -1255,7 +1255,7 @@ typedef struct screen {
 	int		_sysmouse_new_buttons;
 #endif
 
-#if USE_TERM_DRIVER || USE_NAMED_PIPES
+#if USE_TERM_DRIVER || (USE_NAMED_PIPES && JPF)
 	MEVENT		_drv_mouse_fifo[FIFO_SIZE];
 	int		_drv_mouse_head;
 	int		_drv_mouse_tail;
@@ -2296,7 +2296,7 @@ extern NCURSES_EXPORT(int) _nc_eventlist_timeout(_nc_eventlist *);
  */
 #if USE_WIDEC_SUPPORT
 
-#if defined(_NC_WINDOWS_NATIVE) && !defined(_NC_MSC) && !USE_NAMED_PIPES
+#if defined(_NC_WINDOWS_NATIVE) && !defined(_NC_MSC) && !USE_NAMED_PIPES // JPF check
 /*
  * MinGW has wide-character functions, but they do not work correctly.
  */
@@ -2572,30 +2572,27 @@ extern NCURSES_EXPORT_VAR(TERM_DRIVER) _nc_WIN_DRIVER;
 extern NCURSES_EXPORT_VAR(TERM_DRIVER) _nc_TINFO_DRIVER;
 #endif /* USE_TERM_DRIVER */
 
+#if  USE_NAMED_PIPES || defined(USE_WIN32CON_DRIVER)
+extern NCURSES_EXPORT(BOOL) _nc_console_setup(void);
+#endif
+
+#if USE_NAMED_PIPES
+#define NC_READ(fd, buf, count) WINCONPTY.read(fd,buf,count)
+#else
+#define NC_READ(fd, buf, count) read(fd, buf, count)
+#endif
+
 #ifdef TERMIOS
 #define USE_WINCONMODE 0
 #elif defined(USE_WIN32CON_DRIVER)
 #define USE_WINCONMODE 1
-extern NCURSES_EXPORT(int)  _nc_console_setmode(void* handle, const ConsoleMode* arg);
-extern NCURSES_EXPORT(int)  _nc_console_getmode(void* handle, ConsoleMode* arg);
 extern NCURSES_EXPORT(bool)  _nc_console_checkinit(bool assumeTermInfo);
 extern NCURSES_EXPORT(void*) _nc_console_fd2handle(int fd);
-extern NCURSES_EXPORT(WORD) _nc_console_MapColor(bool fore, int color);
 extern NCURSES_EXPORT(int)  _nc_console_flush(void* handle);
-extern NCURSES_EXPORT(bool) _nc_console_get_SBI(void);
 extern NCURSES_EXPORT(HANDLE) _nc_console_handle(int fd);
 extern NCURSES_EXPORT(int)  _nc_console_isatty(int fd);
-extern NCURSES_EXPORT(bool) _nc_console_keyExist(int keycode);
-extern NCURSES_EXPORT(int)  _nc_console_keyok(int keycode, int flag);
-extern NCURSES_EXPORT(int)  _nc_console_read(SCREEN *sp, HANDLE fd, int *buf);
 extern NCURSES_EXPORT(bool) _nc_console_restore(void);
-extern NCURSES_EXPORT(void) _nc_console_selectActiveHandle(void);
-extern NCURSES_EXPORT(void) _nc_console_set_scrollback(bool normal, CONSOLE_SCREEN_BUFFER_INFO * info);
-extern NCURSES_EXPORT(void) _nc_console_size(int *Lines, int *Cols);
 extern NCURSES_EXPORT(int)  _nc_console_test(int fd);
-extern NCURSES_EXPORT(int)  _nc_console_testmouse(const SCREEN *sp, HANDLE fd, int delay EVENTLIST_2nd(_nc_eventlist*));
-extern NCURSES_EXPORT(int)  _nc_console_twait(const SCREEN *sp, HANDLE hdl,int mode,int msec,int *left EVENTLIST_2nd(_nc_eventlist * evl));
-extern NCURSES_EXPORT(int)  _nc_console_vt_supported(void);
 
 #ifdef _NC_CHECK_MINTTY
 extern NCURSES_EXPORT(int)    _nc_console_checkmintty(int fd, LPHANDLE pMinTTY);
@@ -2605,8 +2602,8 @@ extern NCURSES_EXPORT(int)    _nc_console_checkmintty(int fd, LPHANDLE pMinTTY);
 #error unsupported driver configuration
 #endif /* USE_WIN32CON_DRIVER */
 
-#if USE_TERM_DRIVER && defined(USE_WIN32CON_DRIVER)
-#define NC_ISATTY(fd) (0 != _nc_console_isatty(fd))
+#if USE_TERM_DRIVER && defined(USE_WIN32CON_DRIVER) // JPF
+#define NC_ISATTY(fd) (0 != WINCONSOLE.isatty(fd))
 #else
 #define NC_ISATTY(fd) isatty(fd)
 #endif
@@ -2622,10 +2619,10 @@ extern NCURSES_EXPORT(int)    _nc_console_checkmintty(int fd, LPHANDLE pMinTTY);
 #if USE_TERM_DRIVER
 #  define IsTermInfo(sp)       ((TCBOf(sp) != NULL) && ((TCBOf(sp)->drv != NULL)) && ((TCBOf(sp)->drv->isTerminfo)))
 #  define HasTInfoTerminal(sp) ((NULL != TerminalOf(sp)) && IsTermInfo(sp))
-#  if USE_NAMED_PIPES
-#    define IsTermInfoOnConsole(sp) (IsTermInfo(sp) && _nc_console_test(TerminalOf(sp)->Filedes))
+#  if USE_NAMED_PIPES // JPF
+#    define IsTermInfoOnConsole(sp) (IsConPTY())
 #  elif defined(USE_WIN32CON_DRIVER)
-#    define IsTermInfoOnConsole(sp) (IsTermInfo(sp) && _nc_console_test(TerminalOf(sp)->Filedes))
+#    define IsTermInfoOnConsole(sp) (!IsConPTY())
 #  else
 #    define IsTermInfoOnConsole(sp) FALSE
 #  endif
@@ -2633,7 +2630,7 @@ extern NCURSES_EXPORT(int)    _nc_console_checkmintty(int fd, LPHANDLE pMinTTY);
 #  define IsTermInfo(sp)       TRUE
 #  define HasTInfoTerminal(sp) (NULL != TerminalOf(sp))
 #  if USE_NAMED_PIPES
-#    define IsTermInfoOnConsole(sp) _nc_console_test(TerminalOf(sp)->Filedes)
+#    define IsTermInfoOnConsole(sp) (IsConPTY())
 #  else
 #    define IsTermInfoOnConsole(sp) FALSE
 #  endif

@@ -38,7 +38,7 @@
  */
 
 #include <curses.priv.h>
-
+#if JPF || 1
 #define CUR TerminalType(my_term).
 
 MODULE_ID("$Id: win32_driver.c,v 1.20 2025/12/30 19:34:50 tom Exp $")
@@ -503,7 +503,7 @@ wcon_doupdate(TERMINAL_CONTROL_BLOCK * TCB)
 			       CurScreen(sp)->_cury,
 			       CurScreen(sp)->_curx);
 	}
-	_nc_console_selectActiveHandle();
+	// JPF _nc_console_selectActiveHandle();
 	result = OK;
     }
     returnCode(result);
@@ -524,7 +524,7 @@ wcon_CanHandle(TERMINAL_CONTROL_BLOCK * TCB,
     TCB->magic = WINMAGIC;
 
     if (tname == NULL || *tname == 0) {
-	if (!_nc_console_vt_supported())
+	if (FALSE /* JPF !_nc_console_vt_supported()*/)
 	    code = TRUE;
     } else if (tname != NULL && *tname == '#') {
 	/*
@@ -1212,3 +1212,4 @@ NCURSES_EXPORT_VAR (TERM_DRIVER) _nc_WIN_DRIVER = {
 	wcon_kyExist,		/* kyExist       */
 	wcon_cursorSet		/* cursorSet     */
 };
+#endif /* USE_WIN32_CONSOLE */

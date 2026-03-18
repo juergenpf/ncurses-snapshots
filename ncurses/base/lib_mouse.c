@@ -1118,7 +1118,7 @@ decode_xterm_X10(SCREEN *sp, MEVENT * eventp)
     for (grabbed = 0; grabbed < MAX_KBUF; grabbed += (size_t) res) {
 
 	/* For VIO mouse we add extra bit 64 to disambiguate button-up. */
-	res = (int) read(
+	res = (int) NC_READ(
 #if USE_EMX_MOUSE
 			    (M_FD(sp) >= 0) ? M_FD(sp) : sp->_ifd,
 #else
@@ -1166,7 +1166,7 @@ decode_xterm_1005(SCREEN *sp, MEVENT * eventp)
     for (grabbed = 0; grabbed < limit;) {
 	int res;
 
-	res = (int) read(
+	res = (int) NC_READ(
 #if USE_EMX_MOUSE
 			    (M_FD(sp) >= 0) ? M_FD(sp) : sp->_ifd,
 #else
@@ -1244,7 +1244,7 @@ read_SGR(const SCREEN *sp, SGR_DATA * result)
     do {
 	int res;
 
-	res = (int) read(
+	res = (int) NC_READ(
 #if USE_EMX_MOUSE
 			    (M_FD(sp) >= 0) ? M_FD(sp) : sp->_ifd,
 #else

@@ -156,8 +156,8 @@ flush_input(int fd)
 #else /* !TERMIOS */
     errno = 0;
     do {
-#if defined(USE_WIN32CON_DRIVER)
-	_nc_console_flush(_nc_console_fd2handle(fd));
+#if USE_NAMED_PIPES || USE_WINCONMODE
+	CORECONSOLE.flush(fd);
 #else
 	ioctl(fd, TIOCFLUSH, 0);
 #endif

@@ -112,22 +112,4 @@ _nc_console_checkmintty(int fd, LPHANDLE pMinTTY)
 }
 #endif /* _NC_CHECK_MINTTY */
 
-#if HAVE_GETTIMEOFDAY == 2
-#define JAN1970 116444736000000000LL	/* the value for 01/01/1970 00:00 */
-
-NCURSES_EXPORT(int)
-_nc_gettimeofday(struct timeval *tv, void *tz GCC_UNUSED)
-{
-    union {
-	FILETIME ft;
-	long long since1601;	/* time since 1 Jan 1601 in 100ns units */
-    } data;
-
-    GetSystemTimeAsFileTime(&data.ft);
-    tv->tv_usec = (long) ((data.since1601 / 10LL) % 1000000LL);
-    tv->tv_sec = (long) ((data.since1601 - JAN1970) / 10000000LL);
-    return (0);
-}
-#endif // HAVE_GETTIMEOFDAY == 2
-
 #endif // _NC_WINDOWS_NATIVE

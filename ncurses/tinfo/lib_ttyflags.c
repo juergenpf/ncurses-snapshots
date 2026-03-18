@@ -156,8 +156,8 @@ NCURSES_SP_NAME(def_shell_mode) (NCURSES_SP_DCL0)
 #ifdef TERMIOS
 	    if (termp->Ottyb.c_oflag & OFLAGS_TABS)
 		tab = back_tab = NULL;
-#elif USE_NAMED_PIPES
-	    /* noop */
+#elif USE_NAMED_PIPES || USE_WINCONMODE
+	    CORECONSOLE.defmode(&termp->Ottyb, TTY_MODE_SHELL);
 #else
 	    if (termp->Ottyb.sg_flags & XTABS)
 		tab = back_tab = NULL;
@@ -195,8 +195,8 @@ NCURSES_SP_NAME(def_prog_mode) (NCURSES_SP_DCL0)
 	if (_nc_get_tty_mode(&termp->Nttyb) == OK) {
 #ifdef TERMIOS
 	    termp->Nttyb.c_oflag &= (unsigned) (~OFLAGS_TABS);
-#elif USE_NAMED_PIPES
-	    /* noop */
+#elif USE_NAMED_PIPES || USE_WINCONMODE
+	    CORECONSOLE.defmode(&termp->Nttyb, TTY_MODE_PROGRAM);
 #else
 	    termp->Nttyb.sg_flags &= (unsigned) (~XTABS);
 #endif
@@ -302,8 +302,19 @@ saved_tty(NCURSES_SP_DCL0)
 NCURSES_EXPORT(int)
 NCURSES_SP_NAME(savetty) (NCURSES_SP_DCL0)
 {
+    int code;
+    TTY *tty;
+
     T((T_CALLED("savetty(%p)"), (void *) SP_PARM));
-    returnCode(NCURSES_SP_NAME(_nc_get_tty_mode) (NCURSES_SP_ARGx saved_tty(NCURSES_SP_ARG)));
+
+    tty = saved_tty(NCURSES_SP_ARG);
+    code = NCURSES_SP_NAME(_nc_get_tty_mode) (NCURSES_SP_ARGx tty);
+#if USE_NAMED_PIPES || USE_WINCONMODE
+    if (code == OK)
+	code = CORECONSOLE.defmode(tty, TTY_MODE_AUTO);
+#endif
+    returnCode(code);
+
 }
 
 #if NCURSES_SP_FUNCS

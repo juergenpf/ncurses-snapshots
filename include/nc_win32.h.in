@@ -28,7 +28,8 @@
  ****************************************************************************/
 
 /****************************************************************************
- * Author: Thomas Dickey, 2008-on                                           *
+ * Author: Thomas Dickey, 2008-on
+ *         Juergen Pfeifer, 2026                                           *
  ****************************************************************************/
 
 /* $Id: nc_win32.h.in,v 1.19 2025/12/26 23:32:43 tom Exp $ */
@@ -43,7 +44,7 @@
 #if @USE_NAMED_PIPES@	/* USE_NAMED_PIPES */
 
 #ifndef _NC_WINDOWS_NATIVE
-#define _NC_WINDOWS_NATIVE
+#  define _NC_WINDOWS_NATIVE
 #endif
 
 #ifdef TERMIOS
@@ -64,7 +65,13 @@
 
 #undef _NC_CHECK_MINTTY
 #if WINVER >= 0x0600
-#define _NC_CHECK_MINTTY
+#  define _NC_CHECK_MINTTY
+#endif
+
+// This are the "modern" defaults Windows Terminal uses
+#ifndef DEFAULT_CONSOLE_LINES
+#define DEFAULT_CONSOLE_LINES 30
+#define DEFAULT_CONSOLE_COLS  120
 #endif
 
 #include <windows.h>
@@ -81,11 +88,6 @@
 
 #include <windows.h>
 
-#undef sleep
-#define sleep(n) Sleep((n) * 1000)
-
-#endif /* USE_NAMED_PIPES */
-
 #if HAVE_SYS_TIME_H
 #include <sys/time.h>		/* for struct timeval */
 #endif
@@ -93,6 +95,11 @@
 #ifdef _MSC_VER
 #include <winsock2.h>		/* for struct timeval */
 #endif
+
+#undef sleep
+#define sleep(n) Sleep((n) * 1000)
+
+#endif /* USE_NAMED_PIPES */
 
 #include <stdint.h>		/* for uint32_t */
 
@@ -103,15 +110,15 @@
 #define DEFAULT_TERM_ENV "ms-terminal"
 #endif
 
+// JPF needs fix
 #undef VALID_TERM_ENV
 #define VALID_TERM_ENV(term_env, no_terminal) \
-	(term_env = (NonEmpty(term_env) \
-		      ? term_env \
-		      : (_nc_console_vt_supported() \
-		         ? DEFAULT_TERM_ENV \
-		         : no_terminal)), \
-	 NonEmpty(term_env))
+        (term_env = (NonEmpty(term_env) \
+                      ? term_env \
+                      : DEFAULT_TERM_ENV), \
+         NonEmpty(term_env))
 
+#if  defined(USE_WIN32CON_DRIVER)
   /*
    * Various Console mode definitions
    */
@@ -127,12 +134,41 @@
   /* Flags to reset from RAW/CBREAK */
 #define CONMODE_NORAW    (ENABLE_PROCESSED_INPUT|ENABLE_LINE_INPUT)
 #define CONMODE_NOCBREAK (ENABLE_LINE_INPUT)
+#endif /* USE_WIN32CON_DRIVER */
 
 #include <ncurses_dll.h>
 
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+/*
+* Milliseconds to wait between checks for console resize events. 
+* We don't want to check too often, as that would be wasteful, but we 
+* also don't want to check too rarely, as that would make the UI feel 
+* unresponsive when resizing the console window.
+*/
+#define RESIZE_CHECK_THROTTLING_MS 100
+
+#define TTY_MODE_UNSPECIFIED 0
+#define TTY_MODE_SHELL 1
+#define TTY_MODE_PROGRAM 2
+#define TTY_MODE_AUTO 3
+/* This is our equivalent to termios (aka TTY).
+* It can be used in ConPTY context as well as with the legacy console API. 
+* The "kind" field is used to manage the differences between shell and program 
+* mode, and is currently only used in the ConPTY implementation, where we have 
+* to manage the I/O subsystem of ncurses differently in shell and program mode.
+* But we should also make use of it in Legacy console mode to improve the
+* mode switching in that scenario as well.
+*/
+typedef struct
+{
+    DWORD dwFlagIn;        /* Input Handle Console mode flags */
+    DWORD dwFlagOut;       /* Output Handle Console mode flags */
+    uint8_t kind;          /* 0=unspecified, 1=shell, 2=prog, 3=auto */
+} ConsoleMode;
+
 
 #if defined(CURSES_PRIV_H) || defined(TEST_PRIV_H)
 
@@ -143,30 +179,60 @@ extern NCURSES_EXPORT(int) _nc_gettimeofday(struct timeval *, void *);
 #define gettimeofday(tv,tz) _nc_gettimeofday(tv,tz)
 #endif
 
+extern NCURSES_EXPORT(BOOL) _nc_conpty_supported(void);
+
+#ifndef EVENTLIST_2nd
+#define EVENTLIST_2nd(param) /* nothing */
+#endif
+
 #endif /* defined(CURSES_PRIV_H) || defined(TEST_PRIV_H) */
 
 #if !HAVE_WCWIDTH
 #undef wcwidth
+#undef wcswidth
 #define wcwidth(ucs) _nc_wcwidth((wchar_t)(ucs))
+#define wcswidth(pwcs, n) _nc_wcswidth((pwcs), (n))
 extern NCURSES_EXPORT(int) _nc_wcwidth(uint32_t);
+extern NCURSES_EXPORT(int) _nc_wcswidth(const uint32_t *pwcs, size_t n);
 #endif
 
-typedef struct
-{
-    DWORD dwFlagIn;
-    DWORD dwFlagOut;
-} ConsoleMode;
+typedef struct {
+    // Properties
+    BOOL initialized;                /* Whether the console has been initialized */
+    BOOL is_conpty;                   /* Whether we are running on a ConPTY or on the legacy console API */
 
+    ConsoleMode ttyflags;            /* The desired state of the console  */
+    
+    HANDLE ConsoleHandleIn;          /* Pseudo-Console Handle actually used for input operations */
+    HANDLE ConsoleHandleOut;         /* Pseudo-Console Handle actually used for output operations */
+
+    int sbi_lines;                   /* Cached console size */
+    int sbi_cols;                    /* Cached console size */
+
+    // Methods
+    BOOL (*init)(int fdOut, int fdIn);                 /* Initialize with I/O file descriptors. fdIn maybe -1 in first call */
+    void (*size)(int *Lines, int *Cols);               /* Query console size. Safe to be called before init */ 
+    BOOL (*size_changed)(void);                        /* Return TRUE if the console has been resized */
+    int (*setmode)(int fd, const ConsoleMode *arg);    /* Our SET_TTY implementation */
+    int (*getmode)(int fd, ConsoleMode *arg);          /* Our GET_TTY implementation */
+    int (*defmode )(ConsoleMode *arg, short kind);     /* Used by shell-/prog-mode handling to manage start/stop of the I/O subsystem of ncurses */
+    int (*flush)(int fd);                              /* flush the console I/O stream denoted by the file descriptor. Actualy, we only flush the input. */
+} ConsoleCoreInterface;
+
+extern NCURSES_EXPORT_VAR(ConsoleCoreInterface*) _nc_CORECONSOLE;
+#define CORECONSOLE (*_nc_CORECONSOLE)
+#define IsConPTY() CORECONSOLE.is_conpty
+
+#if defined(USE_WIN32CON_DRIVER)
 #define CON_NUMPAIRS 64
 typedef struct {
-    BOOL initialized;
+    ConsoleCoreInterface core;
+
     BOOL buffered;
     BOOL window_only;
     BOOL progMode;
     BOOL isMinTTY;
     BOOL isTermInfoConsole;
-    HANDLE out;
-    HANDLE inp;
     HANDLE hdl;
     HANDLE lastOut;
     int numButtons;
@@ -182,10 +248,46 @@ typedef struct {
     CONSOLE_SCREEN_BUFFER_INFO save_SBI;
     CONSOLE_CURSOR_INFO save_CI;
     ConsoleMode originalMode;
-} ConsoleInfo;
 
-extern NCURSES_EXPORT_VAR(ConsoleInfo) _nc_CONSOLE;
+    int (*isatty)(int fd);                             /* Check if the file descriptor refers to a terminal */
+  } LegacyConsoleInterface;
+
+extern NCURSES_EXPORT_VAR(LegacyConsoleInterface) _nc_CONSOLE;
 #define WINCONSOLE _nc_CONSOLE
+#endif /* USE_WIN32CON_DRIVER */
+
+#if @USE_NAMED_PIPES@  /* USE_NAMED_PIPES */
+#ifndef POLLIN
+#define POLLIN  0x0001  // Input available (for stdin/pipe)
+#define POLLOUT 0x0004  // Output available (for stdout/pipe, optional)
+#define POLLERR 0x0008  // Error condition (for stdin/pipe)
+#endif /* POLLIN */
+
+// --- Structure similar to UNIX ---
+struct pty_pollfd {
+    int fd;         // only 0 (STDIN) supported)
+    short events;   // events to check
+    short revents;  // returned events
+};
+
+// --- Typ für Anzahl der FDs ---
+typedef unsigned long nfds_t;
+
+typedef struct {
+  // Properties
+    ConsoleCoreInterface core;                                        /* The common part for ConPTY as well as legacy console API*/
+  // Methods
+    int (*read)(int fd, unsigned char* result, size_t count);         /* Read bytes from the input stream. */
+    int (*write)(int fd, const void *buf, size_t count);              /* Write bytes to the output stream. */
+    int (*start_input_subsystem)(void);                               /* In prog mode, we control the input stream */
+    int (*stop_input_subsystem)(void);                                /* In shell mode, we leave it to the C runtime */
+    int (*poll)(struct pty_pollfd *fds, nfds_t nfds, int timeout_ms); /* Minimalistic clone of UNIX poll, just polling stdin console input */
+  } ConPtyInterface;
+
+// Guaranteed to be statically initialzed.
+extern NCURSES_EXPORT_VAR(ConPtyInterface*) _nc_currentCONPTY;
+#define WINCONPTY (*_nc_currentCONPTY)
+#endif /* USE_NAMED_PIPES */
 
 #ifdef __cplusplus
 }
@@ -202,7 +304,7 @@ NCURSES_EXPORT(const char *) _nc_to_dospath(const char *, char *);
 	path = _nc_to_dospath(path, fixed_pathname)
 #define FixupPathname2(path,buffer) \
 	path = _nc_to_dospath(path, buffer)
-#endif
+#endif /* USE_DOS_PATHS */
 
 #undef  ttyname
 #define ttyname(fd) NULL
