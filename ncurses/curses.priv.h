@@ -1255,7 +1255,7 @@ typedef struct screen {
 	int		_sysmouse_new_buttons;
 #endif
 
-#if USE_TERM_DRIVER || (USE_NAMED_PIPES && JPF)
+#if USE_TERM_DRIVER
 	MEVENT		_drv_mouse_fifo[FIFO_SIZE];
 	int		_drv_mouse_head;
 	int		_drv_mouse_tail;
@@ -2599,7 +2599,7 @@ extern NCURSES_EXPORT(int)    _nc_console_checkmintty(int fd, LPHANDLE pMinTTY);
 #endif
 
 #else
-#error unsupported driver configuration
+// JPF #error unsupported driver configuration
 #endif /* USE_WIN32CON_DRIVER */
 
 #if USE_TERM_DRIVER && defined(USE_WIN32CON_DRIVER) // JPF

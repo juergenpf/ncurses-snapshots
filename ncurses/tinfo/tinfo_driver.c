@@ -433,11 +433,11 @@ drv_size(TERMINAL_CONTROL_BLOCK * TCB, int *linep, int *colp)
 	useTioctl = _nc_prescreen.use_tioctl;
     }
 
-#if USE_WINCONMODE && JPF
+#if USE_NAMED_PIPES || USE_WINCONMODE 
     /* If we are here, then Windows console is used in terminfo mode.
        We need to figure out the size using the console API
      */
-    _nc_console_size(linep, colp);
+    CORECONSOLE.size(linep, colp);
     T(("screen size: winconsole lines = %d columns = %d", *linep, *colp));
 #else
     /* figure out the size of the screen */

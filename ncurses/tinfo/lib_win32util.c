@@ -60,7 +60,7 @@ MODULE_ID("$Id: lib_win32util.c,v 1.7 2025/06/28 16:58:13 tom Exp $")
 NCURSES_EXPORT(int)
 _nc_console_checkmintty(int fd, LPHANDLE pMinTTY)
 {
-    HANDLE handle = _nc_console_handle(fd);
+    HANDLE handle = INVALID_HANDLE_VALUE; // JPF _nc_console_handle(fd);
     DWORD dw;
     int code = 0;
 

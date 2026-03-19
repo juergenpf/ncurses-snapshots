@@ -58,6 +58,9 @@ NCURSES_EXPORT_VAR(char) PC = 0;              /* used by termcap library */
 NCURSES_EXPORT_VAR(NCURSES_OSPEED) ospeed = 0;        /* used by termcap library */
 
 NCURSES_EXPORT_VAR(int) _nc_nulls_sent = 0;
+#if USE_NAMED_PIPES
+#define write(fd,buf,len) WINCONPTY.write(fd, buf, len)
+#endif
 
 #if NCURSES_NO_PADDING
 NCURSES_EXPORT(void)

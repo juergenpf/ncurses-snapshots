@@ -96,8 +96,8 @@ NCURSES_SP_NAME(raw) (NCURSES_SP_DCL0)
 	buf.c_iflag &= (unsigned) ~(COOKED_INPUT);
 	buf.c_cc[VMIN] = 1;
 	buf.c_cc[VTIME] = 0;
-#elif defined(USE_WIN32CON_DRIVER)
-	buf.dwFlagIn &= (unsigned long) ~CONMODE_NORAW;
+#elif USE_NAMED_PIPES || USE_WINCONMODE
+	buf.dwFlagIn &= (unsigned long) ~(ENABLE_PROCESSED_INPUT | ENABLE_LINE_INPUT);
 #else
 	buf.sg_flags |= RAW;
 #endif
@@ -152,9 +152,8 @@ NCURSES_SP_NAME(cbreak) (NCURSES_SP_DCL0)
 	buf.c_iflag &= (unsigned) ~ICRNL;
 	buf.c_cc[VMIN] = 1;
 	buf.c_cc[VTIME] = 0;
-#elif defined(USE_WIN32CON_DRIVER)
-	buf.dwFlagIn |= CONMODE_NORAW;
-	buf.dwFlagIn &= (unsigned long) ~CONMODE_NOCBREAK;
+#elif USE_NAMED_PIPES || USE_WINCONMODE
+	buf.dwFlagIn &= (unsigned long) ~(ENABLE_PROCESSED_INPUT | ENABLE_LINE_INPUT);
 #else
 	buf.sg_flags |= CBREAK;
 #endif
@@ -230,8 +229,8 @@ NCURSES_SP_NAME(noraw) (NCURSES_SP_DCL0)
 	buf.c_lflag |= ISIG | ICANON |
 	    (termp->Ottyb.c_lflag & IEXTEN);
 	buf.c_iflag |= COOKED_INPUT;
-#elif defined(USE_WIN32CON_DRIVER)
-	buf.dwFlagIn |= CONMODE_NORAW;
+#elif USE_NAMED_PIPES || USE_WINCONMODE
+	buf.dwFlagIn |= (ENABLE_PROCESSED_INPUT | ENABLE_LINE_INPUT);
 #else
 	buf.sg_flags &= ~(RAW | CBREAK);
 #endif
@@ -284,8 +283,8 @@ NCURSES_SP_NAME(nocbreak) (NCURSES_SP_DCL0)
 #ifdef TERMIOS
 	buf.c_lflag |= ICANON;
 	buf.c_iflag |= ICRNL;
-#elif defined(USE_WIN32CON_DRIVER)
-	buf.dwFlagIn |= (CONMODE_NOCBREAK | CONMODE_NORAW);
+#elif USE_NAMED_PIPES || USE_WINCONMODE
+	buf.dwFlagIn |= (ENABLE_LINE_INPUT | ENABLE_PROCESSED_INPUT);
 #else
 	buf.sg_flags &= ~CBREAK;
 #endif

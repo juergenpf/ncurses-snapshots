@@ -272,7 +272,6 @@ use_tioctl(bool f)
 }
 #endif
 
-#if !(USE_TERM_DRIVER || USE_NAMED_PIPES) // JPF
 static void
 _nc_default_screensize(TERMINAL *termp, int *linep, int *colp)
 {
@@ -293,6 +292,7 @@ _nc_default_screensize(TERMINAL *termp, int *linep, int *colp)
     }
 }
 
+#if !(USE_TERM_DRIVER || USE_NAMED_PIPES) // JPF
 #if defined(USE_CHECK_SIZE) && defined(user6) && defined(user7)
 static const char *
 skip_csi(const char *value)
@@ -454,6 +454,8 @@ _nc_check_screensize(SCREEN *sp, TERMINAL *termp, int *linep, int *colp)
 #else /* !USE_CHECK_SIZE */
 #define _nc_check_screensize(sp, termp, linep, colp)	/* nothing */
 #endif
+#else
+#define _nc_check_screensize(sp, termp, linep, colp)	/* nothing */
 #endif /* !(USE_TERM_DRIVER || USE_NAMED_PIPES) */
 
 NCURSES_EXPORT(void)
@@ -494,7 +496,7 @@ _nc_get_screensize(SCREEN *sp,
     /* If we are here, then Windows console is used in terminfo mode.
        We need to figure out the size using the console API
      */
-    _nc_console_size(linep, colp);
+    CORECONSOLE.size(linep, colp);
     T(("screen size: winconsole lines = %d columns = %d", *linep, *colp));
 #else
     /* figure out the size of the screen */
@@ -881,7 +883,7 @@ TINFO_SETUP_TERM(TERMINAL **tp,
      */
     if (Filedes == STDOUT_FILENO && !NC_ISATTY(Filedes))
 	Filedes = STDERR_FILENO;
-#if USE_NAMED_PIPES
+#if USE_NAMED_PIPES && JPF
     if (Filedes != STDERR_FILENO && NC_ISATTY(Filedes))
 	_setmode(Filedes, _O_BINARY);
 #endif
@@ -1012,7 +1014,13 @@ TINFO_SETUP_TERM(TERMINAL **tp,
 	if (VALID_STRING(command_character))
 	    _nc_tinfo_cmdch(termp, UChar(*command_character));
 
-	/*
+
+#if USE_NAMED_PIPES || USE_WINCONMODE  
+	if (!_nc_console_setup() || !CORECONSOLE.init(Filedes, -1))
+	    code = ERR;
+	else {
+#endif
+	    /*
 	 * If an application calls setupterm() rather than initscr() or
 	 * newterm(), we will not have the def_prog_mode() call in
 	 * _nc_setupscreen().  Do it now anyway, so we can initialize the
@@ -1024,6 +1032,10 @@ TINFO_SETUP_TERM(TERMINAL **tp,
 	    NCURSES_SP_NAME(baudrate) (NCURSES_SP_ARG);
 	}
 	code = OK;
+#if USE_NAMED_PIPES || USE_WINCONMODE
+	}
+#endif
+
 #endif
     }
 

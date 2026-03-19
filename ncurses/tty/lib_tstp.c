@@ -356,7 +356,7 @@ CatchIfDefault(int sig, void (*handler) (int))
     ohandler = signal(sig, SIG_IGN);
     if (ohandler == SIG_DFL
 	|| ohandler == handler
-#if USE_SIGWINCH
+#if USE_SIGWINCH && defined(SIGWINCH)
 	|| (sig == SIGWINCH && ohandler == SIG_IGN)
 #endif
 	) {
@@ -418,7 +418,7 @@ _nc_signal_handler(int enable)
 	if (enable) {
 	    CatchIfDefault(SIGINT, handle_SIGINT);
 	    CatchIfDefault(SIGTERM, handle_SIGINT);
-#if USE_SIGWINCH
+#if USE_SIGWINCH && defined(SIGWINCH)
 	    CatchIfDefault(SIGWINCH, handle_SIGWINCH);
 #endif
 	    _nc_globals.init_signals = TRUE;

@@ -94,7 +94,7 @@ NCURSES_SP_NAME(erasechar) (NCURSES_SP_DCL0)
 	result = termp->Ottyb.c_cc[VERASE];
 	if (result == _nc_vdisable())
 	    result = ERR;
-#elif defined(USE_WIN32CON_DRIVER)
+#elif USE_NAMED_PIPES || USE_WINCONMODE
 	result = ERR;
 #else
 	result = termp->Ottyb.sg_erase;
@@ -131,7 +131,7 @@ NCURSES_SP_NAME(killchar) (NCURSES_SP_DCL0)
 	result = termp->Ottyb.c_cc[VKILL];
 	if (result == _nc_vdisable())
 	    result = ERR;
-#elif defined(USE_WIN32CON_DRIVER)
+#elif USE_NAMED_PIPES || USE_WINCONMODE
 	result = ERR;
 #else
 	result = termp->Ottyb.sg_kill;
