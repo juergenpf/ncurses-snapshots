@@ -523,8 +523,6 @@ _nc_timed_wait(const SCREEN *sp MAYBE_UNUSED,
 #endif
 
 #if USE_FUNC_POLL || USE_CONPTY
-    if (fds != fd_list)
-	free((char *) fds);
 #ifdef NCURSES_WGETCH_EVENTS
     if (fds != fd_list)
 	free((char *) fds);

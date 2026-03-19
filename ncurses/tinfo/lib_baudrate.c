@@ -99,7 +99,7 @@ struct speed {
     int actual_speed;		/* the actual speed */
 };
 
-#if !(USE_CONSOLE_API) // JPF
+#if !(USE_CONSOLE_API)
 #define DATA(number) { B##number, number }
 
 static struct speed const speeds[] =

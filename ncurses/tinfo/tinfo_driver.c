@@ -633,7 +633,7 @@ drv_mode(TERMINAL_CONTROL_BLOCK * TCB, int progFlag, int defFlag)
 		    if (sp->_keypad_on)
 			_nc_keypad(sp, TRUE);
 		}
-#if USE_WINCONMODE && JPF
+#if USE_LEGACY_CONSOLE && JPF
 		if (!WINCONSOLE.buffered)
 		    _nc_console_set_scrollback(FALSE, &WINCONSOLE.SBI);
 #endif
@@ -665,7 +665,7 @@ drv_mode(TERMINAL_CONTROL_BLOCK * TCB, int progFlag, int defFlag)
 		NCURSES_SP_NAME(_nc_flush) (sp);
 	    }
 	    code = drv_sgmode(TCB, TRUE, &(_term->Ottyb));
-#if USE_WINCONMODE && JPF
+#if USE_LEGACY_CONSOLE && JPF
 	    if (!_nc_console_restore())
 		code = ERR;
 #endif
@@ -962,7 +962,7 @@ drv_testmouse(TERMINAL_CONTROL_BLOCK * TCB,
     } else
 #endif
     {
-#if USE_WINCONMODE && JPF
+#if USE_LEGACY_CONSOLE && JPF
 	rc = _nc_console_testmouse(sp,
 				   _nc_console_handle(sp->_ifd),
 				   delay
@@ -1271,7 +1271,7 @@ drv_twait(TERMINAL_CONTROL_BLOCK * TCB,
 
     AssertTCB();
     SetSP();
-#if USE_WINCONMODE && JPF
+#if USE_LEGACY_CONSOLE && JPF
     return _nc_console_twait(sp,
 			     _nc_console_handle(sp->_ifd),
 			     mode,
@@ -1294,7 +1294,7 @@ drv_read(TERMINAL_CONTROL_BLOCK * TCB, int *buf)
     SetSP();
 
     _nc_set_read_thread(TRUE);
-#if USE_WINCONMODE && JPF
+#if USE_LEGACY_CONSOLE && JPF
     n = _nc_console_read(sp,
 			 _nc_console_handle(sp->_ifd),
 			 buf);
@@ -1321,10 +1321,8 @@ drv_nap(TERMINAL_CONTROL_BLOCK * TCB GCC_UNUSED, int ms)
 	    request = remaining;
 	}
     }
-#elif USE_CONSOLE_API
-    Sleep((DWORD) ms);
 #else
-    _nc_timed_wait(NULL, 0, ms, (int *) 0 EVENTLIST_2nd(NULL));
+    _nc_timed_wait(NULL, TW_NONE, ms, (int *) 0 EVENTLIST_2nd(NULL));
 #endif
     return OK;
 }
@@ -1515,7 +1513,7 @@ typedef struct DriverEntry {
 
 static DRIVER_ENTRY DriverTable[] =
 {
-#if USE_WINCONMODE
+#if USE_LEGACY_CONSOLE
     {"win32console", &_nc_WIN_DRIVER},
 #endif
     {"tinfo", &_nc_TINFO_DRIVER}	/* must be last */
@@ -1536,7 +1534,7 @@ _nc_get_driver(TERMINAL_CONTROL_BLOCK * TCB, const char *name, int *errret)
 
     for (i = 0; i < SIZEOF(DriverTable); i++) {
 	res = DriverTable[i].driver;
-#if USE_WINCONMODE
+#if USE_LEGACY_CONSOLE
 	if ((i + 1) == SIZEOF(DriverTable)) {
 	    /* For Windows >= 10.0.17763 Windows Console interface implements
 	       virtual Terminal functionality.

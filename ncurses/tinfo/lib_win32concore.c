@@ -150,7 +150,7 @@ _nc_console_setup(void) {
 		CORECONSOLE.is_conpty = TRUE;
 #endif
 	} else {
-#if USE_WINCONMODE
+#if USE_LEGACY_CONSOLE
 		_nc_CORECONSOLE = & (_nc_CONSOLE.core);
 		CORECONSOLE.is_conpty = FALSE;
 #endif

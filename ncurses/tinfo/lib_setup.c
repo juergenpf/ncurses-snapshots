@@ -272,7 +272,12 @@ use_tioctl(bool f)
 }
 #endif
 
-#if !(USE_TERM_DRIVER || USE_CONSOLE_API) // JPF
+#if USE_CONSOLE_API 
+/* By design, the CONSOLE always provides a default size */
+#define _nc_default_screensize(termp, linep, colp) CORECONSOLE.size(linep, colp);
+#endif
+
+#if !(USE_TERM_DRIVER || USE_CONSOLE_API) 
 static void
 _nc_default_screensize(TERMINAL *termp, int *linep, int *colp)
 {
@@ -891,10 +896,6 @@ TINFO_SETUP_TERM(TERMINAL **tp,
      */
     if (Filedes == STDOUT_FILENO && !NC_ISATTY(Filedes))
 	Filedes = STDERR_FILENO;
-#if USE_CONPTY && JPF
-    if (Filedes != STDERR_FILENO && NC_ISATTY(Filedes))
-	_setmode(Filedes, _O_BINARY);
-#endif
 
     /*
      * Check if we have already initialized to use this terminal.  If so, we

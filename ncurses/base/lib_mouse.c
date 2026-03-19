@@ -388,7 +388,7 @@ handle_sysmouse(int sig GCC_UNUSED)
 }
 #endif /* USE_SYSMOUSE */
 
-#if !defined(_NC_WINDOWS_NATIVE) || USE_CONPTY
+#if USE_CONPTY
 #define xterm_kmous "\033[M"
 
 static void
@@ -445,7 +445,7 @@ init_xterm_mouse(SCREEN *sp)
 	}
     }
 }
-#endif
+#endif /* USE_CONPTY */
 
 static void
 enable_xterm_mouse(SCREEN *sp, bool enable)
@@ -461,17 +461,18 @@ enable_xterm_mouse(SCREEN *sp, bool enable)
     sp->_mouse_active = enable;
 }
 
-#if USE_TERM_DRIVER
+#if USE_TERM_DRIVER && USE_CONSOLE_API
 static void
 enable_win32_mouse(SCREEN *sp, bool enable)
 {
 #if USE_CONPTY
     enable_xterm_mouse(sp, enable);
-#else
+#endif
+#if USE_LEGACY_CONSOLE
     sp->_mouse_active = enable;
 #endif
 }
-#endif
+#endif /* USE_TERM_DRIVER && USE_CONSOLE_API */
 
 #if USE_GPM_SUPPORT
 static bool
@@ -765,7 +766,7 @@ initialize_mousetype(SCREEN *sp)
 #if USE_TERM_DRIVER
     CallDriver(sp, td_initmouse);
 #endif
-#if !defined(_NC_WINDOWS_NATIVE) || USE_CONPTY
+#if USE_CONPTY
     /* we know how to recognize mouse events under "xterm" */
     if (NonEmpty(key_mouse)) {
 	init_xterm_mouse(sp);
@@ -1449,7 +1450,7 @@ mouse_activate(SCREEN *sp, bool on)
 	    sp->_mouse_active = TRUE;
 	    break;
 #endif
-#if USE_TERM_DRIVER
+#if USE_TERM_DRIVER && USE_CONSOLE_API
 	case M_TERM_DRIVER:
 	    enable_win32_mouse(sp, TRUE);
 	    break;
@@ -1486,7 +1487,7 @@ mouse_activate(SCREEN *sp, bool on)
 	    sp->_mouse_active = FALSE;
 	    break;
 #endif
-#if USE_TERM_DRIVER
+#if USE_TERM_DRIVER && USE_CONSOLE_API
 	case M_TERM_DRIVER:
 	    enable_win32_mouse(sp, FALSE);
 	    break;
@@ -1841,7 +1842,7 @@ _nc_mouse_resume(SCREEN *sp)
 	break;
 #endif
 
-#if USE_TERM_DRIVER
+#if USE_TERM_DRIVER && USE_CONSOLE_API
     case M_TERM_DRIVER:
 	mouse_activate(sp, TRUE);
 	break;
@@ -1894,6 +1895,7 @@ NCURSES_SP_NAME(getmouse) (NCURSES_SP_DCLx MEVENT * aevent)
 	    SP_PARM->_mouse_read++;
 	    result = OK;
 	} else {
+	    TR(TRACE_IEVENT, ("getmouse: no valid event in queue"));
 	    /* Reset the provided event */
 	    aevent->bstate = 0;
 	    Invalidate(aevent);

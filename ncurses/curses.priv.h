@@ -433,32 +433,32 @@ typedef TRIES {
 #endif /* USE_TERM_DRIVER */
 
 #if USE_NAMED_PIPES || USE_CONPTY
-#   if defined(TERMIOS)
+#  if defined(TERMIOS)
 #     error Unsupported configuration: named pipes and conpty are only supported on Windows
 #  endif
 #  undef  USE_CONPTY
 #  define USE_CONPTY 1
 #  undef  USE_NAMED_PIPES
-# define  USE_NAMED_PIPES 1
+#  define  USE_NAMED_PIPES 1
 #endif /* USE_NAMED_PIPES || USE_CONPTY */
 
 #if defined(USE_WIN32CON_DRIVER)
-# define USE_WINCONMODE 1
+# define USE_LEGACY_CONSOLE 1
 #else
-# define USE_WINCONMODE 0
+# define USE_LEGACY_CONSOLE 0
 #endif /* USE_WIN32CON_DRIVER */
 
-#if USE_CONPTY || USE_WINCONMODE
-// We define USE_CONSOLE_API to describe that we use either conpty or legacy.
-#  define USE_CONSOLE_API 1	
-//  Although Windows doesn't have SIGWINCH actually, we can use the console API
-//  to simulate the behavior of SIGWINCH.
-#  undef USE_SIZECHANGE
-#  define USE_SIZECHANGE 1
-#  undef USE_SIGWINCH
-#  define USE_SIGWINCH 1
+#if USE_CONPTY || USE_LEGACY_CONSOLE
+  // We define USE_CONSOLE_API to describe that we use either conpty or legacy.
+# define USE_CONSOLE_API 1	
+  //  Although Windows doesn't have SIGWINCH actually, we can use the console API
+  //  to simulate the behavior of SIGWINCH.
+# undef USE_SIZECHANGE
+# define USE_SIZECHANGE 1
+# undef USE_SIGWINCH
+# define USE_SIGWINCH 1
 #else
-#  define USE_CONSOLEAPI 0
+# define USE_CONSOLE_API 0
 #endif
 
 #ifndef FixupPathname
@@ -2613,7 +2613,7 @@ extern NCURSES_EXPORT(BOOL) _nc_console_setup(void);
 #define NC_READ(fd, buf, count) read(fd, buf, count)
 #endif
 
-#if USE_WINCONMODE
+#if USE_LEGACY_CONSOLE
 extern NCURSES_EXPORT(bool)  _nc_console_checkinit(bool assumeTermInfo);
 extern NCURSES_EXPORT(void*) _nc_console_fd2handle(int fd);
 extern NCURSES_EXPORT(int)  _nc_console_flush(void* handle);

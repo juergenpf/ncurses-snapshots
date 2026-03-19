@@ -704,6 +704,11 @@ METHOD(poll, int) (struct pty_pollfd * fds, nfds_t nfds, int timeout_ms)
 
     T((T_CALLED("lib_win32conpty::pty_poll(fds=%p, nfds=%u, timeout_ms=%d)"),
        fds, (unsigned) nfds, timeout_ms));
+    if (nfds==0) {
+	// pure wait, o we don't actually poll and don't need to assert the input system is up.
+	Sleep((DWORD) timeout_ms);
+	returnCode(0);
+    }
     assert(g_input_thread != NULL && g_stdin_handle != INVALID_HANDLE_VALUE);
 
     if (g_input_thread == NULL || g_stdin_handle == INVALID_HANDLE_VALUE)

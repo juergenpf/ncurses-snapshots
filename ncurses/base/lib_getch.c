@@ -145,17 +145,6 @@ check_mouse_activity(SCREEN *sp, int delay EVENTLIST_2nd(_nc_eventlist * evl))
 #if USE_TERM_DRIVER
     TERMINAL_CONTROL_BLOCK *TCB = TCBOf(sp);
     rc = TCBOf(sp)->drv->td_testmouse(TCBOf(sp), delay EVENTLIST_2nd(evl));
-# if JPF
-# if USE_CONPTY || defined(_NC_WINDOWS_NATIVE)
-    /* if we emulate terminfo on console, we have to use the console routine */
-    if (IsTermInfoOnConsole(sp)) {
-	rc = _nc_console_testmouse(sp,
-				   _nc_console_handle(sp->_ifd),
-				   delay EVENTLIST_2nd(evl));
-    } else
-# endif
-	rc = TCB->drv->td_testmouse(TCB, delay EVENTLIST_2nd(evl));
-#endif /* JPF */
 #else /* !USE_TERM_DRIVER */
 # if USE_SYSMOUSE
     if ((sp->_mouse_type == M_SYSMOUSE)
@@ -164,18 +153,11 @@ check_mouse_activity(SCREEN *sp, int delay EVENTLIST_2nd(_nc_eventlist * evl))
     } else
 # endif
     {
-# if USE_CONPTY && JPF
-	rc = _nc_console_testmouse(sp,
-				   _nc_console_handle(sp->_ifd),
-				   delay
-				   EVENTLIST_2nd(evl));
-# else
 	rc = _nc_timed_wait(sp,
 			    TWAIT_MASK,
 			    delay,
 			    (int *) 0
 			    EVENTLIST_2nd(evl));
-# endif
 # if USE_SYSMOUSE
 	if ((sp->_mouse_type == M_SYSMOUSE)
 	    && (sp->_sysmouse_head < sp->_sysmouse_tail)
@@ -306,20 +288,10 @@ fifo_push(SCREEN *sp EVENTLIST_2nd(_nc_eventlist * evl))
 	    n = CallDriver_1(sp, td_read, &buf);
 	ch = buf;
 #else /* !USE_TERM_DRIVER */
-#if USE_CONPTY && JPF
-	int buf;
-#endif
 	unsigned char c2 = 0;
 
 	_nc_set_read_thread(TRUE);
-#if USE_CONPTY && JPF
-	n = _nc_console_read(sp,
-			     _nc_console_handle(sp->_ifd),
-			     &buf);
-	c2 = buf;
-#else
 	n = (int) NC_READ(sp->_ifd, &c2, (size_t) 1);
-#endif
 	_nc_set_read_thread(FALSE);
 	ch = c2;
 #endif /* USE_TERM_DRIVER */
@@ -584,24 +556,8 @@ _nc_wgetch(WINDOW *win,
     if (CORECONSOLE.size_changed()) {
 	/* Resize detected - preserve the triggering character */
 	safe_ungetch(sp, ch);
+	ch = ERR; // Fake an error to trigger the resize handling below
     }
-#if USE_SIZECHANGE
-    /* Always process pending size change flag, not just on ERR */
-    if (_nc_handle_sigwinch(sp)) {
-	_nc_update_screensize(sp);
-	/* resizeterm can push KEY_RESIZE */
-	if (cooked_key_in_fifo()) {
-	    *result = fifo_pull(sp);
-	    /*
-	     * Get the ERR from queue -- it is from WINCH,
-	     * so we should take it out, the "error" is handled.
-	     */
-	    if (fifo_peek(sp) == -1)
-		fifo_pull(sp);
-	    returnCode(*result >= KEY_MIN ? KEY_CODE_YES : OK);
-	}
-    }
-#endif    
 #endif
 
     if (ch == ERR) {

@@ -90,10 +90,14 @@ _nc_initscr(NCURSES_SP_DCL0)
 	buf.sg_flags &= ~(ECHO | CRMOD);
 #elif USE_CONPTY
 	buf.dwFlagIn  = ENABLE_PROCESSED_INPUT;
-        buf.dwFlagOut = ENABLE_PROCESSED_OUTPUT | ENABLE_WRAP_AT_EOL_OUTPUT;
+        buf.dwFlagOut = ENABLE_PROCESSED_OUTPUT 
+			| ENABLE_WRAP_AT_EOL_OUTPUT;
 	if (IsConPTY()) {
-		buf.dwFlagIn |= ENABLE_VIRTUAL_TERMINAL_INPUT | ENABLE_QUICK_EDIT_MODE | ENABLE_EXTENDED_FLAGS;
-		buf.dwFlagOut |= ENABLE_VIRTUAL_TERMINAL_PROCESSING | DISABLE_NEWLINE_AUTO_RETURN;
+		buf.dwFlagIn |= ENABLE_VIRTUAL_TERMINAL_INPUT 
+				| ENABLE_QUICK_EDIT_MODE 
+				| ENABLE_EXTENDED_FLAGS;
+		buf.dwFlagOut |= ENABLE_VIRTUAL_TERMINAL_PROCESSING 
+				| DISABLE_NEWLINE_AUTO_RETURN;
 	}
  	buf.kind = TTY_MODE_PROGRAM;
 #else
@@ -202,11 +206,6 @@ NCURSES_SP_NAME(newterm) (NCURSES_SP_DCLx
 
     current = CURRENT_SCREEN;
     its_term = (current ? current->_term : NULL);
-
-#if USE_CONPTY && JPF
-    _setmode(fileno(_ifp), _O_BINARY);
-    _setmode(fileno(_ofp), _O_BINARY);
-#endif
 
     INIT_TERM_DRIVER();
     /* this loads the capability entry, then sets LINES and COLS */

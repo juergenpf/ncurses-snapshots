@@ -238,11 +238,15 @@ _nc_trace_ttymode(const TTY * tty)
     };
 
     buf = _nc_trace_buf(0,
-			8 + sizeof(dwFlagsOut) +
-			8 + sizeof(dwFlagsIn));
+			14 + sizeof(dwFlagsOut) +
+			14 + sizeof(dwFlagsIn) +
+			24);
     if (buf != NULL) {
-	lookup_bits(buf, dwFlagsIn, "dwIn", tty->dwFlagIn);
-	lookup_bits(buf, dwFlagsOut, "dwOut", tty->dwFlagOut);
+	_nc_STRCAT(buf, "\n", TRACE_BUF_SIZE(0));
+	lookup_bits(buf, dwFlagsIn, "dwFlagIn", tty->dwFlagIn);
+	_nc_STRCAT(buf, "\n", TRACE_BUF_SIZE(0));
+	lookup_bits(buf, dwFlagsOut, "dwFlagOut", tty->dwFlagOut);
+	_nc_STRCAT(buf, "\n", TRACE_BUF_SIZE(0));
     }
 #else
     /* reference: ttcompat(4M) on SunOS 4.1 */
