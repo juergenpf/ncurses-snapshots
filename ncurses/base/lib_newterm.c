@@ -247,7 +247,7 @@ NCURSES_SP_NAME(newterm) (NCURSES_SP_DCLx
 	} else {
 	    int value;
 	    int cols;
-#if USE_CONPTY || USE_WINCONMODE
+#if USE_CONSOLE_API
 	    if (!CORECONSOLE.init(fileno(_ofp), fileno(_ifp))) {
 		_nc_set_screen(current);
 		returnSP(NULL);
@@ -360,7 +360,7 @@ NCURSES_SP_NAME(newterm) (NCURSES_SP_DCLx
 
 	    _nc_signal_handler(TRUE);
 	    result = SP_PARM;
-#if USE_CONPTY || USE_WINCONMODE
+#if USE_CONSOLE_API
 	}
 #endif
 	}

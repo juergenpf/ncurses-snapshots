@@ -1015,7 +1015,7 @@ TINFO_SETUP_TERM(TERMINAL **tp,
 	    _nc_tinfo_cmdch(termp, UChar(*command_character));
 
 
-#if USE_CONPTY || USE_WINCONMODE  
+#if USE_CONSOLE_API
 	if (!_nc_console_setup() || !CORECONSOLE.init(Filedes, -1))
 	    code = ERR;
 	else {
@@ -1032,7 +1032,7 @@ TINFO_SETUP_TERM(TERMINAL **tp,
 	    NCURSES_SP_NAME(baudrate) (NCURSES_SP_ARG);
 	}
 	code = OK;
-#if USE_CONPTY || USE_WINCONMODE
+#if USE_CONSOLE_API
 	}
 #endif
 

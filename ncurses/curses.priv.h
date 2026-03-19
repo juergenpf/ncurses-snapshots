@@ -448,6 +448,19 @@ typedef TRIES {
 # define USE_WINCONMODE 0
 #endif /* USE_WIN32CON_DRIVER */
 
+#if USE_CONPTY || USE_WINCONMODE
+// We define USE_CONSOLE_API to describe that we use either conpty or legacy.
+#  define USE_CONSOLE_API 1	
+//  Although Windows doesn't have SIGWINCH actually, we can use the console API
+//  to simulate the behavior of SIGWINCH.
+#  undef USE_SIZECHANGE
+#  define USE_SIZECHANGE 1
+#  undef USE_SIGWINCH
+#  define USE_SIGWINCH 1
+#else
+#  define USE_CONSOLEAPI 0
+#endif
+
 #ifndef FixupPathname
 #define FixupPathname(path) /* nothing */
 #define FixupPathname2(path,buffer) /* nothing */

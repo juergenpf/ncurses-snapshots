@@ -53,6 +53,7 @@ MODULE_ID("$Id$")
 // Prototypes of static function we want to use in initializers
 METHOD(init, BOOL) (int fdOut, int fdIn);
 METHOD(size, void) (int *Lines, int *Cols);
+METHOD(size_changed, BOOL) (void);
 METHOD(setmode, int) (int fd, const TTY * arg);
 METHOD(getmode, int) (int fd, TTY * arg);
 METHOD(defmode, int) (TTY * arg, short kind);
@@ -78,7 +79,7 @@ static ConPtyInterface defaultCONPTY =
             .sbi_cols = -1,
  	    Dispatch(init),
     	    Dispatch(size),
-            NULL,
+            Dispatch(size_changed),
             Dispatch(setmode),
             Dispatch(getmode),
             Dispatch(defmode),
@@ -357,7 +358,7 @@ get_sbi(CONSOLE_SCREEN_BUFFER_INFO * csbi)
  * because we can fallback to query the standard handles. */
  METHOD(size, void) (int *Lines, int *Cols)
 {
-    T((T_CALLED("lib_win32concore::core_size(lines=%p, cols=%p)"), Lines, Cols));
+    T((T_CALLED("lib_win32conoty::pty_size(lines=%p, cols=%p)"), Lines, Cols));
 
     if (Lines != NULL && Cols != NULL) {
 	CONSOLE_SCREEN_BUFFER_INFO csbi;
@@ -372,6 +373,45 @@ get_sbi(CONSOLE_SCREEN_BUFFER_INFO * csbi)
 	*Lines = CORECONSOLE.sbi_lines != -1 ? CORECONSOLE.sbi_lines : DEFAULT_CONSOLE_LINES;
 	*Cols = CORECONSOLE.sbi_cols != -1 ? CORECONSOLE.sbi_cols : DEFAULT_CONSOLE_COLS;
     }
+}
+
+/* Check if the Windows Console has been resized. Returns TRUE if a resize was detected.
+ * We implement a simple throttling to ensure that we don't call GetConsoleScreenBufferInfo
+ * too often, which could become expensive in a pseudo-console context because it involves
+ * a round trip to the ConPTY backend. The throttling is implemented by keeping	 track of the
+ * last time we checked for a resize, and if the function is called again within a certain
+ * time frame, we simply return FALSE without checking. This allows us to avoid unnecessary
+ * calls to GetConsoleScreenBufferInfo while still detecting resizes in a timely manner when
+ * they occur. */
+METHOD(size_changed, BOOL) (void)
+{
+    static ULONGLONG lastCheck = 0;
+    int current_lines, current_cols;
+    ULONGLONG now = GetTickCount64();
+    bool resized = FALSE;
+
+    T((T_CALLED("lib_win32conpty::pty_size_changed()")));
+
+    if (now - lastCheck < RESIZE_CHECK_THROTTLING_MS)
+	returnBool(FALSE);
+
+    DispatchMethod(size) (&current_lines, &current_cols);
+
+    if (CORECONSOLE.sbi_lines == -1 || CORECONSOLE.sbi_cols == -1) {
+	CORECONSOLE.sbi_lines = current_lines;
+	CORECONSOLE.sbi_cols  = current_cols;
+    } else {
+	if (current_lines != CORECONSOLE.sbi_lines || current_cols != CORECONSOLE.sbi_cols) {
+	    CORECONSOLE.sbi_lines = current_lines;
+	    CORECONSOLE.sbi_cols  = current_cols;
+
+	    _nc_globals.have_sigwinch = 1;
+
+	    resized = TRUE;
+	}
+    }
+    lastCheck = GetTickCount64();
+    returnBool(resized);
 }
 
 // ---------------------------The input subsystem -------------------------------------------

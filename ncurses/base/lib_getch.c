@@ -579,6 +579,30 @@ _nc_wgetch(WINDOW *win,
 	    fifo_push(sp EVENTLIST_2nd(evl));
 	ch = fifo_pull(sp);
     }
+#if USE_CONSOLE_API
+    /* Check for console resize events after getting input */
+    if (CORECONSOLE.size_changed()) {
+	/* Resize detected - preserve the triggering character */
+	safe_ungetch(sp, ch);
+    }
+#if USE_SIZECHANGE
+    /* Always process pending size change flag, not just on ERR */
+    if (_nc_handle_sigwinch(sp)) {
+	_nc_update_screensize(sp);
+	/* resizeterm can push KEY_RESIZE */
+	if (cooked_key_in_fifo()) {
+	    *result = fifo_pull(sp);
+	    /*
+	     * Get the ERR from queue -- it is from WINCH,
+	     * so we should take it out, the "error" is handled.
+	     */
+	    if (fifo_peek(sp) == -1)
+		fifo_pull(sp);
+	    returnCode(*result >= KEY_MIN ? KEY_CODE_YES : OK);
+	}
+    }
+#endif    
+#endif
 
     if (ch == ERR) {
       check_sigwinch:

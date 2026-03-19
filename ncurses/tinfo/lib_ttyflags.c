@@ -156,7 +156,7 @@ NCURSES_SP_NAME(def_shell_mode) (NCURSES_SP_DCL0)
 #ifdef TERMIOS
 	    if (termp->Ottyb.c_oflag & OFLAGS_TABS)
 		tab = back_tab = NULL;
-#elif USE_CONPTY || USE_WINCONMODE
+#elif USE_CONSOLE_API
 	    CORECONSOLE.defmode(&termp->Ottyb, TTY_MODE_SHELL);
 #else
 	    if (termp->Ottyb.sg_flags & XTABS)
@@ -195,7 +195,7 @@ NCURSES_SP_NAME(def_prog_mode) (NCURSES_SP_DCL0)
 	if (_nc_get_tty_mode(&termp->Nttyb) == OK) {
 #ifdef TERMIOS
 	    termp->Nttyb.c_oflag &= (unsigned) (~OFLAGS_TABS);
-#elif USE_CONPTY || USE_WINCONMODE
+#elif USE_CONSOLE_API
 	    CORECONSOLE.defmode(&termp->Nttyb, TTY_MODE_PROGRAM);
 #else
 	    termp->Nttyb.sg_flags &= (unsigned) (~XTABS);
@@ -309,7 +309,7 @@ NCURSES_SP_NAME(savetty) (NCURSES_SP_DCL0)
 
     tty = saved_tty(NCURSES_SP_ARG);
     code = NCURSES_SP_NAME(_nc_get_tty_mode) (NCURSES_SP_ARGx tty);
-#if USE_CONPTY || USE_WINCONMODE
+#if USE_CONSOLE_API
     if (code == OK)
 	code = CORECONSOLE.defmode(tty, TTY_MODE_AUTO);
 #endif

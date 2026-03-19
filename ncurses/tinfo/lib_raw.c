@@ -96,7 +96,7 @@ NCURSES_SP_NAME(raw) (NCURSES_SP_DCL0)
 	buf.c_iflag &= (unsigned) ~(COOKED_INPUT);
 	buf.c_cc[VMIN] = 1;
 	buf.c_cc[VTIME] = 0;
-#elif USE_CONPTY || USE_WINCONMODE
+#elif USE_CONSOLE_API
 	buf.dwFlagIn &= (unsigned long) ~(ENABLE_PROCESSED_INPUT | ENABLE_LINE_INPUT);
 #else
 	buf.sg_flags |= RAW;
@@ -152,7 +152,7 @@ NCURSES_SP_NAME(cbreak) (NCURSES_SP_DCL0)
 	buf.c_iflag &= (unsigned) ~ICRNL;
 	buf.c_cc[VMIN] = 1;
 	buf.c_cc[VTIME] = 0;
-#elif USE_CONPTY || USE_WINCONMODE
+#elif USE_CONSOLE_API
 	buf.dwFlagIn &= (unsigned long) ~(ENABLE_PROCESSED_INPUT | ENABLE_LINE_INPUT);
 #else
 	buf.sg_flags |= CBREAK;
@@ -229,7 +229,7 @@ NCURSES_SP_NAME(noraw) (NCURSES_SP_DCL0)
 	buf.c_lflag |= ISIG | ICANON |
 	    (termp->Ottyb.c_lflag & IEXTEN);
 	buf.c_iflag |= COOKED_INPUT;
-#elif USE_CONPTY || USE_WINCONMODE
+#elif USE_CONSOLE_API
 	buf.dwFlagIn |= (ENABLE_PROCESSED_INPUT | ENABLE_LINE_INPUT);
 #else
 	buf.sg_flags &= ~(RAW | CBREAK);
@@ -283,7 +283,7 @@ NCURSES_SP_NAME(nocbreak) (NCURSES_SP_DCL0)
 #ifdef TERMIOS
 	buf.c_lflag |= ICANON;
 	buf.c_iflag |= ICRNL;
-#elif USE_CONPTY || USE_WINCONMODE
+#elif USE_CONSOLE_API
 	buf.dwFlagIn |= (ENABLE_LINE_INPUT | ENABLE_PROCESSED_INPUT);
 #else
 	buf.sg_flags &= ~CBREAK;

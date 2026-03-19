@@ -35,10 +35,9 @@
 
 MODULE_ID("$Id$")
 
-#ifdef _NC_WINDOWS_NATIVE
+#if USE_CONSOLE_API
 
 #include <winternl.h>
-
 
 /* AKA Windows 10 version 1809, which is the first version that introduced ConPTY.
  * We check for this version or higher to ensure that ConPTY is available, which is
@@ -140,9 +139,6 @@ _nc_conpty_supported(void)
 NCURSES_EXPORT_VAR(ConsoleCoreInterface*) 
 _nc_CORECONSOLE = NULL;
 
-static void core_size (int *Lines, int *Cols);
-static BOOL core_size_changed (void);
-
 NCURSES_EXPORT(BOOL)
 _nc_console_setup(void) {
 	BOOL res = FALSE;
@@ -168,51 +164,9 @@ _nc_console_setup(void) {
 		CORECONSOLE.ttyflags.kind = TTY_MODE_UNSPECIFIED;
 		CORECONSOLE.sbi_lines = -1;
 		CORECONSOLE.sbi_cols = -1;
-		CORECONSOLE.size_changed = core_size_changed;
 		res = TRUE;
 	}
 	returnBool(res);
-}
-
-
-/* Check if the Windows Console has been resized. Returns TRUE if a resize was detected.
- * We implement a simple throttling to ensure that we don't call GetConsoleScreenBufferInfo
- * too often, which could become expensive in a pseudo-console context because it involves
- * a round trip to the ConPTY backend. The throttling is implemented by keeping	 track of the
- * last time we checked for a resize, and if the function is called again within a certain
- * time frame, we simply return FALSE without checking. This allows us to avoid unnecessary
- * calls to GetConsoleScreenBufferInfo while still detecting resizes in a timely manner when
- * they occur. */
-static BOOL
-core_size_changed (void)
-{
-    static ULONGLONG lastCheck = 0;
-    int current_lines, current_cols;
-    ULONGLONG now = GetTickCount64();
-    bool resized = FALSE;
-
-    T((T_CALLED("lib_win32concore::core_size_changed()")));
-
-    if (now - lastCheck < RESIZE_CHECK_THROTTLING_MS)
-	returnBool(FALSE);
-
-    CORECONSOLE.size (&current_lines, &current_cols);
-
-    if (CORECONSOLE.sbi_lines == -1 || CORECONSOLE.sbi_cols == -1) {
-	CORECONSOLE.sbi_lines = current_lines;
-	CORECONSOLE.sbi_cols  = current_cols;
-    } else {
-	if (current_lines != CORECONSOLE.sbi_lines || current_cols != CORECONSOLE.sbi_cols) {
-	    CORECONSOLE.sbi_lines = current_lines;
-	    CORECONSOLE.sbi_cols  = current_cols;
-
-	    _nc_globals.have_sigwinch = 1;
-
-	    resized = TRUE;
-	}
-    }
-    lastCheck = GetTickCount64();
-    returnBool(resized);
 }
 
 #endif // _NC_WINDOWS_NATIVE

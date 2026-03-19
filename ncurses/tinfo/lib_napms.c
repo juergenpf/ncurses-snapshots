@@ -78,7 +78,7 @@ NCURSES_SP_NAME(napms) (NCURSES_SP_DCLx int ms)
 	    request = remaining;
 	}
     }
-#elif USE_CONPTY || USE_WINCONMODE
+#elif USE_CONSOLE_API
     Sleep((DWORD) ms);
 #else
     _nc_timed_wait(NULL, 0, ms, (int *) 0 EVENTLIST_2nd(NULL));
