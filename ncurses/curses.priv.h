@@ -2631,7 +2631,7 @@ extern NCURSES_EXPORT(int)    _nc_console_checkmintty(int fd, LPHANDLE pMinTTY);
 #endif /* USE_WIN32CON_DRIVER */
 
 #if USE_TERM_DRIVER && defined(USE_WIN32CON_DRIVER) // JPF
-#define NC_ISATTY(fd) (0 != WINCONSOLE.isatty(fd))
+#define NC_ISATTY(fd) (IsConPTY() ? isatty(fd) : (0 != WINCONSOLE.isatty(fd)))
 #else
 #define NC_ISATTY(fd) isatty(fd)
 #endif
@@ -2647,17 +2647,15 @@ extern NCURSES_EXPORT(int)    _nc_console_checkmintty(int fd, LPHANDLE pMinTTY);
 #if USE_TERM_DRIVER
 #  define IsTermInfo(sp)       ((TCBOf(sp) != NULL) && ((TCBOf(sp)->drv != NULL)) && ((TCBOf(sp)->drv->isTerminfo)))
 #  define HasTInfoTerminal(sp) ((NULL != TerminalOf(sp)) && IsTermInfo(sp))
-#  if USE_CONPTY // JPF
+#  if USE_CONSOLE_API
 #    define IsTermInfoOnConsole(sp) (IsConPTY())
-#  elif defined(USE_WIN32CON_DRIVER)
-#    define IsTermInfoOnConsole(sp) (!IsConPTY())
-#  else
+# else
 #    define IsTermInfoOnConsole(sp) FALSE
 #  endif
 #else
 #  define IsTermInfo(sp)       TRUE
 #  define HasTInfoTerminal(sp) (NULL != TerminalOf(sp))
-#  if USE_CONPTY
+#  if USE_CONSOLE_API
 #    define IsTermInfoOnConsole(sp) (IsConPTY())
 #  else
 #    define IsTermInfoOnConsole(sp) FALSE

@@ -123,7 +123,7 @@ get_baudrate(TERMINAL *termp)
     if (GET_TTY(termp->Filedes, &termp->Nttyb) == OK) {
 #ifdef TERMIOS
 	termp->Nttyb.c_oflag &= (unsigned) (~OFLAGS_TABS);
-#elif defined(USE_WIN32CON_DRIVER)
+#elif defined(USE_CONSOLE_API)
 	/* noop */
 #else
 	termp->Nttyb.sg_flags &= (unsigned) (~XTABS);
@@ -135,7 +135,7 @@ get_baudrate(TERMINAL *termp)
 #else /* !USE_OLD_TTY */
 #ifdef TERMIOS
     my_ospeed = (NCURSES_OSPEED) cfgetospeed(&(termp->Nttyb));
-#elif defined(USE_WIN32CON_DRIVER)
+#elif defined(USE_CONSOLE_API)
     /* noop */
     my_ospeed = 0;
 #else
@@ -439,6 +439,7 @@ drv_size(TERMINAL_CONTROL_BLOCK * TCB, int *linep, int *colp)
      */
     CORECONSOLE.size(linep, colp);
     T(("screen size: winconsole lines = %d columns = %d", *linep, *colp));
+    return OK;
 #else
     /* figure out the size of the screen */
     T(("screen size: terminfo lines = %d columns = %d", lines, columns));
@@ -1301,9 +1302,9 @@ drv_read(TERMINAL_CONTROL_BLOCK * TCB, int *buf)
     n = (int) NC_READ(sp->_ifd, &c2, (size_t) 1);
 #endif
     _nc_set_read_thread(FALSE);
-#if !defined(USE_WIN32CON_DRIVER)
+//#if !defined(USE_WIN32CON_DRIVER) || 1 // JPF
     *buf = (int) c2;
-#endif
+//#endif
     return n;
 }
 
@@ -1320,7 +1321,7 @@ drv_nap(TERMINAL_CONTROL_BLOCK * TCB GCC_UNUSED, int ms)
 	    request = remaining;
 	}
     }
-#elif defined(USE_WIN32CON_DRIVER)
+#elif USE_CONSOLE_API
     Sleep((DWORD) ms);
 #else
     _nc_timed_wait(NULL, 0, ms, (int *) 0 EVENTLIST_2nd(NULL));

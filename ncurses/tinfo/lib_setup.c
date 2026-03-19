@@ -272,6 +272,7 @@ use_tioctl(bool f)
 }
 #endif
 
+#if !(USE_TERM_DRIVER || USE_CONSOLE_API) // JPF
 static void
 _nc_default_screensize(TERMINAL *termp, int *linep, int *colp)
 {
@@ -292,7 +293,6 @@ _nc_default_screensize(TERMINAL *termp, int *linep, int *colp)
     }
 }
 
-#if !(USE_TERM_DRIVER || USE_CONPTY) // JPF
 #if defined(USE_CHECK_SIZE) && defined(user6) && defined(user7)
 static const char *
 skip_csi(const char *value)
@@ -850,9 +850,17 @@ TINFO_SETUP_TERM(TERMINAL **tp,
     T((T_CALLED("setupterm(%s,%d,%p)"), _nc_visbuf(tname), Filedes, (void *) errret));
 #endif
 
+#if USE_CONSOLE_API
+    if (!_nc_console_setup() || !CORECONSOLE.init(Filedes, -1)) {
+	code = ERR;
+	ret_error0(TGETENT_ERR,
+	    "Unable to initialize console API.\n");
+    }
+#endif
+
     if (tname == NULL) {
 	tname = getenv("TERM");
-#if USE_CONPTY
+#if USE_CONSOLE_API
 	if (!VALID_TERM_ENV(tname, NO_TERMINAL)) {
 	    T(("Failure with TERM=%s", NonNull(tname)));
 	    ret_error0(TGETENT_ERR, "TERM environment variable not set.\n");
@@ -1014,13 +1022,7 @@ TINFO_SETUP_TERM(TERMINAL **tp,
 	if (VALID_STRING(command_character))
 	    _nc_tinfo_cmdch(termp, UChar(*command_character));
 
-
-#if USE_CONSOLE_API
-	if (!_nc_console_setup() || !CORECONSOLE.init(Filedes, -1))
-	    code = ERR;
-	else {
-#endif
-	    /*
+	/*
 	 * If an application calls setupterm() rather than initscr() or
 	 * newterm(), we will not have the def_prog_mode() call in
 	 * _nc_setupscreen().  Do it now anyway, so we can initialize the
@@ -1032,10 +1034,6 @@ TINFO_SETUP_TERM(TERMINAL **tp,
 	    NCURSES_SP_NAME(baudrate) (NCURSES_SP_ARG);
 	}
 	code = OK;
-#if USE_CONSOLE_API
-	}
-#endif
-
 #endif
     }
 
