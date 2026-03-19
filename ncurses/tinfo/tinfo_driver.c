@@ -618,7 +618,7 @@ drv_mode(TERMINAL_CONTROL_BLOCK * TCB, int progFlag, int defFlag)
 	    if ((drv_sgmode(TCB, FALSE, &(_term->Nttyb)) == OK)) {
 #ifdef TERMIOS
 		_term->Nttyb.c_oflag &= (unsigned) ~OFLAGS_TABS;
-#elif USE_cONPTY
+#elif USE_CONPTY
 		CORECONSOLE.defmode(&(_term->Nttyb),TTY_MODE_PROGRAM);
 #else
 		_term->Nttyb.sg_flags &= (unsigned) ~XTABS;
