@@ -51,7 +51,7 @@ MODULE_ID("$Id: win32_driver.c,v 1.20 2025/12/30 19:34:50 tom Exp $")
 #define  console_initialized LEGACYCONSOLE.core.initialized
 
 #define AssertTCB() assert(TCB != NULL && (TCB->magic == WINMAGIC))
-#define validateConsoleHandle() (AssertTCB(), console_initialized)
+#define ValidateConsole() (1)
 #define SetSP() assert(TCB->csp != NULL); sp = TCB->csp; (void) sp
 #define EnsureInit() /* noop */
 
@@ -345,7 +345,7 @@ wcon_kpad(TERMINAL_CONTROL_BLOCK * TCB, int flag GCC_UNUSED)
 
     T((T_CALLED("win32_driver::wcon_kpad(%p, %d)"), TCB, flag));
 
-    if (validateConsoleHandle()) {
+    if (ValidateConsole()) {
 	SetSP();
 
 	if (sp) {
@@ -365,7 +365,7 @@ wcon_keyok(TERMINAL_CONTROL_BLOCK * TCB,
 
     T((T_CALLED("win32_driver::wcon_keyok(%p, %d, %d)"), TCB, keycode, flag));
 
-    if (validateConsoleHandle()) {
+    if (ValidateConsole()) {
 	SetSP();
 	if (sp) {
 	    code = console_keyok(keycode, flag);
@@ -398,7 +398,7 @@ wcon_setcolor(TERMINAL_CONTROL_BLOCK * TCB,
 	      int (*outc) (SCREEN *, int) GCC_UNUSED)
 {
     (void) TCB;
-    if (validateConsoleHandle()) {
+    if (ValidateConsole()) {
 	WORD a = console_MapColor(fore, color);
 	a |= (WORD) ((LEGACYCONSOLE.SBI.wAttributes) & (fore ? 0xfff8 : 0xff8f));
 	SetConsoleTextAttribute(LEGACYCONSOLE.core.ConsoleHandleOut, a);
@@ -454,7 +454,7 @@ wcon_initpair(TERMINAL_CONTROL_BLOCK * TCB,
 {
     SCREEN *sp;
 
-    if (validateConsoleHandle()) {
+    if (ValidateConsole()) {
 	SetSP();
 
 	if ((pair > 0) && (pair < CON_NUMPAIRS) && (f >= 0) && (f < 8)
@@ -490,7 +490,7 @@ IsConsoleHandle(HANDLE hdl)
     DWORD dwFlag = 0;
     BOOL result = FALSE;
 
-    T((T_CALLED("lib_win32con::IsConsoleHandle(HANDLE=%p"), hdl));
+    T((T_CALLED("win32_driver::IsConsoleHandle(HANDLE=%p"), hdl));
 
     EnsureInit();
 
@@ -514,7 +514,7 @@ console_test(int fd)
 {
     int code = 0;
     HANDLE hdl = INVALID_HANDLE_VALUE;
-    T((T_CALLED("lib_win32con::_nc_console_test(%d)"), fd));
+    T((T_CALLED("win32_driver::console_test(%d)"), fd));
     hdl = (HANDLE)((intptr_t)_get_osfhandle(fd));
     code = (int) IsConsoleHandle(hdl);
     returnCode(code);
@@ -525,7 +525,7 @@ console_test(int fd)
 METHOD(flush, int) (int fd GCC_UNUSED)
 {
     int code = OK;
-    T((T_CALLED("lib_win32conpty::pty_flush(fd=%d)"), fd));
+    T((T_CALLED("win32_driver::legacy_flush(fd=%d)"), fd));
     FlushConsoleInputBuffer(GetStdHandle(STD_INPUT_HANDLE));
     returnCode(code);
 }
@@ -545,7 +545,7 @@ METHOD(setmode, int) (int fd GCC_UNUSED, const TTY * arg)
     BOOL input_ok = FALSE;
     BOOL output_ok = FALSE;
 
-    T((T_CALLED("lib_win32conpty::pty_setmode(fd=%d, TTY*=%p)"), fd, arg));
+    T((T_CALLED("win32_driver::legacy_setmode(fd=%d, TTY*=%p)"), fd, arg));
 
     if (!arg)
 	returnCode(ERR);
@@ -632,7 +632,7 @@ METHOD(setmode, int) (int fd GCC_UNUSED, const TTY * arg)
  * that TTY. */
 METHOD(getmode, int) (int fd GCC_UNUSED, TTY * arg)
 {
-    T((T_CALLED("lib_win32conpty::pty_getmode(fd=%d, TTY*=%p)"), fd, arg));
+    T((T_CALLED("win32_driver::legacy_getmode(fd=%d, TTY*=%p)"), fd, arg));
 
     if (NULL == arg)
 	returnCode(ERR);
@@ -658,7 +658,7 @@ METHOD(defmode, int) (TTY * arg, short kind)
 {
     short realMode = kind;
 
-    T((T_CALLED("lib_win32conpty::pty_defmode(TTY*=%p, kind=%d)"), arg, kind));
+    T((T_CALLED("win32_driver::legacy_defmode(TTY*=%p, kind=%d)"), arg, kind));
 
     if (NULL == arg)
 	returnCode(ERR);
@@ -738,7 +738,7 @@ METHOD(size_changed, BOOL) (void)
     ULONGLONG now = GetTickCount64();
     bool resized = FALSE;
 
-    T((T_CALLED("lib_win32conpty::pty_size_changed()")));
+    T((T_CALLED("win32_driver::legacy_size_changed()")));
 
     if (now - lastCheck < RESIZE_CHECK_THROTTLING_MS)
 	returnBool(FALSE);
@@ -767,9 +767,9 @@ wcon_size(TERMINAL_CONTROL_BLOCK * TCB, int *Lines, int *Cols)
 {
     int result = ERR;
 
-    T((T_CALLED("win32con::wcon_size(%p)"), TCB));
+    T((T_CALLED("win32_driver::wcon_size(%p)"), TCB));
 
-    if (validateConsoleHandle() &&
+    if (ValidateConsole() &&
 	(Lines != NULL) && (Cols != NULL)) {
 	DispatchMethod(size)(Lines, Cols);
 	result = OK;
@@ -974,7 +974,7 @@ set_scrollback(bool normal, CONSOLE_SCREEN_BUFFER_INFO * info)
     COORD coord;
     bool changed = FALSE;
 
-    T((T_CALLED("lib_win32con::_nc_console_set_scrollback(%s)"),
+    T((T_CALLED("win32_driver::set_scrollback(%s)"),
        (normal
 	? "normal"
 	: "application")));
@@ -1246,8 +1246,8 @@ wcon_doupdate(TERMINAL_CONTROL_BLOCK * TCB)
     int y, nonempty, n, x0, x1, Width, Height;
     SCREEN *sp;
 
-    T((T_CALLED("win32con::wcon_doupdate(%p)"), TCB));
-    if (validateConsoleHandle()) {
+    T((T_CALLED("win32_driver::wcon_doupdate(%p)"), TCB));
+    if (ValidateConsole()) {
 	SetSP();
 
 	Width = screen_columns(sp);
@@ -1396,7 +1396,7 @@ wcon_CanHandle(TERMINAL_CONTROL_BLOCK * TCB,
 {
     bool code = FALSE;
 
-    T((T_CALLED("win32con::wcon_CanHandle(%p,%s,%p)"),
+    T((T_CALLED("win32_driver::wcon_CanHandle(%p,%s,%p)"),
        (void *) TCB, NonNull(tname), (void *) errret));
 
     assert(TCB != NULL);
@@ -1422,11 +1422,6 @@ wcon_CanHandle(TERMINAL_CONTROL_BLOCK * TCB,
     } else if (tname != NULL && stricmp(tname, "unknown") == 0) {
 	code = TRUE;
     }
-#if !USE_NAMED_PIPES
-    else if (_isatty(TCB->term.Filedes)) {
-	code = TRUE;
-    }
-#endif
 
     /*
      * This is intentional, to avoid unnecessary breakage of applications
@@ -1437,13 +1432,6 @@ wcon_CanHandle(TERMINAL_CONTROL_BLOCK * TCB,
 #if NCURSES_EXT_NUMBERS
 	_nc_export_termtype2(&TCB->term.type, &TerminalType(&TCB->term));
 #endif
-    }
-
-    if (!code) {
-	if (console_test(0)) {
-	    T(("isTermInfoConsole=TRUE"));
-	    // LEGACYCONSOLE.isTermInfoConsole = TRUE;
-	}
     }
     returnBool(code);
 }
@@ -1468,7 +1456,7 @@ wcon_dobeepflash(TERMINAL_CONTROL_BLOCK * TCB,
     SMALL_RECT this_region;
     COORD bufferCoord;
 
-    if (validateConsoleHandle()) {
+    if (ValidateConsole()) {
 	SetSP();
 	this_region.Top = LEGACYCONSOLE.SBI.srWindow.Top;
 	this_region.Left = LEGACYCONSOLE.SBI.srWindow.Left;
@@ -1531,7 +1519,7 @@ wcon_rescol(TERMINAL_CONTROL_BLOCK * TCB)
     bool res = FALSE;
 
     (void) TCB;
-    if (validateConsoleHandle()) {
+    if (ValidateConsole()) {
 	WORD a = FOREGROUND_BLUE | FOREGROUND_RED | FOREGROUND_GREEN;
 	SetConsoleTextAttribute(LEGACYCONSOLE.core.ConsoleHandleOut, a);
 	get_SBI();
@@ -1546,9 +1534,9 @@ wcon_sgmode(TERMINAL_CONTROL_BLOCK * TCB, int setFlag, TTY * buf)
 {
     int result = ERR;
 
-    T((T_CALLED("win32con::wcon_sgmode(TCB=(%p),setFlag=%d,TTY=(%p)"),
+    T((T_CALLED("win32_driver::wcon_sgmode(TCB=(%p),setFlag=%d,TTY=(%p)"),
        TCB, setFlag, buf));
-    if (buf != NULL && validateConsoleHandle()) {
+    if (buf != NULL && ValidateConsole()) {
 
 	if (setFlag) {
 	    DispatchMethod(setmode)(fileno(stdout), buf);
@@ -1567,10 +1555,10 @@ wcon_mode(TERMINAL_CONTROL_BLOCK * TCB, int progFlag, int defFlag)
     TERMINAL *_term = (TERMINAL *) TCB;
     int code = ERR;
 
-    T((T_CALLED("win32con::wcon_mode(%p, progFlag=%d, defFlag=%d)"),
+    T((T_CALLED("win32_driver::wcon_mode(%p, progFlag=%d, defFlag=%d)"),
        TCB, progFlag, defFlag));
 
-    if (validateConsoleHandle()) {
+    if (ValidateConsole()) {
 	sp = TCB->csp;
 
 	LEGACYCONSOLE.progMode = progFlag;
@@ -1635,7 +1623,7 @@ wcon_wrap(SCREEN *sp GCC_UNUSED)
 static void
 wcon_release(TERMINAL_CONTROL_BLOCK * TCB)
 {
-    T((T_CALLED("win32con::wcon_release(%p)"), TCB));
+    T((T_CALLED("win32_driver::wcon_release(%p)"), TCB));
 
     AssertTCB();
     if (TCB->prop)
@@ -1686,6 +1674,7 @@ METHOD(init, BOOL) (int fdOut, int fdIn)
 	WORD a;
 	int i;
 	DWORD num_buttons;
+	DWORD last_error;
 
 	if (_nc_conpty_supported()) {
 	    T(("Windows version does support ConPTY, please don't use the legacy API!"));
@@ -1698,11 +1687,15 @@ METHOD(init, BOOL) (int fdOut, int fdIn)
 	}
 
 	hasConsole = AllocConsole();
-	if (!hasConsole)
-	    hasConsole = AttachConsole(ATTACH_PARENT_PROCESS);
 	if (!hasConsole) {
-	    T(("AllocConsole() and AttachConsole() failed"));
-	    returnBool(FALSE);
+	    last_error = GetLastError();
+	    T(("AllocConsole() failed with error %#lx", (unsigned long) last_error));
+	    hasConsole = AttachConsole(ATTACH_PARENT_PROCESS);
+	    if (!hasConsole) {
+		last_error = GetLastError();
+	    	T(("AllocConsole() and AttachConsole() failed with error %#lx", (unsigned long) last_error));
+	    	//returnBool(FALSE);
+	    }
 	}
 	
 	stdin_handle  = GetDirectHandle("CONIN$", FILE_SHARE_READ);
@@ -1846,7 +1839,7 @@ METHOD(init, BOOL) (int fdOut, int fdIn)
 static void
 wcon_init(TERMINAL_CONTROL_BLOCK * TCB)
 {
-    T((T_CALLED("win32con::wcon_init(%p)"), TCB));
+    T((T_CALLED("win32_driver::wcon_init(%p)"), TCB));
 
     AssertTCB();
 #if JPF
@@ -1881,9 +1874,9 @@ wcon_initmouse(TERMINAL_CONTROL_BLOCK * TCB)
 {
     SCREEN *sp;
 
-    T((T_CALLED("win32con::wcon_initmouse(%p)"), TCB));
+    T((T_CALLED("win32_driver::wcon_initmouse(%p)"), TCB));
 
-    if (validateConsoleHandle()) {
+    if (ValidateConsole()) {
 	SetSP();
 
 	sp->_mouse_type = M_TERM_DRIVER;
@@ -1899,8 +1892,8 @@ wcon_testmouse(TERMINAL_CONTROL_BLOCK * TCB,
     int rc = 0;
     SCREEN *sp;
 
-    T((T_CALLED("win32con::wcon_testmouse(%p)"), TCB));
-    if (validateConsoleHandle()) {
+    T((T_CALLED("win32_driver::wcon_testmouse(%p)"), TCB));
+    if (ValidateConsole()) {
 	SetSP();
 
 	if (sp->_drv_mouse_head < sp->_drv_mouse_tail) {
@@ -1925,7 +1918,7 @@ wcon_mvcur(TERMINAL_CONTROL_BLOCK * TCB,
     int ret = ERR;
 
     (void) TCB;
-    if (validateConsoleHandle()) {
+    if (ValidateConsole()) {
 	COORD loc;
 	loc.X = (short) x;
 	loc.Y = (short) (y + AdjustY());
@@ -2010,7 +2003,7 @@ wcon_initacs(TERMINAL_CONTROL_BLOCK * TCB,
     unsigned n;
 
     SCREEN *sp;
-    if (validateConsoleHandle()) {
+    if (ValidateConsole()) {
 	SetSP();
 
 	for (n = 0; n < SIZEOF(table); ++n) {
@@ -2032,7 +2025,7 @@ wcon_twait(TERMINAL_CONTROL_BLOCK * TCB,
     SCREEN *sp;
     int code = 0;
 
-    if (validateConsoleHandle()) {
+    if (ValidateConsole()) {
 	SetSP();
 
 	code = console_twait(sp,
@@ -2050,10 +2043,10 @@ wcon_read(TERMINAL_CONTROL_BLOCK * TCB, int *buf)
     SCREEN *sp;
     int n = -1;
 
-    T((T_CALLED("win32con::wcon_read(%p)"), TCB));
+    T((T_CALLED("win32_driver::wcon_read(%p)"), TCB));
 
     assert(buf);
-    if (validateConsoleHandle()) {
+    if (ValidateConsole()) {
 	SetSP();
 
 	n = console_read(sp, LEGACYCONSOLE.core.ConsoleHandleIn, buf);
@@ -2064,7 +2057,7 @@ wcon_read(TERMINAL_CONTROL_BLOCK * TCB, int *buf)
 static int
 wcon_nap(TERMINAL_CONTROL_BLOCK * TCB GCC_UNUSED, int ms)
 {
-    T((T_CALLED("win32con::wcon_nap(%p, %d)"), TCB, ms));
+    T((T_CALLED("win32_driver::wcon_nap(%p, %d)"), TCB, ms));
     Sleep((DWORD) ms);
     returnCode(OK);
 }
@@ -2074,8 +2067,8 @@ wcon_cursorSet(TERMINAL_CONTROL_BLOCK * TCB GCC_UNUSED, int mode)
 {
     int res = -1;
 
-    T((T_CALLED("win32con:wcon_cursorSet(%d)"), mode));
-    if (validateConsoleHandle()) {
+    T((T_CALLED("win32_driver::wcon_cursorSet(%d)"), mode));
+    if (ValidateConsole()) {
 	CONSOLE_CURSOR_INFO this_CI = LEGACYCONSOLE.save_CI;
 	switch (mode) {
 	case 0:
@@ -2413,7 +2406,7 @@ console_read(
 
     memset(&inp_rec, 0, sizeof(inp_rec));
 
-    T((T_CALLED("lib_win32con::_nc_console_read(%p)"), sp));
+    T((T_CALLED("win32_driver::console_read(%p)"), sp));
 
     while ((b = read_keycode(hdl, &inp_rec, 1, &nRead))) {
 	if (b && nRead > 0) {

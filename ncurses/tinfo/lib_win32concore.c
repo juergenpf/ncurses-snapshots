@@ -120,7 +120,7 @@ _nc_conpty_supported(void)
 		} else {
 	    	DWORD dwFlag;
 	    	if (GetConsoleMode(hOut, &dwFlag) == 0) {
-				T(("Output handle is not a console"));
+				T(("Output handle is not a pseudo-console"));
 				result = FALSE;
 	    	} else {
 	    		if ((dwFlag & ENABLE_VIRTUAL_TERMINAL_PROCESSING) == 0) {
