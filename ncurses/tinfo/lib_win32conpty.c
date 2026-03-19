@@ -48,6 +48,7 @@ MODULE_ID("$Id$")
 
 #define DispatchMethod(name) pty_##name
 #define Dispatch(name) .name = DispatchMethod(name)
+#define NoDispatch(name) .name = NULL
 #define METHOD(name,type) static type DispatchMethod(name)
 
 // Prototypes of static function we want to use in initializers

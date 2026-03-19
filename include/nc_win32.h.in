@@ -63,11 +63,6 @@
 #  define WINVER 0x0600
 #endif
 
-#undef _NC_CHECK_MINTTY
-#if WINVER >= 0x0600
-#  define _NC_CHECK_MINTTY
-#endif
-
 // This are the "modern" defaults Windows Terminal uses
 #ifndef DEFAULT_CONSOLE_LINES
 #define DEFAULT_CONSOLE_LINES 30
@@ -231,10 +226,6 @@ typedef struct {
     BOOL buffered;
     BOOL window_only;
     BOOL progMode;
-    BOOL isMinTTY;
-    BOOL isTermInfoConsole;
-    HANDLE hdl;
-    HANDLE lastOut;
     int numButtons;
     LPDWORD ansi_map;
     LPDWORD map;
@@ -249,11 +240,10 @@ typedef struct {
     CONSOLE_CURSOR_INFO save_CI;
     ConsoleMode originalMode;
 
-    int (*isatty)(int fd);                             /* Check if the file descriptor refers to a terminal */
-  } LegacyConsoleInterface;
+} LegacyConsoleInterface;
 
-extern NCURSES_EXPORT_VAR(LegacyConsoleInterface) _nc_CONSOLE;
-#define WINCONSOLE _nc_CONSOLE
+extern NCURSES_EXPORT_VAR(LegacyConsoleInterface *) _nc_LEGACYCONSOLE;
+#define LEGACYCONSOLE (*_nc_LEGACYCONSOLE)
 #endif /* USE_WIN32CON_DRIVER */
 
 #if @USE_NAMED_PIPES@  /* USE_NAMED_PIPES */

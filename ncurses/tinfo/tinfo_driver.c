@@ -964,7 +964,7 @@ drv_testmouse(TERMINAL_CONTROL_BLOCK * TCB,
     {
 #if USE_LEGACY_CONSOLE && JPF
 	rc = _nc_console_testmouse(sp,
-				   _nc_console_handle(sp->_ifd),
+				   (HANDLE)((intptr_t)_get_osfhandle(sp->_ifd)),
 				   delay
 				   EVENTLIST_2nd(evl));
 #else
@@ -1273,7 +1273,7 @@ drv_twait(TERMINAL_CONTROL_BLOCK * TCB,
     SetSP();
 #if USE_LEGACY_CONSOLE && JPF
     return _nc_console_twait(sp,
-			     _nc_console_handle(sp->_ifd),
+			     (HANDLE)((intptr_t)_get_osfhandle(sp->_ifd)),
 			     mode,
 			     milliseconds,
 			     timeleft EVENTLIST_2nd(evl));
@@ -1296,7 +1296,7 @@ drv_read(TERMINAL_CONTROL_BLOCK * TCB, int *buf)
     _nc_set_read_thread(TRUE);
 #if USE_LEGACY_CONSOLE && JPF
     n = _nc_console_read(sp,
-			 _nc_console_handle(sp->_ifd),
+			 (HANDLE)((intptr_t)_get_osfhandle(sp->_ifd)),
 			 buf);
 #else
     n = (int) NC_READ(sp->_ifd, &c2, (size_t) 1);

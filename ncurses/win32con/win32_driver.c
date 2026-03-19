@@ -36,7 +36,8 @@
  * TODO - improve screen-repainting performance, using implied wraparound to reduce write's
  * TODO - make it optional whether screen is restored or not when non-buffered
  */
-#if JPF || 1
+#if USE_WIN32CON_DRIVER || 1
+
 #include <curses.priv.h>
 #include <windows.h>
 
@@ -47,18 +48,16 @@ MODULE_ID("$Id: win32_driver.c,v 1.20 2025/12/30 19:34:50 tom Exp $")
 #define WINMAGIC NCDRV_MAGIC(NCDRV_WINCONSOLE)
 #define EXP_OPTIMIZE 0
 
-static bool console_initialized = false;
+#define  console_initialized LEGACYCONSOLE.core.initialized
 
 #define AssertTCB() assert(TCB != NULL && (TCB->magic == WINMAGIC))
-#define validateConsoleHandle() (AssertTCB(), console_initialized || \
-                                 (console_initialized = \
-                                  _nc_console_checkinit(USE_NAMED_PIPES)))
+#define validateConsoleHandle() (AssertTCB(), console_initialized)
 #define SetSP() assert(TCB->csp != NULL); sp = TCB->csp; (void) sp
-#define EnsureInit() (void)(console_initialized ? TRUE : _nc_console_checkinit(USE_NAMED_PIPES))
+#define EnsureInit() /* noop */
 
-#define AdjustY() (WINCONSOLE.buffered \
+#define AdjustY() (LEGACYCONSOLE.buffered \
                    ? 0 \
-                   : (int) WINCONSOLE.SBI.srWindow.Top)
+                   : (int) LEGACYCONSOLE.SBI.srWindow.Top)
 
 #define RevAttr(attr) (WORD) (((attr) & 0xff00) | \
 		      ((((attr) & 0x07) << 4) | \
@@ -66,17 +65,27 @@ static bool console_initialized = false;
 
 #define CONTROL_PRESSED (LEFT_CTRL_PRESSED | RIGHT_CTRL_PRESSED)
 
-NCURSES_EXPORT_VAR(LegacyConsoleInterface) _nc_CONSOLE;
+#define DispatchMethod(name) legacy_##name
+#define Dispatch(name) .name = DispatchMethod(name)
+#define NoDispatch(name) .name = NULL
+#define METHOD(name,type) static type DispatchMethod(name)
+
+METHOD(init, BOOL) (int fdOut, int fdIn);
+METHOD(size, void) (int *Lines, int *Cols);
+METHOD(size_changed, BOOL) (void);
+METHOD(getmode, int) (int fd GCC_UNUSED, TTY * arg);
+METHOD(setmode, int) (int fd GCC_UNUSED, const TTY * arg);
+METHOD(defmode, int) (TTY * arg, short kind);
+METHOD(flush,int)(int fd);
 
 static BOOL get_SBI(void);
-static void get_console_size(int *Lines, int *Cols);
-static int console_setmode(HANDLE hdl, const TTY * arg);
-static int console_getmode(HANDLE hdl, TTY * arg);
-static void selectActiveHandle(void);
 static void set_scrollback(bool normal, CONSOLE_SCREEN_BUFFER_INFO * info);
 static int console_keyok(int keycode, int flag);
 static BOOL console_keyExist(int keycode);
 static WORD console_MapColor(bool fore, int color);
+static BOOL console_restore(void);
+static int console_test(int fd);
+
 static int console_twait(
 		     const SCREEN *sp,
 		     HANDLE hdl,
@@ -93,6 +102,46 @@ static int console_read(
 		    SCREEN *sp,
 		    HANDLE hdl,
 		    int *buf);
+
+static LegacyConsoleInterface legacyCONSOLE =
+{
+    .core =
+    {
+	.initialized = FALSE,
+	.is_conpty = FALSE,
+	.ttyflags = {0, 0, TTY_MODE_UNSPECIFIED},
+	.ConsoleHandleIn = INVALID_HANDLE_VALUE,
+	.ConsoleHandleOut = INVALID_HANDLE_VALUE,
+	.sbi_lines = -1,
+	.sbi_cols = -1,
+	Dispatch(init),
+	Dispatch(size),
+	Dispatch(size_changed),
+	Dispatch(setmode),
+	Dispatch(getmode),
+	Dispatch(defmode),
+	Dispatch(flush)
+    },
+    .buffered = FALSE,
+    .window_only = FALSE,
+    .progMode = FALSE,
+    .numButtons = 0,
+    .ansi_map = NULL,
+    .map = NULL,
+    .rmap = NULL,
+    .pairs = {0},
+    .origin = {0, 0},
+    .save_screen = NULL,
+    .save_size = {0, 0},
+    .save_region = {0, 0, 0, 0},
+    .SBI = {0},
+    .save_SBI = {0},
+    .save_CI = {0},
+    .originalMode = {0}
+};
+
+NCURSES_EXPORT_VAR(LegacyConsoleInterface *) 
+_nc_LEGACYCONSOLE = &legacyCONSOLE;
 
 static WORD
 MapAttr(WORD res, attr_t ch)
@@ -184,51 +233,48 @@ MapKey(WORD vKey)
 {
     int code = -1;
 
-    if (!WINCONSOLE.isTermInfoConsole) {
-	WORD nKey = 0;
-	void *res;
-	LONG key = GenMap(vKey, 0);
+    WORD nKey = 0;
+    void *res;
+    LONG key = GenMap(vKey, 0);
 
-	res = bsearch(&key,
-		      WINCONSOLE.map,
-		      (size_t) (N_INI + FKEYS),
-		      sizeof(keylist[0]),
-		      keycompare);
-	if (res) {
-	    key = *((LONG *) res);
-	    nKey = LOWORD(key);
-	    code = (int) (nKey & 0x7fff);
-	    if (nKey & 0x8000)
-		code = -code;
+    res = bsearch(&key,
+		  LEGACYCONSOLE.map,
+		  (size_t) (N_INI + FKEYS),
+		  sizeof(keylist[0]),
+		  keycompare);
+    if (res) {
+	key = *((LONG *) res);
+	nKey = LOWORD(key);
+	code = (int) (nKey & 0x7fff);
+	if (nKey & 0x8000)
+	    code = -code;
 	}
-    }
     return code;
 }
 
 static int
 AnsiKey(WORD vKey)
 {
-    int code = -1;
+	int code = -1;
 
-    if (!WINCONSOLE.isTermInfoConsole) {
 	WORD nKey = 0;
 	void *res;
 	LONG key = GenMap(vKey, 0);
 
 	res = bsearch(&key,
-		      WINCONSOLE.ansi_map,
-		      (size_t) (N_INI + FKEYS),
-		      sizeof(keylist[0]),
-		      keycompare);
-	if (res) {
-	    key = *((LONG *) res);
-	    nKey = LOWORD(key);
-	    code = (int) (nKey & 0x7fff);
-	    if (nKey & 0x8000)
-		code = -code;
+				  LEGACYCONSOLE.ansi_map,
+				  (size_t)(N_INI + FKEYS),
+				  sizeof(keylist[0]),
+				  keycompare);
+	if (res)
+	{
+		key = *((LONG *)res);
+		nKey = LOWORD(key);
+		code = (int)(nKey & 0x7fff);
+		if (nKey & 0x8000)
+			code = -code;
 	}
-    }
-    return code;
+	return code;
 }
 
 static int
@@ -240,10 +286,10 @@ console_keyok(int keycode, int flag)
     void *res;
     LONG key = GenMap(0, (WORD) keycode);
 
-    T((T_CALLED("lib_win32con::_nc_console_keyok(%d, %d)"), keycode, flag));
+    T((T_CALLED("win32_driver::console_keyok(%d, %d)"), keycode, flag));
 
     res = bsearch(&key,
-		  WINCONSOLE.rmap,
+		  LEGACYCONSOLE.rmap,
 		  (size_t) (N_INI + FKEYS),
 		  sizeof(keylist[0]),
 		  rkeycompare);
@@ -266,9 +312,9 @@ console_keyExist(int keycode)
     bool found = FALSE;
     LONG key = GenMap(0, (WORD) keycode);
 
-    T((T_CALLED("lib_win32con::_nc_console_keyExist(%d)"), keycode));
+    T((T_CALLED("win32_driver::console_keyExist(%d)"), keycode));
     res = bsearch(&key,
-		  WINCONSOLE.rmap,
+		  LEGACYCONSOLE.rmap,
 		  (size_t) (N_INI + FKEYS),
 		  sizeof(keylist[0]),
 		  rkeycompare);
@@ -286,7 +332,7 @@ wcon_kyExist(TERMINAL_CONTROL_BLOCK * TCB GCC_UNUSED, int keycode)
 {
     bool found = FALSE;
 
-    T((T_CALLED("win32con::wcon_kyExist(%d)"), keycode));
+    T((T_CALLED("win32_driver::wcon_kyExist(%d)"), keycode));
     found = console_keyExist(keycode);
     returnBool(found);
 }
@@ -297,7 +343,7 @@ wcon_kpad(TERMINAL_CONTROL_BLOCK * TCB, int flag GCC_UNUSED)
     SCREEN *sp;
     int code = ERR;
 
-    T((T_CALLED("win32con::wcon_kpad(%p, %d)"), TCB, flag));
+    T((T_CALLED("win32_driver::wcon_kpad(%p, %d)"), TCB, flag));
 
     if (validateConsoleHandle()) {
 	SetSP();
@@ -317,7 +363,7 @@ wcon_keyok(TERMINAL_CONTROL_BLOCK * TCB,
     int code = ERR;
     SCREEN *sp;
 
-    T((T_CALLED("win32con::wcon_keyok(%p, %d, %d)"), TCB, keycode, flag));
+    T((T_CALLED("win32_driver::wcon_keyok(%p, %d, %d)"), TCB, keycode, flag));
 
     if (validateConsoleHandle()) {
 	SetSP();
@@ -354,8 +400,8 @@ wcon_setcolor(TERMINAL_CONTROL_BLOCK * TCB,
     (void) TCB;
     if (validateConsoleHandle()) {
 	WORD a = console_MapColor(fore, color);
-	a |= (WORD) ((WINCONSOLE.SBI.wAttributes) & (fore ? 0xfff8 : 0xff8f));
-	SetConsoleTextAttribute(WINCONSOLE.hdl, a);
+	a |= (WORD) ((LEGACYCONSOLE.SBI.wAttributes) & (fore ? 0xfff8 : 0xff8f));
+	SetConsoleTextAttribute(LEGACYCONSOLE.core.ConsoleHandleOut, a);
 	get_SBI();
     }
 }
@@ -413,7 +459,7 @@ wcon_initpair(TERMINAL_CONTROL_BLOCK * TCB,
 
 	if ((pair > 0) && (pair < CON_NUMPAIRS) && (f >= 0) && (f < 8)
 	    && (b >= 0) && (b < 8)) {
-	    WINCONSOLE.pairs[pair] =
+	    LEGACYCONSOLE.pairs[pair] =
 		console_MapColor(true, f) |
 		console_MapColor(false, b);
 	}
@@ -435,15 +481,6 @@ wcon_initcolor(TERMINAL_CONTROL_BLOCK * TCB,
 
 // ------------------------------- HANDLE related definitions and functions ----------------------------------
 
-/* Convert a file descriptor into a HANDLE
-   That's not necessarily a console HANDLE
-*/
-NCURSES_EXPORT(HANDLE)
-_nc_console_handle(int fd)
-{
-    intptr_t value = _get_osfhandle(fd);
-    return (HANDLE) value;
-}
 /* Validate that a HANDLE is actually a
    console HANDLE
 */
@@ -472,188 +509,166 @@ IsConsoleHandle(HANDLE hdl)
      with the terminal escape sequences that are sent by
      terminfo.
  */
-NCURSES_EXPORT(int)
-_nc_console_test(int fd)
+static int
+console_test(int fd)
 {
     int code = 0;
     HANDLE hdl = INVALID_HANDLE_VALUE;
     T((T_CALLED("lib_win32con::_nc_console_test(%d)"), fd));
-    hdl = _nc_console_handle(fd);
+    hdl = (HANDLE)((intptr_t)_get_osfhandle(fd));
     code = (int) IsConsoleHandle(hdl);
     returnCode(code);
 }
 
-#define OutHandle() ((WINCONSOLE.isTermInfoConsole || WINCONSOLE.progMode) ? WINCONSOLE.hdl : WINCONSOLE.core.ConsoleHandleOut)
-
-static void
-selectActiveHandle(void)
-{
-    if (WINCONSOLE.lastOut != WINCONSOLE.hdl) {
-	WINCONSOLE.lastOut = WINCONSOLE.hdl;
-	SetConsoleActiveScreenBuffer(WINCONSOLE.lastOut);
-    }
-}
-
-NCURSES_EXPORT(HANDLE)
-_nc_console_fd2handle(int fd)
-{
-    HANDLE hdl = _nc_console_handle(fd);
-    if (hdl == WINCONSOLE.core.ConsoleHandleIn) {
-	T(("lib_win32con:validateHandle %d -> WINCONSOLE.core.ConsoleHandleIn", fd));
-    } else if (hdl == WINCONSOLE.hdl) {
-	T(("lib_win32con:validateHandle %d -> WINCONSOLE.hdl", fd));
-    } else if (hdl == WINCONSOLE.core.ConsoleHandleOut) {
-	T(("lib_win32con:validateHandle %d -> WINCONSOLE.core.ConsoleHandleOut", fd));
-    } else if (hdl == GetStdHandle(STD_INPUT_HANDLE)) {
-	T(("lib_win32con:validateHandle %d -> STD_INPUT_HANDLE", fd));
-	if (!WINCONSOLE.isTermInfoConsole && WINCONSOLE.progMode) {
-	    hdl = WINCONSOLE.core.ConsoleHandleIn;
-	}
-    } else {
-	T(("lib_win32con:validateHandle %d maps to unknown HANDLE", fd));
-	hdl = INVALID_HANDLE_VALUE;
-    }
-    if (hdl != INVALID_HANDLE_VALUE) {
-	if (hdl != WINCONSOLE.core.ConsoleHandleIn && (!WINCONSOLE.isTermInfoConsole && WINCONSOLE.progMode)) {
-	    if (hdl == WINCONSOLE.core.ConsoleHandleOut && hdl != WINCONSOLE.hdl) {
-		T(("lib_win32con:validateHandle forcing WINCONSOLE.core.ConsoleHandleOut -> WINCONSOLE.hdl"));
-		hdl = WINCONSOLE.hdl;
-	    }
-	}
-    }
-    return hdl;
-}
-
-NCURSES_EXPORT(int)
-_nc_console_flush(HANDLE hdl)
+/* This function flushes the console input buffer. It is called by the main thread when it
+ * wants to discard any pending input in the console. The function returns OK on success. */
+METHOD(flush, int) (int fd GCC_UNUSED)
 {
     int code = OK;
-
-    T((T_CALLED("lib_win32con::_nc_console_flush(hdl=%p"), hdl));
-
-    if (hdl != INVALID_HANDLE_VALUE) {
-	if (hdl == WINCONSOLE.hdl ||
-	    hdl == WINCONSOLE.core.ConsoleHandleIn ||
-	    hdl == WINCONSOLE.core.ConsoleHandleOut) {
-	    if (!FlushConsoleInputBuffer(WINCONSOLE.core.ConsoleHandleIn))
-		code = ERR;
-	} else {
-	    code = ERR;
-	    T(("_nc_console_flush not requesting a handle owned by console."));
-	}
-    }
+    T((T_CALLED("lib_win32conpty::pty_flush(fd=%d)"), fd));
+    FlushConsoleInputBuffer(GetStdHandle(STD_INPUT_HANDLE));
     returnCode(code);
 }
 
-#if USE_TERM_DRIVER && (USE_NAMED_PIPES || defined(USE_WIN32CON_DRIVER))
-/*   Our replacement for the systems _isatty to include also
-     a test for mintty. This is called from the NC_ISATTY macro
-     defined in curses.priv.h
-
-     Return codes:
-     - 0 : Not a TTY
-     - 1 : A Windows character device detected by _isatty
-     - 2 : A future implementation may return 2 for mintty
- */
-NCURSES_EXPORT(int)
-_nc_console_isatty(int fd)
-{
-    int result = 0;
-    T((T_CALLED("lib_win32con::_nc_console_isatty(%d"), fd));
-
-    if (isatty(fd))
-	result = 1;
-#ifdef _NC_CHECK_MINTTY
-    else {
-	if (_nc_console_checkmintty(fd, NULL)) {
-	    result = 2;
-	    fprintf(stderr,
-		    "ncurses on Windows must run in a Windows console.\n"
-		    "On newer versions of Windows, the calling program should create a PTY-like.\n"
-		    "device using the CreatePseudoConsole Windows API call.\n");
-	    exit(EXIT_FAILURE);
-	}
-    }
-#endif
-    returnCode(result);
-}
-#endif /* USE_TERM_DRIVER && (USE_NAMED_PIPES || defined(USE_WIN32CON_DRIVER)) */
 
 // -------------------------------- Mode related definitions and functions -----------------------------------
 
-static int
-console_setmode(HANDLE hdl, const TTY * arg)
+/* This function sets the console mode for the input and output handles. It is called by the main thread
+ * when it wants to change the console mode. The function takes a TTY structure that contains the desired
+ * mode flags, and it returns OK on success or ERR on failure.
+ * It is also responsible for detecting switches between shell mode and program mode, and starting or
+ * stopping the input subsystem accordingly. */
+METHOD(setmode, int) (int fd GCC_UNUSED, const TTY * arg)
 {
-    DWORD dwFlag = 0;
-    int code = ERR;
-    HANDLE alt;
+    HANDLE input_target = LEGACYCONSOLE.core.ConsoleHandleIn;
+    HANDLE output_target = LEGACYCONSOLE.core.ConsoleHandleOut;
+    BOOL input_ok = FALSE;
+    BOOL output_ok = FALSE;
 
-    if (arg) {
-#ifdef TRACE
-	TTY TRCTTY;
-#define TRCTTYOUT(flag) TRCTTY.dwFlagOut = flag
-#define TRCTTYIN(flag)  TRCTTY.dwFlagIn = flag
-#else
-#define TRCTTYOUT(flag)
-#define TRCTTYIN(flag)
-#endif
-	T(("lib_win32con:_nc_console_setmode %s", _nc_trace_ttymode(arg)));
-	if (hdl == WINCONSOLE.core.ConsoleHandleIn) {
-	    dwFlag = arg->dwFlagIn | ENABLE_MOUSE_INPUT | VT_FLAG_IN;
-	    TRCTTYIN(dwFlag);
-	    SetConsoleMode(hdl, dwFlag);
+    T((T_CALLED("lib_win32conpty::pty_setmode(fd=%d, TTY*=%p)"), fd, arg));
 
-	    alt = OutHandle();
-	    dwFlag = arg->dwFlagOut;
-	    TRCTTYOUT(dwFlag);
-	    SetConsoleMode(alt, dwFlag);
+    if (!arg)
+	returnCode(ERR);
+
+    if (input_target != INVALID_HANDLE_VALUE) {
+	DWORD mode = arg->dwFlagIn;
+	if (arg->kind == TTY_MODE_SHELL) {
+	    /* In shell mode, we want to disable VT input and enable the basic line input, processed
+	     * input and echo input modes, to provide a more traditional console input experience.
+	     * This allows the user to interact with the console in a way that is consistent with
+	     * what they would expect from a typical command prompt or terminal window, with
+	     * features like line editing and input processing enabled. */
+	    mode |= (ENABLE_LINE_INPUT | ENABLE_PROCESSED_INPUT | ENABLE_ECHO_INPUT);
 	} else {
-	    dwFlag = arg->dwFlagOut;
-	    TRCTTYOUT(dwFlag);
-	    SetConsoleMode(hdl, dwFlag);
-
-	    alt = WINCONSOLE.core.ConsoleHandleIn;
-	    dwFlag = arg->dwFlagIn | ENABLE_MOUSE_INPUT;
-	    TRCTTYIN(dwFlag);
-	    SetConsoleMode(alt, dwFlag);
-	    T(("effective mode set %s", _nc_trace_ttymode(&TRCTTY)));
+	    /* In program mode, we want to enable VT input. */
+	    mode |= ENABLE_MOUSE_INPUT | ENABLE_WINDOW_INPUT;
 	}
-	code = OK;
+
+	/* Sanitize: ENABLE_ECHO_INPUT requires ENABLE_LINE_INPUT */
+	if ((mode & ENABLE_ECHO_INPUT) && !(mode & ENABLE_LINE_INPUT)) {
+	    mode &= ~ENABLE_ECHO_INPUT;
+	}
+
+	input_ok = SetConsoleMode(input_target, mode);
+	if (input_ok) {
+	    /* Make sure the cached value reflects the real value we set, as the
+	     * caller may not have provided all necessary flags (e.g.
+	     * ENABLE_PROCESSED_INPUT when VT is requested) */
+	    DWORD realMode;
+	    if (GetConsoleMode(input_target, &realMode)) {
+		LEGACYCONSOLE.core.ttyflags.dwFlagIn = realMode;
+	    } else {
+		LEGACYCONSOLE.core.ttyflags.dwFlagIn = mode;
+	    }
+	} else {
+	    T(("Invalid input file descriptor"));
+	}
     }
-    return (code);
+
+    if (output_target != INVALID_HANDLE_VALUE) {
+	DWORD mode = arg->dwFlagOut;
+	output_ok = SetConsoleMode(output_target, mode);
+	if (output_ok) {
+	    /* Make sure the cached value reflects the real value we set,
+	     * as the caller may not have provided all necessary flags
+	     * (e.g. VT output is required for the Windows Console backend) */
+	    DWORD realMode;
+	    if (GetConsoleMode(output_target, &realMode)) {
+		LEGACYCONSOLE.core.ttyflags.dwFlagOut = realMode;
+	    } else {
+		LEGACYCONSOLE.core.ttyflags.dwFlagOut = mode;
+	    }
+	} else {
+	    T(("Invalid output file descriptor"));
+	}
+    }
+
+    if (arg->kind == TTY_MODE_SHELL) {
+	T(("Shell mode set"));
+	LEGACYCONSOLE.progMode = FALSE;
+    } else if (arg->kind == TTY_MODE_PROGRAM) {
+	T(("Program mode set"));
+	LEGACYCONSOLE.progMode = TRUE;
+    }
+
+    // Handle errors
+    if (!input_ok || !output_ok) {
+	returnCode(ERR);
+    }
+
+    returnCode(OK);
 }
 
-static int
-console_getmode(HANDLE hdl, TTY * arg)
+
+/* getmode always sets the kind field to TTY_MODE_UNSPECIFIED. The trick is, that
+ * def_shell_mode, def_prog_mode and savetty will call above method defmode to
+ * set the field right after getting it.
+ * So only calls to reset_shell_mode, reset_prog_mode and resetty will have the kind
+ * field in the TTY structure set to a specific mode, which means that the setmode
+ * function will know that it should apply the necessary changes to the input subsystem
+ * when restoring that TTY. All other calls to setmode will have the kind field in the
+ * TTY structure set to TTY_MODE_UNSPECIFIED, which means that the setmode function
+ * will know that it should not change the status of the input subsystem when restoring
+ * that TTY. */
+METHOD(getmode, int) (int fd GCC_UNUSED, TTY * arg)
 {
-    int code = ERR;
+    T((T_CALLED("lib_win32conpty::pty_getmode(fd=%d, TTY*=%p)"), fd, arg));
 
-    if (arg) {
-	DWORD dwFlag = 0;
-	HANDLE alt;
+    if (NULL == arg)
+	returnCode(ERR);
 
-	if (hdl == WINCONSOLE.core.ConsoleHandleIn) {
-	    if (GetConsoleMode(hdl, &dwFlag)) {
-		arg->dwFlagIn = dwFlag;
-		alt = OutHandle();
-		if (GetConsoleMode(alt, &dwFlag)) {
-		    arg->dwFlagOut = dwFlag;
-		    code = OK;
-		}
-	    }
-	} else {
-	    if (GetConsoleMode(hdl, &dwFlag)) {
-		arg->dwFlagOut = dwFlag;
-		alt = WINCONSOLE.core.ConsoleHandleIn;
-		if (GetConsoleMode(alt, &dwFlag)) {
-		    arg->dwFlagIn = dwFlag;
-		    code = OK;
-		}
-	    }
-	}
+    *arg = LEGACYCONSOLE.core.ttyflags;
+    arg->kind = TTY_MODE_UNSPECIFIED;
+    returnCode(OK);
+}
+
+/* The defmode function is only called from def_shell_mode, def_prog_mode, and savetty.
+ * It's only purpose is to set the kind field in the TTY structure and to set the
+ * REQUIRED console mode flags for shell mode and program mode.
+ * The design idea is this: the three mentioned calls are the only ones used to get the
+ * TTY structure in order to store it and later on use it to restore the console to the
+ * desired state. TTY changing calls like raw() or cbreak() don't do that. The implementation
+ * of the getmode function will always set the kind field to TTY_MODE_UNSPECIFIED, which means
+ * that if that TTY is later used in a setmode call, the setmode function will know that it
+ * should not change the status of the input subsystem. Only the def_shell_mode, def_prog_mode,
+ * and savetty functions will set the kind field to a specific mode, which means that the setmode
+ * function will know that it should apply the necessary changes to the input subsystem when
+ * restoring that TTY. */
+METHOD(defmode, int) (TTY * arg, short kind)
+{
+    short realMode = kind;
+
+    T((T_CALLED("lib_win32conpty::pty_defmode(TTY*=%p, kind=%d)"), arg, kind));
+
+    if (NULL == arg)
+	returnCode(ERR);
+
+    if (realMode == TTY_MODE_AUTO) {
+	realMode = (LEGACYCONSOLE.progMode==TRUE) ? TTY_MODE_PROGRAM : TTY_MODE_SHELL;
     }
-    T(("lib_win32con:_nc_console_getmode %s", _nc_trace_ttymode(arg)));
-    return (code);
+
+    arg->kind = realMode;
+    returnCode(OK);
 }
 
 // ------------------------------ Meta-Data related definitions and functions ---------------------------------
@@ -662,28 +677,28 @@ static BOOL
 get_SBI(void)
 {
     bool rc = FALSE;
-    if (GetConsoleScreenBufferInfo(WINCONSOLE.hdl, &(WINCONSOLE.SBI))) {
+    if (GetConsoleScreenBufferInfo(LEGACYCONSOLE.core.ConsoleHandleOut, &(LEGACYCONSOLE.SBI))) {
 	T(("GetConsoleScreenBufferInfo"));
 	T(("... buffer(X:%d Y:%d)",
-	   WINCONSOLE.SBI.dwSize.X,
-	   WINCONSOLE.SBI.dwSize.Y));
+	   LEGACYCONSOLE.SBI.dwSize.X,
+	   LEGACYCONSOLE.SBI.dwSize.Y));
 	T(("... window(X:%d Y:%d)",
-	   WINCONSOLE.SBI.dwMaximumWindowSize.X,
-	   WINCONSOLE.SBI.dwMaximumWindowSize.Y));
+	   LEGACYCONSOLE.SBI.dwMaximumWindowSize.X,
+	   LEGACYCONSOLE.SBI.dwMaximumWindowSize.Y));
 	T(("... cursor(X:%d Y:%d)",
-	   WINCONSOLE.SBI.dwCursorPosition.X,
-	   WINCONSOLE.SBI.dwCursorPosition.Y));
+	   LEGACYCONSOLE.SBI.dwCursorPosition.X,
+	   LEGACYCONSOLE.SBI.dwCursorPosition.Y));
 	T(("... display(Top:%d Bottom:%d Left:%d Right:%d)",
-	   WINCONSOLE.SBI.srWindow.Top,
-	   WINCONSOLE.SBI.srWindow.Bottom,
-	   WINCONSOLE.SBI.srWindow.Left,
-	   WINCONSOLE.SBI.srWindow.Right));
-	if (WINCONSOLE.buffered) {
-	    WINCONSOLE.origin.X = 0;
-	    WINCONSOLE.origin.Y = 0;
+	   LEGACYCONSOLE.SBI.srWindow.Top,
+	   LEGACYCONSOLE.SBI.srWindow.Bottom,
+	   LEGACYCONSOLE.SBI.srWindow.Left,
+	   LEGACYCONSOLE.SBI.srWindow.Right));
+	if (LEGACYCONSOLE.buffered) {
+	    LEGACYCONSOLE.origin.X = 0;
+	    LEGACYCONSOLE.origin.Y = 0;
 	} else {
-	    WINCONSOLE.origin.X = WINCONSOLE.SBI.srWindow.Left;
-	    WINCONSOLE.origin.Y = WINCONSOLE.SBI.srWindow.Top;
+	    LEGACYCONSOLE.origin.X = LEGACYCONSOLE.SBI.srWindow.Left;
+	    LEGACYCONSOLE.origin.Y = LEGACYCONSOLE.SBI.srWindow.Top;
 	}
 	rc = TRUE;
     } else {
@@ -692,21 +707,59 @@ get_SBI(void)
     return rc;
 }
 
-static void
-get_console_size(int *Lines, int *Cols)
+METHOD(size, void) (int *Lines, int *Cols)
 {
     EnsureInit();
     if (Lines != NULL && Cols != NULL) {
-	if (WINCONSOLE.buffered) {
-	    *Lines = (int) (WINCONSOLE.SBI.dwSize.Y);
-	    *Cols = (int) (WINCONSOLE.SBI.dwSize.X);
+	if (LEGACYCONSOLE.buffered) {
+	    *Lines = (int) (LEGACYCONSOLE.SBI.dwSize.Y);
+	    *Cols = (int) (LEGACYCONSOLE.SBI.dwSize.X);
 	} else {
-	    *Lines = (int) (WINCONSOLE.SBI.srWindow.Bottom + 1 -
-			    WINCONSOLE.SBI.srWindow.Top);
-	    *Cols = (int) (WINCONSOLE.SBI.srWindow.Right + 1 -
-			   WINCONSOLE.SBI.srWindow.Left);
+	    *Lines = (int) (LEGACYCONSOLE.SBI.srWindow.Bottom + 1 -
+			    LEGACYCONSOLE.SBI.srWindow.Top);
+	    *Cols = (int) (LEGACYCONSOLE.SBI.srWindow.Right + 1 -
+			   LEGACYCONSOLE.SBI.srWindow.Left);
 	}
     }
+}
+
+/* Check if the Windows Console has been resized. Returns TRUE if a resize was detected.
+ * We implement a simple throttling to ensure that we don't call GetConsoleScreenBufferInfo
+ * too often, which could become expensive in a pseudo-console context because it involves
+ * a round trip to the ConPTY backend. The throttling is implemented by keeping	 track of the
+ * last time we checked for a resize, and if the function is called again within a certain
+ * time frame, we simply return FALSE without checking. This allows us to avoid unnecessary
+ * calls to GetConsoleScreenBufferInfo while still detecting resizes in a timely manner when
+ * they occur. */
+METHOD(size_changed, BOOL) (void)
+{
+    static ULONGLONG lastCheck = 0;
+    int current_lines, current_cols;
+    ULONGLONG now = GetTickCount64();
+    bool resized = FALSE;
+
+    T((T_CALLED("lib_win32conpty::pty_size_changed()")));
+
+    if (now - lastCheck < RESIZE_CHECK_THROTTLING_MS)
+	returnBool(FALSE);
+
+    DispatchMethod(size) (&current_lines, &current_cols);
+
+    if (CORECONSOLE.sbi_lines == -1 || CORECONSOLE.sbi_cols == -1) {
+	CORECONSOLE.sbi_lines = current_lines;
+	CORECONSOLE.sbi_cols  = current_cols;
+    } else {
+	if (current_lines != CORECONSOLE.sbi_lines || current_cols != CORECONSOLE.sbi_cols) {
+	    CORECONSOLE.sbi_lines = current_lines;
+	    CORECONSOLE.sbi_cols  = current_cols;
+
+	    _nc_globals.have_sigwinch = 1;
+
+	    resized = TRUE;
+	}
+    }
+    lastCheck = GetTickCount64();
+    returnBool(resized);
 }
 
 static int
@@ -718,7 +771,7 @@ wcon_size(TERMINAL_CONTROL_BLOCK * TCB, int *Lines, int *Cols)
 
     if (validateConsoleHandle() &&
 	(Lines != NULL) && (Cols != NULL)) {
-	get_console_size(Lines, Cols);
+	DispatchMethod(size)(Lines, Cols);
 	result = OK;
     }
     returnCode(result);
@@ -743,40 +796,40 @@ read_screen_data(void)
     COORD bufferCoord;
     size_t want;
 
-    WINCONSOLE.save_size.X = (SHORT) (WINCONSOLE.save_region.Right
-				      - WINCONSOLE.save_region.Left + 1);
-    WINCONSOLE.save_size.Y = (SHORT) (WINCONSOLE.save_region.Bottom
-				      - WINCONSOLE.save_region.Top + 1);
+    LEGACYCONSOLE.save_size.X = (SHORT) (LEGACYCONSOLE.save_region.Right
+				      - LEGACYCONSOLE.save_region.Left + 1);
+    LEGACYCONSOLE.save_size.Y = (SHORT) (LEGACYCONSOLE.save_region.Bottom
+				      - LEGACYCONSOLE.save_region.Top + 1);
 
-    want = (size_t) (WINCONSOLE.save_size.X * WINCONSOLE.save_size.Y);
+    want = (size_t) (LEGACYCONSOLE.save_size.X * LEGACYCONSOLE.save_size.Y);
 
-    if ((WINCONSOLE.save_screen = malloc(want * sizeof(CHAR_INFO))) != NULL) {
-	bufferCoord.X = (SHORT) (WINCONSOLE.window_only
-				 ? WINCONSOLE.SBI.srWindow.Left
+    if ((LEGACYCONSOLE.save_screen = malloc(want * sizeof(CHAR_INFO))) != NULL) {
+	bufferCoord.X = (SHORT) (LEGACYCONSOLE.window_only
+				 ? LEGACYCONSOLE.SBI.srWindow.Left
 				 : 0);
-	bufferCoord.Y = (SHORT) (WINCONSOLE.window_only
-				 ? WINCONSOLE.SBI.srWindow.Top
+	bufferCoord.Y = (SHORT) (LEGACYCONSOLE.window_only
+				 ? LEGACYCONSOLE.SBI.srWindow.Top
 				 : 0);
 
 	T(("... reading console %s %dx%d into %d,%d - %d,%d at %d,%d",
-	   WINCONSOLE.window_only ? "window" : "buffer",
-	   WINCONSOLE.save_size.Y, WINCONSOLE.save_size.X,
-	   WINCONSOLE.save_region.Top,
-	   WINCONSOLE.save_region.Left,
-	   WINCONSOLE.save_region.Bottom,
-	   WINCONSOLE.save_region.Right,
+	   LEGACYCONSOLE.window_only ? "window" : "buffer",
+	   LEGACYCONSOLE.save_size.Y, LEGACYCONSOLE.save_size.X,
+	   LEGACYCONSOLE.save_region.Top,
+	   LEGACYCONSOLE.save_region.Left,
+	   LEGACYCONSOLE.save_region.Bottom,
+	   LEGACYCONSOLE.save_region.Right,
 	   bufferCoord.Y,
 	   bufferCoord.X));
 
-	if (read_screen(WINCONSOLE.hdl,
-			WINCONSOLE.save_screen,
-			WINCONSOLE.save_size,
+	if (read_screen(LEGACYCONSOLE.core.ConsoleHandleOut,
+			LEGACYCONSOLE.save_screen,
+			LEGACYCONSOLE.save_size,
 			bufferCoord,
-			&WINCONSOLE.save_region)) {
+			&LEGACYCONSOLE.save_region)) {
 	    result = TRUE;
 	} else {
 	    T((" error %#lx", (unsigned long) GetLastError()));
-	    FreeAndNull(WINCONSOLE.save_screen);
+	    FreeAndNull(LEGACYCONSOLE.save_screen);
 	}
     }
 
@@ -795,21 +848,21 @@ save_original_screen(void)
 {
     bool result = FALSE;
 
-    WINCONSOLE.save_region.Top = 0;
-    WINCONSOLE.save_region.Left = 0;
-    WINCONSOLE.save_region.Bottom = (SHORT) (WINCONSOLE.SBI.dwSize.Y - 1);
-    WINCONSOLE.save_region.Right = (SHORT) (WINCONSOLE.SBI.dwSize.X - 1);
+    LEGACYCONSOLE.save_region.Top = 0;
+    LEGACYCONSOLE.save_region.Left = 0;
+    LEGACYCONSOLE.save_region.Bottom = (SHORT) (LEGACYCONSOLE.SBI.dwSize.Y - 1);
+    LEGACYCONSOLE.save_region.Right = (SHORT) (LEGACYCONSOLE.SBI.dwSize.X - 1);
 
     if (read_screen_data()) {
 	result = TRUE;
     } else {
 
-	WINCONSOLE.save_region.Top = WINCONSOLE.SBI.srWindow.Top;
-	WINCONSOLE.save_region.Left = WINCONSOLE.SBI.srWindow.Left;
-	WINCONSOLE.save_region.Bottom = WINCONSOLE.SBI.srWindow.Bottom;
-	WINCONSOLE.save_region.Right = WINCONSOLE.SBI.srWindow.Right;
+	LEGACYCONSOLE.save_region.Top = LEGACYCONSOLE.SBI.srWindow.Top;
+	LEGACYCONSOLE.save_region.Left = LEGACYCONSOLE.SBI.srWindow.Left;
+	LEGACYCONSOLE.save_region.Bottom = LEGACYCONSOLE.SBI.srWindow.Bottom;
+	LEGACYCONSOLE.save_region.Right = LEGACYCONSOLE.SBI.srWindow.Right;
 
-	WINCONSOLE.window_only = TRUE;
+	LEGACYCONSOLE.window_only = TRUE;
 
 	if (read_screen_data()) {
 	    result = TRUE;
@@ -821,30 +874,30 @@ save_original_screen(void)
 }
 
 static bool
-restore_original_screencon(void)
+restore_original_screen(void)
 {
     COORD bufferCoord;
     bool result = FALSE;
-    SMALL_RECT save_region = WINCONSOLE.save_region;
+    SMALL_RECT save_region = LEGACYCONSOLE.save_region;
 
     T(("... restoring %s",
-       WINCONSOLE.window_only ? "window" : "entire buffer"));
+       LEGACYCONSOLE.window_only ? "window" : "entire buffer"));
 
-    bufferCoord.X = (SHORT) (WINCONSOLE.window_only ?
-			     WINCONSOLE.SBI.srWindow.Left : 0);
-    bufferCoord.Y = (SHORT) (WINCONSOLE.window_only ?
-			     WINCONSOLE.SBI.srWindow.Top : 0);
+    bufferCoord.X = (SHORT) (LEGACYCONSOLE.window_only ?
+			     LEGACYCONSOLE.SBI.srWindow.Left : 0);
+    bufferCoord.Y = (SHORT) (LEGACYCONSOLE.window_only ?
+			     LEGACYCONSOLE.SBI.srWindow.Top : 0);
 
-    if (write_screen(WINCONSOLE.hdl,
-		     WINCONSOLE.save_screen,
-		     WINCONSOLE.save_size,
+    if (write_screen(LEGACYCONSOLE.core.ConsoleHandleOut,
+		     LEGACYCONSOLE.save_screen,
+		     LEGACYCONSOLE.save_size,
 		     bufferCoord,
 		     &save_region)) {
 	result = TRUE;
-	SetConsoleCursorPosition(WINCONSOLE.hdl, WINCONSOLE.save_SBI.dwCursorPosition);
+	SetConsoleCursorPosition(LEGACYCONSOLE.core.ConsoleHandleOut, LEGACYCONSOLE.save_SBI.dwCursorPosition);
 	T(("... restore original screen contents ok %dx%d (%d,%d - %d,%d)",
-	   WINCONSOLE.save_size.Y,
-	   WINCONSOLE.save_size.X,
+	   LEGACYCONSOLE.save_size.Y,
+	   LEGACYCONSOLE.save_size.X,
 	   save_region.Top,
 	   save_region.Left,
 	   save_region.Bottom,
@@ -859,8 +912,8 @@ restore_original_screencon(void)
 static void
 dump_screen(const char *fn, int ln)
 {
-    int max_cells = (WINCONSOLE.SBI.dwSize.Y *
-		     (1 + WINCONSOLE.SBI.dwSize.X)) + 1;
+    int max_cells = (LEGACYCONSOLE.SBI.dwSize.Y *
+		     (1 + LEGACYCONSOLE.SBI.dwSize.X)) + 1;
     char output[max_cells];
     CHAR_INFO save_screen[max_cells];
     COORD save_size;
@@ -869,17 +922,17 @@ dump_screen(const char *fn, int ln)
 
     T(("dump_screen %s@%d", fn, ln));
 
-    save_region.Top = WINCONSOLE.SBI.srWindow.Top;
-    save_region.Left = WINCONSOLE.SBI.srWindow.Left;
-    save_region.Bottom = WINCONSOLE.SBI.srWindow.Bottom;
-    save_region.Right = WINCONSOLE.SBI.srWindow.Right;
+    save_region.Top = LEGACYCONSOLE.SBI.srWindow.Top;
+    save_region.Left = LEGACYCONSOLE.SBI.srWindow.Left;
+    save_region.Bottom = LEGACYCONSOLE.SBI.srWindow.Bottom;
+    save_region.Right = LEGACYCONSOLE.SBI.srWindow.Right;
 
     save_size.X = (SHORT) (save_region.Right - save_region.Left + 1);
     save_size.Y = (SHORT) (save_region.Bottom - save_region.Top + 1);
 
     bufferCoord.X = bufferCoord.Y = 0;
 
-    if (read_screen(WINCONSOLE.hdl,
+    if (read_screen(LEGACYCONSOLE.hdl,
 		    save_screen,
 		    save_size,
 		    bufferCoord,
@@ -908,40 +961,6 @@ dump_screen(const char *fn, int ln)
 #define dump_screen(fn,ln)	/* nothing */
 #endif
 
-static bool
-restore_original_screen(void)
-{
-    COORD bufferCoord;
-    bool result = FALSE;
-    SMALL_RECT save_region = WINCONSOLE.save_region;
-
-    T(("... restoring %s", WINCONSOLE.window_only ?
-       "window" : "entire buffer"));
-
-    bufferCoord.X = (SHORT) (WINCONSOLE.window_only ?
-			     WINCONSOLE.SBI.srWindow.Left : 0);
-    bufferCoord.Y = (SHORT) (WINCONSOLE.window_only ?
-			     WINCONSOLE.SBI.srWindow.Top : 0);
-
-    if (write_screen(WINCONSOLE.hdl,
-		     WINCONSOLE.save_screen,
-		     WINCONSOLE.save_size,
-		     bufferCoord,
-		     &save_region)) {
-	result = TRUE;
-	mvcur(-1, -1, LINES - 2, 0);
-	T(("... restore original screen contents ok %dx%d (%d,%d - %d,%d)",
-	   WINCONSOLE.save_size.Y,
-	   WINCONSOLE.save_size.X,
-	   save_region.Top,
-	   save_region.Left,
-	   save_region.Bottom,
-	   save_region.Right));
-    } else {
-	T(("... restore original screen contents err"));
-    }
-    return result;
-}
 
 #define MIN_WIDE 80
 #define MIN_HIGH 24
@@ -972,9 +991,9 @@ set_scrollback(bool normal, CONSOLE_SCREEN_BUFFER_INFO * info)
     if (normal) {
 	rect = info->srWindow;
 	coord = info->dwSize;
-	if (memcmp(info, &WINCONSOLE.SBI, sizeof(*info)) != 0) {
+	if (memcmp(info, &LEGACYCONSOLE.SBI, sizeof(*info)) != 0) {
 	    changed = TRUE;
-	    WINCONSOLE.SBI = *info;
+	    LEGACYCONSOLE.SBI = *info;
 	}
     } else {
 	int high = info->srWindow.Bottom - info->srWindow.Top + 1;
@@ -1013,27 +1032,27 @@ set_scrollback(bool normal, CONSOLE_SCREEN_BUFFER_INFO * info)
 	T(("... rect %d,%d - %d,%d",
 	   rect.Top, rect.Left,
 	   rect.Bottom, rect.Right));
-	SetConsoleScreenBufferSize(WINCONSOLE.hdl, coord);	/* dwSize */
-	SetConsoleWindowInfo(WINCONSOLE.hdl, TRUE, &rect);	/* srWindow */
+	SetConsoleScreenBufferSize(LEGACYCONSOLE.core.ConsoleHandleOut, coord);	/* dwSize */
+	SetConsoleWindowInfo(LEGACYCONSOLE.core.ConsoleHandleOut, TRUE, &rect);	/* srWindow */
 	get_SBI();
     }
     returnVoid;
 }
 
-NCURSES_EXPORT(bool)
-_nc_console_restore(void)
+static BOOL
+console_restore(void)
 {
-    bool res = FALSE;
+    BOOL res = FALSE;
 
-    T((T_CALLED("lib_win32con::_nc_console_restore")));
-    if (WINCONSOLE.hdl != INVALID_HANDLE_VALUE) {
+    T((T_CALLED("win32_driver::console_restore")));
+    if (LEGACYCONSOLE.core.ConsoleHandleOut != INVALID_HANDLE_VALUE) {
 	res = TRUE;
-	if (!WINCONSOLE.buffered) {
-	    set_scrollback(TRUE, &WINCONSOLE.save_SBI);
+	if (!LEGACYCONSOLE.buffered) {
+	    set_scrollback(TRUE, &LEGACYCONSOLE.save_SBI);
 	    if (!restore_original_screen())
 		res = FALSE;
 	}
-	SetConsoleCursorInfo(WINCONSOLE.hdl, &WINCONSOLE.save_CI);
+	SetConsoleCursorInfo(LEGACYCONSOLE.core.ConsoleHandleOut, &LEGACYCONSOLE.save_CI);
     }
     returnBool(res);
 }
@@ -1067,7 +1086,7 @@ con_write16(TERMINAL_CONTROL_BLOCK * TCB,
 	if (isWidecExt(ch))
 	    continue;
 	ci[actual].CharInfoChar = CharOf(ch);
-	ci[actual].Attributes = MapAttr(WINCONSOLE.SBI.wAttributes,
+	ci[actual].Attributes = MapAttr(LEGACYCONSOLE.SBI.wAttributes,
 					AttrOf(ch));
 	if (AttrOf(ch) & A_ALTCHARSET) {
 	    if (_nc_wacs) {
@@ -1094,7 +1113,7 @@ con_write16(TERMINAL_CONTROL_BLOCK * TCB,
     rec.Right = (SHORT) (x + limit - 1);
     rec.Bottom = rec.Top;
 
-    return write_screen(WINCONSOLE.hdl, ci, siz, loc, &rec);
+    return write_screen(LEGACYCONSOLE.core.ConsoleHandleOut, ci, siz, loc, &rec);
 }
 #define con_write(tcb, y, x, str, n) con_write16(tcb, y, x, str, n)
 #else
@@ -1114,7 +1133,7 @@ con_write8(TERMINAL_CONTROL_BLOCK * TCB, int y, int x, chtype *str, int n)
     for (i = 0; i < n; i++) {
 	ch = str[i];
 	ci[i].CharInfoChar = ChCharOf(ch);
-	ci[i].Attributes = MapAttr(WINCONSOLE.SBI.wAttributes,
+	ci[i].Attributes = MapAttr(LEGACYCONSOLE.SBI.wAttributes,
 				   ChAttrOf(ch));
 	if (ChAttrOf(ch) & A_ALTCHARSET) {
 	    if (sp->_acs_map)
@@ -1133,7 +1152,7 @@ con_write8(TERMINAL_CONTROL_BLOCK * TCB, int y, int x, chtype *str, int n)
     rec.Right = (short) (x + n - 1);
     rec.Bottom = rec.Top;
 
-    return write_screen(WINCONSOLE.hdl, ci, siz, loc, &rec);
+    return write_screen(LEGACYCONSOLE.hdl, ci, siz, loc, &rec);
 }
 #define con_write(tcb, y, x, str, n) con_write8(tcb, y, x, str, n)
 #endif
@@ -1355,37 +1374,11 @@ wcon_doupdate(TERMINAL_CONTROL_BLOCK * TCB)
 			       CurScreen(sp)->_cury,
 			       CurScreen(sp)->_curx);
 	}
-	selectActiveHandle();
+	// selectActiveHandle();
 	result = OK;
     }
     returnCode(result);
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 static const char *
@@ -1447,9 +1440,9 @@ wcon_CanHandle(TERMINAL_CONTROL_BLOCK * TCB,
     }
 
     if (!code) {
-	if (_nc_console_test(0)) {
+	if (console_test(0)) {
 	    T(("isTermInfoConsole=TRUE"));
-	    WINCONSOLE.isTermInfoConsole = TRUE;
+	    // LEGACYCONSOLE.isTermInfoConsole = TRUE;
 	}
     }
     returnBool(code);
@@ -1462,10 +1455,10 @@ wcon_dobeepflash(TERMINAL_CONTROL_BLOCK * TCB,
     SCREEN *sp;
     int res = ERR;
 
-    int high = (WINCONSOLE.SBI.srWindow.Bottom -
-		WINCONSOLE.SBI.srWindow.Top + 1);
-    int wide = (WINCONSOLE.SBI.srWindow.Right -
-		WINCONSOLE.SBI.srWindow.Left + 1);
+    int high = (LEGACYCONSOLE.SBI.srWindow.Bottom -
+		LEGACYCONSOLE.SBI.srWindow.Top + 1);
+    int wide = (LEGACYCONSOLE.SBI.srWindow.Right -
+		LEGACYCONSOLE.SBI.srWindow.Left + 1);
     int max_cells = (high * wide);
     int i;
 
@@ -1477,10 +1470,10 @@ wcon_dobeepflash(TERMINAL_CONTROL_BLOCK * TCB,
 
     if (validateConsoleHandle()) {
 	SetSP();
-	this_region.Top = WINCONSOLE.SBI.srWindow.Top;
-	this_region.Left = WINCONSOLE.SBI.srWindow.Left;
-	this_region.Bottom = WINCONSOLE.SBI.srWindow.Bottom;
-	this_region.Right = WINCONSOLE.SBI.srWindow.Right;
+	this_region.Top = LEGACYCONSOLE.SBI.srWindow.Top;
+	this_region.Left = LEGACYCONSOLE.SBI.srWindow.Left;
+	this_region.Bottom = LEGACYCONSOLE.SBI.srWindow.Bottom;
+	this_region.Right = LEGACYCONSOLE.SBI.srWindow.Right;
 
 	this_size.X = (SHORT) wide;
 	this_size.Y = (SHORT) high;
@@ -1489,7 +1482,7 @@ wcon_dobeepflash(TERMINAL_CONTROL_BLOCK * TCB,
 	bufferCoord.Y = this_region.Top;
 
 	if (!beepFlag &&
-	    read_screen(WINCONSOLE.hdl,
+	    read_screen(LEGACYCONSOLE.core.ConsoleHandleOut,
 			this_screen,
 			this_size,
 			bufferCoord,
@@ -1504,10 +1497,10 @@ wcon_dobeepflash(TERMINAL_CONTROL_BLOCK * TCB,
 		    RevAttr(that_screen[i].Attributes);
 	    }
 
-	    write_screen(WINCONSOLE.hdl, that_screen, this_size,
+	    write_screen(LEGACYCONSOLE.core.ConsoleHandleOut, that_screen, this_size,
 			 bufferCoord, &this_region);
 	    Sleep(200);
-	    write_screen(WINCONSOLE.hdl, this_screen, this_size,
+	    write_screen(LEGACYCONSOLE.core.ConsoleHandleOut, this_screen, this_size,
 			 bufferCoord, &this_region);
 
 	} else {
@@ -1532,7 +1525,6 @@ wcon_print(TERMINAL_CONTROL_BLOCK * TCB,
 }
 
 
-
 static bool
 wcon_rescol(TERMINAL_CONTROL_BLOCK * TCB)
 {
@@ -1541,7 +1533,7 @@ wcon_rescol(TERMINAL_CONTROL_BLOCK * TCB)
     (void) TCB;
     if (validateConsoleHandle()) {
 	WORD a = FOREGROUND_BLUE | FOREGROUND_RED | FOREGROUND_GREEN;
-	SetConsoleTextAttribute(WINCONSOLE.hdl, a);
+	SetConsoleTextAttribute(LEGACYCONSOLE.core.ConsoleHandleOut, a);
 	get_SBI();
 	res = TRUE;
     }
@@ -1559,11 +1551,9 @@ wcon_sgmode(TERMINAL_CONTROL_BLOCK * TCB, int setFlag, TTY * buf)
     if (buf != NULL && validateConsoleHandle()) {
 
 	if (setFlag) {
-	    console_setmode(WINCONSOLE.hdl, buf);
-	    TCB->term.Nttyb = *buf;
+	    DispatchMethod(setmode)(fileno(stdout), buf);
 	} else {
-	    console_getmode(WINCONSOLE.hdl, &(TCB->term.Nttyb));
-	    *buf = TCB->term.Nttyb;
+	    DispatchMethod(getmode)(fileno(stdout), buf);
 	}
 	result = OK;
     }
@@ -1583,9 +1573,8 @@ wcon_mode(TERMINAL_CONTROL_BLOCK * TCB, int progFlag, int defFlag)
     if (validateConsoleHandle()) {
 	sp = TCB->csp;
 
-	WINCONSOLE.progMode = progFlag;
-	WINCONSOLE.lastOut = progFlag ? WINCONSOLE.hdl : WINCONSOLE.core.ConsoleHandleOut;
-	SetConsoleActiveScreenBuffer(WINCONSOLE.lastOut);
+	LEGACYCONSOLE.progMode = progFlag;
+	SetConsoleActiveScreenBuffer(LEGACYCONSOLE.core.ConsoleHandleOut);
 
 	if (progFlag) /* prog mode */  {
 	    if (defFlag) {
@@ -1599,14 +1588,14 @@ wcon_mode(TERMINAL_CONTROL_BLOCK * TCB, int progFlag, int defFlag)
 			if (sp->_keypad_on)
 			    _nc_keypad(sp, TRUE);
 		    }
-		    if (!WINCONSOLE.buffered) {
-			set_scrollback(FALSE, &WINCONSOLE.SBI);
+		    if (!LEGACYCONSOLE.buffered) {
+			set_scrollback(FALSE, &LEGACYCONSOLE.SBI);
 		    }
 		    code = OK;
 		}
 	    }
 	    T(("... buffered:%d, clear:%d",
-	       WINCONSOLE.buffered, CurScreen(sp)->_clear));
+	       LEGACYCONSOLE.buffered, CurScreen(sp)->_clear));
 	} else {		/* shell mode */
 	    if (defFlag) {
 		/* def_shell_mode */
@@ -1620,12 +1609,12 @@ wcon_mode(TERMINAL_CONTROL_BLOCK * TCB, int progFlag, int defFlag)
 		    NCURSES_SP_NAME(_nc_flush) (sp);
 		}
 		code = wcon_sgmode(TCB, TRUE, &(_term->Ottyb));
-		if (!WINCONSOLE.buffered) {
-		    set_scrollback(TRUE, &WINCONSOLE.save_SBI);
+		if (!LEGACYCONSOLE.buffered) {
+		    set_scrollback(TRUE, &LEGACYCONSOLE.save_SBI);
 		    if (!restore_original_screen())
 			code = ERR;
 		}
-		SetConsoleCursorInfo(WINCONSOLE.hdl, &WINCONSOLE.save_CI);
+		SetConsoleCursorInfo(LEGACYCONSOLE.core.ConsoleHandleOut, &LEGACYCONSOLE.save_CI);
 	    }
 	}
 
@@ -1655,135 +1644,203 @@ wcon_release(TERMINAL_CONTROL_BLOCK * TCB)
     returnVoid;
 }
 
-NCURSES_EXPORT(bool)
-_nc_console_checkinit(bool assumeTermInfo)
+/* This initializaton function can be called multiple time, and actually it is called from within
+ * setupterm() the first time and potentially if we enter ncurses from newterm() the next time.
+ * The main purpose is to initialize the defaultCONPTY structure when called the first time. The
+ * first call will alway have fdIn set to -1, as setupterm() only cares about output. Please note
+ * that setupterm() already handles redirection of stdout and assigns stderr for output if stdout
+ * is not a tty.
+ *
+ * The other purpose of this routine is to manage the assignment of pseudo-console handles. If the
+ * assigned filedescriptors are NOT valid pseudo-console handles, the call will return FALSE.
+ *
+ * The function will also return FALSE, if the Windows version we run on does not support ConPTY,
+ * which is a requirement for the Windows Console backend of ncurses. This is because without
+ * ConPTY, the Windows Console does not provide the necessary capabilities for ncurses and
+ * especially the terminfo layer to function properly. */
+METHOD(init, BOOL) (int fdOut, int fdIn)
 {
-    bool res = FALSE;
+    BOOL result = FALSE;
 
-    T((T_CALLED("lib_win32con::_nc_console_checkinit(assumeTermInfo=%d)"),
-       assumeTermInfo));
+    T((T_CALLED("win32_driver::legacy_init(fdOut=%d, fdIn=%d)"), fdOut, fdIn));
 
     /* initialize once, or not at all */
-    if (!console_initialized) {
+    if (!LEGACYCONSOLE.core.initialized) {
+	/*
+	 * We set the console mode flags to the most basic ones that are required for ConPTY
+	 * to function properly. */
+	DWORD dwFlagIn = (ENABLE_LINE_INPUT
+			  | ENABLE_PROCESSED_INPUT
+			  | ENABLE_ECHO_INPUT
+			  | ENABLE_EXTENDED_FLAGS);
+
+	DWORD dwFlagOut = (ENABLE_PROCESSED_OUTPUT
+			   | DISABLE_NEWLINE_AUTO_RETURN
+			   | ENABLE_WRAP_AT_EOL_OUTPUT);
+
+	DWORD dwFlag;
+	HANDLE stdin_handle = INVALID_HANDLE_VALUE;
+	HANDLE stdout_handle = INVALID_HANDLE_VALUE;
+	BOOL hasConsole = FALSE;
+	BOOL buffered = FALSE;
+	WORD a;
 	int i;
 	DWORD num_buttons;
-	WORD a;
-	BOOL buffered = FALSE;
-	BOOL b;
 
-	START_TRACE();
-	WINCONSOLE.isTermInfoConsole = assumeTermInfo;
+	if (_nc_conpty_supported()) {
+	    T(("Windows version does support ConPTY, please don't use the legacy API!"));
+	    returnBool(FALSE);
+	}
 
-	WINCONSOLE.map = (LPDWORD) malloc(sizeof(DWORD) * MAPSIZE);
-	WINCONSOLE.rmap = (LPDWORD) malloc(sizeof(DWORD) * MAPSIZE);
-	WINCONSOLE.ansi_map = (LPDWORD) malloc(sizeof(DWORD) * MAPSIZE);
+	if (fdIn != -1) {
+	    T(("In the first call fdIn is expected to be -1."));
+	    returnBool(FALSE);
+	}
+
+	hasConsole = AllocConsole();
+	if (!hasConsole)
+	    hasConsole = AttachConsole(ATTACH_PARENT_PROCESS);
+	if (!hasConsole) {
+	    T(("AllocConsole() and AttachConsole() failed"));
+	    returnBool(FALSE);
+	}
+	
+	stdin_handle  = GetDirectHandle("CONIN$", FILE_SHARE_READ);
+	stdout_handle = GetDirectHandle("CONOUT$", FILE_SHARE_WRITE);
+
+	if (getenv("NCGDB") || getenv("NCURSES_CONSOLE2")) {
+	    buffered = FALSE;
+	    T(("... will not buffer console"));
+	} else {
+	    T(("... creating console buffer"));
+	    stdout_handle =
+		CreateConsoleScreenBuffer(GENERIC_READ | GENERIC_WRITE,
+					FILE_SHARE_READ | FILE_SHARE_WRITE,
+					NULL,
+					CONSOLE_TEXTMODE_BUFFER,
+					NULL);
+	    buffered = TRUE;
+	}
+
+	/* Especially with UCRT and wide mode, make sure we use an UTF-8 capable locale.
+	 * At least we set the codepage to a proper value that's either compatible with
+	 * ASCII or UTF-8, to ensure that the console can display characters properly.
+	 * The actual locale setting is not that important, as long as the code page is set
+	 * correctly, because we handle UTF-8 encoding and decoding ourselves and we don't
+	 * rely on the C runtime for that. */
+	// encoding_init();
+
+	if (stdout_handle == INVALID_HANDLE_VALUE || GetConsoleMode(stdout_handle,
+								 &dwFlag) == 0) {
+	    T(("Output handle is not a console"));
+	    returnBool(FALSE);
+	}
+	LEGACYCONSOLE.core.ConsoleHandleOut = stdout_handle;
+
+	if (stdin_handle == INVALID_HANDLE_VALUE || GetConsoleMode(stdin_handle,
+								&dwFlag) == 0) 
+	{
+	    T(("StdIn handle is not a console"));
+	    returnBool(FALSE);
+	}
+	LEGACYCONSOLE.core.ConsoleHandleIn = stdin_handle;
+
+	SetConsoleMode(stdout_handle, dwFlagOut);
+	/* We immediately read the console mode back to reflect any changes the
+	 * runtime may have added, so the saved value reflects the actual mode
+	 * of the console. */
+	if (GetConsoleMode(stdout_handle, &dwFlagOut) == 0) {
+	    T(("GetConsoleMode() failed for stdout"));
+	    returnBool(FALSE);
+	}
+	LEGACYCONSOLE.core.ttyflags.dwFlagOut = dwFlagOut;
+
+	SetConsoleMode(stdin_handle, dwFlagIn);
+	/* We immediately read the console mode back to reflect any changes the
+	 * runtime may have added, so the saved value reflects the actual mode
+	 * of the console. */
+	if (GetConsoleMode(stdin_handle, &dwFlagIn) == 0) {
+	    T(("GetConsoleMode() failed for stdin"));
+	    returnBool(FALSE);
+	}
+	LEGACYCONSOLE.core.ttyflags.dwFlagIn = dwFlagIn;
+
+	LEGACYCONSOLE.map = (LPDWORD) malloc(sizeof(DWORD) * MAPSIZE);
+	LEGACYCONSOLE.rmap = (LPDWORD) malloc(sizeof(DWORD) * MAPSIZE);
+	LEGACYCONSOLE.ansi_map = (LPDWORD) malloc(sizeof(DWORD) * MAPSIZE);
 
 	for (i = 0; i < (N_INI + FKEYS); i++) {
 	    if (i < N_INI) {
-		WINCONSOLE.rmap[i] = WINCONSOLE.map[i] =
+		LEGACYCONSOLE.rmap[i] = LEGACYCONSOLE.map[i] =
 		    (DWORD) keylist[i];
-		WINCONSOLE.ansi_map[i] = (DWORD) ansi_keys[i];
+		LEGACYCONSOLE.ansi_map[i] = (DWORD) ansi_keys[i];
 	    } else {
-		WINCONSOLE.rmap[i] = WINCONSOLE.map[i] =
+		LEGACYCONSOLE.rmap[i] = LEGACYCONSOLE.map[i] =
 		    (DWORD) GenMap((VK_F1 + (i - N_INI)),
 				   (KEY_F(1) + (i - N_INI)));
-		WINCONSOLE.ansi_map[i] =
+		LEGACYCONSOLE.ansi_map[i] =
 		    (DWORD) GenMap((VK_F1 + (i - N_INI)),
 				   (';' + (i - N_INI)));
 	    }
 	}
-	qsort(WINCONSOLE.ansi_map,
+	qsort(LEGACYCONSOLE.ansi_map,
 	      (size_t) (MAPSIZE),
 	      sizeof(keylist[0]),
 	      keycompare);
-	qsort(WINCONSOLE.map,
+	qsort(LEGACYCONSOLE.map,
 	      (size_t) (MAPSIZE),
 	      sizeof(keylist[0]),
 	      keycompare);
-	qsort(WINCONSOLE.rmap,
+	qsort(LEGACYCONSOLE.rmap,
 	      (size_t) (MAPSIZE),
 	      sizeof(keylist[0]),
 	      rkeycompare);
 
-	if (GetNumberOfConsoleMouseButtons(&num_buttons)) {
-	    WINCONSOLE.numButtons = (int) num_buttons;
-	} else {
-	    WINCONSOLE.numButtons = 1;
-	}
+	if (GetNumberOfConsoleMouseButtons(&num_buttons))
+	    LEGACYCONSOLE.numButtons = (int) num_buttons;
+	else 
+	    LEGACYCONSOLE.numButtons = 1;
 
 	a = console_MapColor(true, COLOR_WHITE) |
 	    console_MapColor(false, COLOR_BLACK);
 	for (i = 0; i < CON_NUMPAIRS; i++)
-	    WINCONSOLE.pairs[i] = a;
+	    LEGACYCONSOLE.pairs[i] = a;
 
-#define SaveConsoleMode(handle, value) \
-	GetConsoleMode(WINCONSOLE.core.handle, &WINCONSOLE.originalMode.value)
-
-	if (WINCONSOLE.isTermInfoConsole) {
-	    WINCONSOLE.core.ConsoleHandleIn = GetStdHandle(STD_INPUT_HANDLE);
-	    WINCONSOLE.core.ConsoleHandleOut = GetStdHandle(STD_OUTPUT_HANDLE);
-	    WINCONSOLE.hdl = WINCONSOLE.core.ConsoleHandleOut;
-
-	    SaveConsoleMode(ConsoleHandleIn, dwFlagIn);
-	    SaveConsoleMode(ConsoleHandleOut, dwFlagOut);
-
-	} else {
-	    b = AllocConsole();
-
-	    if (!b)
-		b = AttachConsole(ATTACH_PARENT_PROCESS);
-
-	    WINCONSOLE.core.ConsoleHandleIn = GetDirectHandle("CONIN$", FILE_SHARE_READ);
-	    WINCONSOLE.core.ConsoleHandleOut = GetDirectHandle("CONOUT$", FILE_SHARE_WRITE);
-
-	    SaveConsoleMode(ConsoleHandleIn, dwFlagIn);
-	    SaveConsoleMode(ConsoleHandleOut, dwFlagOut);
-
-	    if (getenv("NCGDB") || getenv("NCURSES_CONSOLE2")) {
-		WINCONSOLE.hdl = WINCONSOLE.core.ConsoleHandleOut;
-		buffered = FALSE;
-		T(("... will not buffer console"));
-	    } else {
-		T(("... creating console buffer"));
-		WINCONSOLE.hdl =
-		    CreateConsoleScreenBuffer(GENERIC_READ | GENERIC_WRITE,
-					      FILE_SHARE_READ | FILE_SHARE_WRITE,
-					      NULL,
-					      CONSOLE_TEXTMODE_BUFFER,
-					      NULL);
-		buffered = TRUE;
-	    }
+	LEGACYCONSOLE.buffered = buffered;
+	get_SBI();
+	LEGACYCONSOLE.save_SBI = LEGACYCONSOLE.SBI;
+	if (!buffered) {
+	    save_original_screen();
+	    set_scrollback(FALSE, &LEGACYCONSOLE.SBI);
 	}
+	GetConsoleCursorInfo(LEGACYCONSOLE.core.ConsoleHandleOut, &LEGACYCONSOLE.save_CI);
+	T(("... initial cursor is %svisible, %d%%",
+	    (LEGACYCONSOLE.save_CI.bVisible ? "" : "not-"),
+	    (int) LEGACYCONSOLE.save_CI.dwSize));
 
-	/* We set binary I/O even when using the console
-	   driver to cover the situation, that the
-	   TERM variable is set to #win32con, but actually
-	   Windows supports virtual terminal processing.
-	   So if terminfo functions are used in this setup,
-	   they actually may work.
-	 */
-	_setmode(fileno(stdin), _O_BINARY);
-	_setmode(fileno(stdout), _O_BINARY);
+	LEGACYCONSOLE.core.initialized = TRUE;
+	result = TRUE;
+    } else {
+	/* This branch is called from newterm() when fdIn is provided, so we need to validate
+	* that the provided fdIn and fdOut are valid pseudo-console handles, and if so we
+	* update the defaultCONPTY structure to use the new handles. */
+	DWORD dwFlagOut;
+	DWORD dwFlagIn;
 
-	if (WINCONSOLE.hdl != INVALID_HANDLE_VALUE) {
-	    WINCONSOLE.buffered = buffered;
-	    get_SBI();
-	    WINCONSOLE.save_SBI = WINCONSOLE.SBI;
-	    if (!buffered) {
-		save_original_screen();
-		set_scrollback(FALSE, &WINCONSOLE.SBI);
-	    }
-	    GetConsoleCursorInfo(WINCONSOLE.hdl, &WINCONSOLE.save_CI);
-	    T(("... initial cursor is %svisible, %d%%",
-	       (WINCONSOLE.save_CI.bVisible ? "" : "not-"),
-	       (int) WINCONSOLE.save_CI.dwSize));
+	if (GetConsoleMode(LEGACYCONSOLE.core.ConsoleHandleOut, &dwFlagOut) == 0) {
+	    T(("Output handle is not a console"));
+	    returnBool(FALSE);
 	}
-
-	WINCONSOLE.core.initialized = TRUE;
-	console_initialized = TRUE;
+	if (GetConsoleMode(LEGACYCONSOLE.core.ConsoleHandleIn, &dwFlagIn) == 0) {
+	    T(("Input handle is not a console"));
+	    returnBool(FALSE);
+	}
+	LEGACYCONSOLE.core.ttyflags.dwFlagOut = dwFlagOut;
+	LEGACYCONSOLE.core.ttyflags.dwFlagIn = dwFlagIn;
+	    
+	result = TRUE;
     }
-    res = (WINCONSOLE.hdl != INVALID_HANDLE_VALUE);
-    returnBool(res);
+    returnBool(result);
 }
 
 static void
@@ -1792,11 +1849,11 @@ wcon_init(TERMINAL_CONTROL_BLOCK * TCB)
     T((T_CALLED("win32con::wcon_init(%p)"), TCB));
 
     AssertTCB();
-
+#if JPF
     if (!(console_initialized = _nc_console_checkinit(USE_NAMED_PIPES))) {
 	returnVoid;
     }
-
+#endif
     if (TCB) {
 	TCB->info.initcolor = TRUE;
 	TCB->info.canchange = FALSE;
@@ -1811,13 +1868,12 @@ wcon_init(TERMINAL_CONTROL_BLOCK * TCB)
 	TCB->info.nocolorvideo = 1;
 	TCB->info.tabsize = 8;
 
-	TCB->info.numbuttons = WINCONSOLE.numButtons;
+	TCB->info.numbuttons = LEGACYCONSOLE.numButtons;
 	TCB->info.defaultPalette = _nc_cga_palette;
 
     }
     returnVoid;
 }
-
 
 
 static void
@@ -1873,7 +1929,7 @@ wcon_mvcur(TERMINAL_CONTROL_BLOCK * TCB,
 	COORD loc;
 	loc.X = (short) x;
 	loc.Y = (short) (y + AdjustY());
-	SetConsoleCursorPosition(WINCONSOLE.hdl, loc);
+	SetConsoleCursorPosition(LEGACYCONSOLE.core.ConsoleHandleOut, loc);
 	ret = OK;
     }
     return ret;
@@ -1980,7 +2036,7 @@ wcon_twait(TERMINAL_CONTROL_BLOCK * TCB,
 	SetSP();
 
 	code = console_twait(sp,
-				 WINCONSOLE.core.ConsoleHandleIn,
+				 LEGACYCONSOLE.core.ConsoleHandleIn,
 				 mode,
 				 milliseconds,
 				 timeleft EVENTLIST_2nd(evl));
@@ -2000,7 +2056,7 @@ wcon_read(TERMINAL_CONTROL_BLOCK * TCB, int *buf)
     if (validateConsoleHandle()) {
 	SetSP();
 
-	n = console_read(sp, WINCONSOLE.core.ConsoleHandleIn, buf);
+	n = console_read(sp, LEGACYCONSOLE.core.ConsoleHandleIn, buf);
     }
     returnCode(n);
 }
@@ -2020,7 +2076,7 @@ wcon_cursorSet(TERMINAL_CONTROL_BLOCK * TCB GCC_UNUSED, int mode)
 
     T((T_CALLED("win32con:wcon_cursorSet(%d)"), mode));
     if (validateConsoleHandle()) {
-	CONSOLE_CURSOR_INFO this_CI = WINCONSOLE.save_CI;
+	CONSOLE_CURSOR_INFO this_CI = LEGACYCONSOLE.save_CI;
 	switch (mode) {
 	case 0:
 	    this_CI.bVisible = FALSE;
@@ -2031,15 +2087,15 @@ wcon_cursorSet(TERMINAL_CONTROL_BLOCK * TCB GCC_UNUSED, int mode)
 	    this_CI.dwSize = 100;
 	    break;
 	}
-	SetConsoleCursorInfo(WINCONSOLE.hdl, &this_CI);
+	SetConsoleCursorInfo(LEGACYCONSOLE.core.ConsoleHandleOut, &this_CI);
     }
     returnCode(res);
 }
 
 
-#define AdjustY() (WINCONSOLE.buffered \
+#define AdjustY() (LEGACYCONSOLE.buffered \
                    ? 0 \
-                   : (int) WINCONSOLE.SBI.srWindow.Top)
+                   : (int) LEGACYCONSOLE.SBI.srWindow.Top)
 
 #define BUTTON_MASK (FROM_LEFT_1ST_BUTTON_PRESSED | \
                      FROM_LEFT_2ND_BUTTON_PRESSED | \
@@ -2065,7 +2121,7 @@ decode_mouse(const SCREEN *sp, int mask)
 	result |= BUTTON4_PRESSED;
 
     if (mask & RIGHTMOST_BUTTON_PRESSED) {
-	switch (WINCONSOLE.numButtons) {
+	switch (LEGACYCONSOLE.numButtons) {
 	case 1:
 	    result |= BUTTON1_PRESSED;
 	    break;
@@ -2119,8 +2175,6 @@ handle_mouse(SCREEN *sp, MOUSE_EVENT_RECORD mer)
     }
     return result;
 }
-
-
 
 static ULONGLONG
 tdiff(FILETIME fstart, FILETIME fend)
@@ -2260,8 +2314,7 @@ console_twait(
 
 				if (inp_rec.Event.KeyEvent.bKeyDown) {
 				    T(("twait:event KeyDown"));
-				    if (!WINCONSOLE.isTermInfoConsole &&
-					(0 == ch)) {
+				    if ((0 == ch)) {
 					int nKey = MapKey(vk);
 					if (nKey < 0) {
 					    CONSUME();
@@ -2290,7 +2343,7 @@ console_twait(
 			default:
 			    T(("twait:event Type %d", inp_rec.EventType));
 			    CONSUME();
-			    selectActiveHandle();
+			    // selectActiveHandle();
 			    continue;
 			}
 		    }

@@ -279,7 +279,7 @@ fifo_push(SCREEN *sp EVENTLIST_2nd(_nc_eventlist * evl))
 	if (NC_ISATTY(sp->_ifd) && IsTermInfoOnConsole(sp) && IsCbreak(sp)) {
 	    _nc_set_read_thread(TRUE);
 	    n = _nc_console_read(sp,
-				 _nc_console_handle(sp->_ifd),
+				(HANDLE)((intptr_t)_get_osfhandle(sp->_ifd)),
 				 &buf);
 	    _nc_set_read_thread(FALSE);
 	} else

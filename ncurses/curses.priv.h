@@ -2603,7 +2603,7 @@ extern NCURSES_EXPORT_VAR(TERM_DRIVER) _nc_WIN_DRIVER;
 extern NCURSES_EXPORT_VAR(TERM_DRIVER) _nc_TINFO_DRIVER;
 #endif /* USE_TERM_DRIVER */
 
-#if  USE_CONPTY || defined(USE_WIN32CON_DRIVER)
+#if  USE_CONPTY || defined(USE_LEGACY_CONSOLE)
 extern NCURSES_EXPORT(BOOL) _nc_console_setup(void);
 #endif
 
@@ -2614,27 +2614,18 @@ extern NCURSES_EXPORT(BOOL) _nc_console_setup(void);
 #endif
 
 #if USE_LEGACY_CONSOLE
+#if JPF
 extern NCURSES_EXPORT(bool)  _nc_console_checkinit(bool assumeTermInfo);
 extern NCURSES_EXPORT(void*) _nc_console_fd2handle(int fd);
 extern NCURSES_EXPORT(int)  _nc_console_flush(void* handle);
-extern NCURSES_EXPORT(HANDLE) _nc_console_handle(int fd);
 extern NCURSES_EXPORT(int)  _nc_console_isatty(int fd);
-extern NCURSES_EXPORT(bool) _nc_console_restore(void);
 extern NCURSES_EXPORT(int)  _nc_console_test(int fd);
-
-#ifdef _NC_CHECK_MINTTY
-extern NCURSES_EXPORT(int)    _nc_console_checkmintty(int fd, LPHANDLE pMinTTY);
 #endif
-
 #else
 // JPF #error unsupported driver configuration
-#endif /* USE_WIN32CON_DRIVER */
+#endif /* USE_LEGACY_CONSOLE */
 
-#if USE_TERM_DRIVER && defined(USE_WIN32CON_DRIVER) // JPF
-#define NC_ISATTY(fd) (IsConPTY() ? isatty(fd) : (0 != WINCONSOLE.isatty(fd)))
-#else
 #define NC_ISATTY(fd) isatty(fd)
-#endif
 
 /*
  * Perhaps not "real" but possibly not "fake".
@@ -2757,7 +2748,7 @@ extern NCURSES_EXPORT(int) _nc_conv_to_utf8(unsigned char *, unsigned, unsigned)
 extern NCURSES_EXPORT(int) _nc_conv_to_utf32(unsigned *, const char *, unsigned);
 #endif
 
-#ifdef _NC_WINDOWS
+#if USE_LEGACY_CONSOLE
 #if USE_WIDEC_SUPPORT
 #define write_screen WriteConsoleOutputW
 #define read_screen  ReadConsoleOutputW
@@ -2771,7 +2762,7 @@ extern NCURSES_EXPORT(int) _nc_conv_to_utf32(unsigned *, const char *, unsigned)
 #define KeyEventChar KeyEvent.uChar.AsciiChar
 #define CharInfoChar Char.AsciiChar
 #endif
-#endif /* _NC_WINDOWS */
+#endif /* USE_LEGACY_CONSOLE */
 
 #ifdef __cplusplus
 }

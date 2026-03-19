@@ -151,7 +151,7 @@ _nc_console_setup(void) {
 #endif
 	} else {
 #if USE_LEGACY_CONSOLE
-		_nc_CORECONSOLE = & (_nc_CONSOLE.core);
+		_nc_CORECONSOLE = & (LEGACYCONSOLE.core);
 		CORECONSOLE.is_conpty = FALSE;
 #endif
 	}
