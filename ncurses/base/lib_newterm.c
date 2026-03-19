@@ -88,7 +88,7 @@ _nc_initscr(NCURSES_SP_DCL0)
 	buf.c_oflag &= (unsigned) ~(ONLCR);
 #elif HAVE_SGTTY_H
 	buf.sg_flags &= ~(ECHO | CRMOD);
-#elif USE_NAMED_PIPES
+#elif USE_CONPTY
 	buf.dwFlagIn  = ENABLE_PROCESSED_INPUT;
         buf.dwFlagOut = ENABLE_PROCESSED_OUTPUT | ENABLE_WRAP_AT_EOL_OUTPUT;
 	if (IsConPTY()) {
@@ -203,7 +203,7 @@ NCURSES_SP_NAME(newterm) (NCURSES_SP_DCLx
     current = CURRENT_SCREEN;
     its_term = (current ? current->_term : NULL);
 
-#if USE_NAMED_PIPES && JPF
+#if USE_CONPTY && JPF
     _setmode(fileno(_ifp), _O_BINARY);
     _setmode(fileno(_ofp), _O_BINARY);
 #endif
@@ -247,7 +247,7 @@ NCURSES_SP_NAME(newterm) (NCURSES_SP_DCLx
 	} else {
 	    int value;
 	    int cols;
-#if USE_NAMED_PIPES || USE_WINCONMODE
+#if USE_CONPTY || USE_WINCONMODE
 	    if (!CORECONSOLE.init(fileno(_ofp), fileno(_ifp))) {
 		_nc_set_screen(current);
 		returnSP(NULL);
@@ -360,7 +360,7 @@ NCURSES_SP_NAME(newterm) (NCURSES_SP_DCLx
 
 	    _nc_signal_handler(TRUE);
 	    result = SP_PARM;
-#if USE_NAMED_PIPES || USE_WINCONMODE
+#if USE_CONPTY || USE_WINCONMODE
 	}
 #endif
 	}

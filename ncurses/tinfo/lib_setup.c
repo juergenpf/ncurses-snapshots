@@ -292,7 +292,7 @@ _nc_default_screensize(TERMINAL *termp, int *linep, int *colp)
     }
 }
 
-#if !(USE_TERM_DRIVER || USE_NAMED_PIPES) // JPF
+#if !(USE_TERM_DRIVER || USE_CONPTY) // JPF
 #if defined(USE_CHECK_SIZE) && defined(user6) && defined(user7)
 static const char *
 skip_csi(const char *value)
@@ -456,7 +456,7 @@ _nc_check_screensize(SCREEN *sp, TERMINAL *termp, int *linep, int *colp)
 #endif
 #else
 #define _nc_check_screensize(sp, termp, linep, colp)	/* nothing */
-#endif /* !(USE_TERM_DRIVER || USE_NAMED_PIPES) */
+#endif /* !(USE_TERM_DRIVER || USE_CONPTY) */
 
 NCURSES_EXPORT(void)
 _nc_get_screensize(SCREEN *sp,
@@ -492,7 +492,7 @@ _nc_get_screensize(SCREEN *sp,
     bool useTioctl = _nc_prescreen.use_tioctl;
 
     T((T_CALLED("_nc_get_screensize (%p)"), (void *) sp));
-#if USE_NAMED_PIPES
+#if USE_CONPTY
     /* If we are here, then Windows console is used in terminfo mode.
        We need to figure out the size using the console API
      */
@@ -852,7 +852,7 @@ TINFO_SETUP_TERM(TERMINAL **tp,
 
     if (tname == NULL) {
 	tname = getenv("TERM");
-#if USE_NAMED_PIPES
+#if USE_CONPTY
 	if (!VALID_TERM_ENV(tname, NO_TERMINAL)) {
 	    T(("Failure with TERM=%s", NonNull(tname)));
 	    ret_error0(TGETENT_ERR, "TERM environment variable not set.\n");
@@ -883,7 +883,7 @@ TINFO_SETUP_TERM(TERMINAL **tp,
      */
     if (Filedes == STDOUT_FILENO && !NC_ISATTY(Filedes))
 	Filedes = STDERR_FILENO;
-#if USE_NAMED_PIPES && JPF
+#if USE_CONPTY && JPF
     if (Filedes != STDERR_FILENO && NC_ISATTY(Filedes))
 	_setmode(Filedes, _O_BINARY);
 #endif
@@ -1015,7 +1015,7 @@ TINFO_SETUP_TERM(TERMINAL **tp,
 	    _nc_tinfo_cmdch(termp, UChar(*command_character));
 
 
-#if USE_NAMED_PIPES || USE_WINCONMODE  
+#if USE_CONPTY || USE_WINCONMODE  
 	if (!_nc_console_setup() || !CORECONSOLE.init(Filedes, -1))
 	    code = ERR;
 	else {
@@ -1032,7 +1032,7 @@ TINFO_SETUP_TERM(TERMINAL **tp,
 	    NCURSES_SP_NAME(baudrate) (NCURSES_SP_ARG);
 	}
 	code = OK;
-#if USE_NAMED_PIPES || USE_WINCONMODE
+#if USE_CONPTY || USE_WINCONMODE
 	}
 #endif
 

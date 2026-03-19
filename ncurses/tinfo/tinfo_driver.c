@@ -433,7 +433,7 @@ drv_size(TERMINAL_CONTROL_BLOCK * TCB, int *linep, int *colp)
 	useTioctl = _nc_prescreen.use_tioctl;
     }
 
-#if USE_NAMED_PIPES || USE_WINCONMODE 
+#if USE_CONPTY || USE_WINCONMODE 
     /* If we are here, then Windows console is used in terminfo mode.
        We need to figure out the size using the console API
      */
@@ -618,7 +618,7 @@ drv_mode(TERMINAL_CONTROL_BLOCK * TCB, int progFlag, int defFlag)
 	    if ((drv_sgmode(TCB, FALSE, &(_term->Nttyb)) == OK)) {
 #ifdef TERMIOS
 		_term->Nttyb.c_oflag &= (unsigned) ~OFLAGS_TABS;
-#elif USE_NAMED_PIPES
+#elif USE_cONPTY
 		CORECONSOLE.defmode(&(_term->Nttyb),TTY_MODE_PROGRAM);
 #else
 		_term->Nttyb.sg_flags &= (unsigned) ~XTABS;
@@ -649,7 +649,7 @@ drv_mode(TERMINAL_CONTROL_BLOCK * TCB, int progFlag, int defFlag)
 #ifdef TERMIOS
 		if (_term->Ottyb.c_oflag & OFLAGS_TABS)
 		    tab = back_tab = NULL;
-#elif USE_NAMED_PIPES
+#elif USE_CONPTY
 		CORECONSOLE.defmode(&(_term->Ottyb),TTY_MODE_SHELL);
 #else
 		if (_term->Ottyb.sg_flags & XTABS)

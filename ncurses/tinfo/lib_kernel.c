@@ -94,7 +94,7 @@ NCURSES_SP_NAME(erasechar) (NCURSES_SP_DCL0)
 	result = termp->Ottyb.c_cc[VERASE];
 	if (result == _nc_vdisable())
 	    result = ERR;
-#elif USE_NAMED_PIPES || USE_WINCONMODE
+#elif USE_CONPTY || USE_WINCONMODE
 	result = ERR;
 #else
 	result = termp->Ottyb.sg_erase;
@@ -131,7 +131,7 @@ NCURSES_SP_NAME(killchar) (NCURSES_SP_DCL0)
 	result = termp->Ottyb.c_cc[VKILL];
 	if (result == _nc_vdisable())
 	    result = ERR;
-#elif USE_NAMED_PIPES || USE_WINCONMODE
+#elif USE_CONPTY || USE_WINCONMODE
 	result = ERR;
 #else
 	result = termp->Ottyb.sg_kill;
@@ -156,7 +156,7 @@ flush_input(int fd)
 #else /* !TERMIOS */
     errno = 0;
     do {
-#if USE_NAMED_PIPES || USE_WINCONMODE
+#if USE_CONPTY || USE_WINCONMODE
 	CORECONSOLE.flush(fd);
 #else
 	ioctl(fd, TIOCFLUSH, 0);

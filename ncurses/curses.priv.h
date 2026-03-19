@@ -424,11 +424,29 @@ typedef TRIES {
 #if defined(TERMIOS)
 #undef  USE_NAMED_PIPES
 #define USE_NAMED_PIPES 0
+#undef  USE_CONPTY
+#define USE_CONPTY 0
 #undef  USE_WIN32CON_DRIVER
 #elif defined(_NC_WINDOWS)
 #include <nc_win32.h>
 #endif /* TERMIOS */
 #endif /* USE_TERM_DRIVER */
+
+#if USE_NAMED_PIPES || USE_CONPTY
+#   if defined(TERMIOS)
+#     error Unsupported configuration: named pipes and conpty are only supported on Windows
+#  endif
+#  undef  USE_CONPTY
+#  define USE_CONPTY 1
+#  undef  USE_NAMED_PIPES
+# define  USE_NAMED_PIPES 1
+#endif /* USE_NAMED_PIPES || USE_CONPTY */
+
+#if defined(USE_WIN32CON_DRIVER)
+# define USE_WINCONMODE 1
+#else
+# define USE_WINCONMODE 0
+#endif /* USE_WIN32CON_DRIVER */
 
 #ifndef FixupPathname
 #define FixupPathname(path) /* nothing */
@@ -2296,7 +2314,7 @@ extern NCURSES_EXPORT(int) _nc_eventlist_timeout(_nc_eventlist *);
  */
 #if USE_WIDEC_SUPPORT
 
-#if defined(_NC_WINDOWS_NATIVE) && !defined(_NC_MSC) && !USE_NAMED_PIPES // JPF check
+#if defined(_NC_WINDOWS_NATIVE) && !defined(_NC_MSC) && !USE_CONPTY // JPF check
 /*
  * MinGW has wide-character functions, but they do not work correctly.
  */
@@ -2572,20 +2590,17 @@ extern NCURSES_EXPORT_VAR(TERM_DRIVER) _nc_WIN_DRIVER;
 extern NCURSES_EXPORT_VAR(TERM_DRIVER) _nc_TINFO_DRIVER;
 #endif /* USE_TERM_DRIVER */
 
-#if  USE_NAMED_PIPES || defined(USE_WIN32CON_DRIVER)
+#if  USE_CONPTY || defined(USE_WIN32CON_DRIVER)
 extern NCURSES_EXPORT(BOOL) _nc_console_setup(void);
 #endif
 
-#if USE_NAMED_PIPES
+#if USE_CONPTY
 #define NC_READ(fd, buf, count) WINCONPTY.read(fd,buf,count)
 #else
 #define NC_READ(fd, buf, count) read(fd, buf, count)
 #endif
 
-#ifdef TERMIOS
-#define USE_WINCONMODE 0
-#elif defined(USE_WIN32CON_DRIVER)
-#define USE_WINCONMODE 1
+#if USE_WINCONMODE
 extern NCURSES_EXPORT(bool)  _nc_console_checkinit(bool assumeTermInfo);
 extern NCURSES_EXPORT(void*) _nc_console_fd2handle(int fd);
 extern NCURSES_EXPORT(int)  _nc_console_flush(void* handle);
@@ -2619,7 +2634,7 @@ extern NCURSES_EXPORT(int)    _nc_console_checkmintty(int fd, LPHANDLE pMinTTY);
 #if USE_TERM_DRIVER
 #  define IsTermInfo(sp)       ((TCBOf(sp) != NULL) && ((TCBOf(sp)->drv != NULL)) && ((TCBOf(sp)->drv->isTerminfo)))
 #  define HasTInfoTerminal(sp) ((NULL != TerminalOf(sp)) && IsTermInfo(sp))
-#  if USE_NAMED_PIPES // JPF
+#  if USE_CONPTY // JPF
 #    define IsTermInfoOnConsole(sp) (IsConPTY())
 #  elif defined(USE_WIN32CON_DRIVER)
 #    define IsTermInfoOnConsole(sp) (!IsConPTY())
@@ -2629,7 +2644,7 @@ extern NCURSES_EXPORT(int)    _nc_console_checkmintty(int fd, LPHANDLE pMinTTY);
 #else
 #  define IsTermInfo(sp)       TRUE
 #  define HasTInfoTerminal(sp) (NULL != TerminalOf(sp))
-#  if USE_NAMED_PIPES
+#  if USE_CONPTY
 #    define IsTermInfoOnConsole(sp) (IsConPTY())
 #  else
 #    define IsTermInfoOnConsole(sp) FALSE

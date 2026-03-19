@@ -146,7 +146,7 @@ check_mouse_activity(SCREEN *sp, int delay EVENTLIST_2nd(_nc_eventlist * evl))
     TERMINAL_CONTROL_BLOCK *TCB = TCBOf(sp);
     rc = TCBOf(sp)->drv->td_testmouse(TCBOf(sp), delay EVENTLIST_2nd(evl));
 # if JPF
-# if USE_NAMED_PIPES || defined(_NC_WINDOWS_NATIVE)
+# if USE_CONPTY || defined(_NC_WINDOWS_NATIVE)
     /* if we emulate terminfo on console, we have to use the console routine */
     if (IsTermInfoOnConsole(sp)) {
 	rc = _nc_console_testmouse(sp,
@@ -164,7 +164,7 @@ check_mouse_activity(SCREEN *sp, int delay EVENTLIST_2nd(_nc_eventlist * evl))
     } else
 # endif
     {
-# if USE_NAMED_PIPES && JPF
+# if USE_CONPTY && JPF
 	rc = _nc_console_testmouse(sp,
 				   _nc_console_handle(sp->_ifd),
 				   delay
@@ -293,7 +293,7 @@ fifo_push(SCREEN *sp EVENTLIST_2nd(_nc_eventlist * evl))
 #if USE_TERM_DRIVER
 	int buf;
 #if JPF
-# if USE_NAMED_PIPES || defined(_NC_WINDOWS_NATIVE)
+# if USE_CONPTY || defined(_NC_WINDOWS_NATIVE)
 	if (NC_ISATTY(sp->_ifd) && IsTermInfoOnConsole(sp) && IsCbreak(sp)) {
 	    _nc_set_read_thread(TRUE);
 	    n = _nc_console_read(sp,
@@ -301,18 +301,18 @@ fifo_push(SCREEN *sp EVENTLIST_2nd(_nc_eventlist * evl))
 				 &buf);
 	    _nc_set_read_thread(FALSE);
 	} else
-# endif	/* USE_NAMED_PIPES */
+# endif	/* USE_CONPTY */
 #endif	/* JPF */
 	    n = CallDriver_1(sp, td_read, &buf);
 	ch = buf;
 #else /* !USE_TERM_DRIVER */
-#if USE_NAMED_PIPES && JPF
+#if USE_CONPTY && JPF
 	int buf;
 #endif
 	unsigned char c2 = 0;
 
 	_nc_set_read_thread(TRUE);
-#if USE_NAMED_PIPES && JPF
+#if USE_CONPTY && JPF
 	n = _nc_console_read(sp,
 			     _nc_console_handle(sp->_ifd),
 			     &buf);

@@ -260,6 +260,14 @@ lib_win32util	 lib		$(tinfo)	$(HEADER_DEPS)
 wcwidth		     lib        $(win32con)	$(HEADER_DEPS)
 win32_driver	 lib        $(win32con)	$(HEADER_DEPS)
 
+# MinGW-W64 or Windows native, using ConPTY
+@ port_win32_conpty
+gettimeofday	 lib		$(win32con)	$(HEADER_DEPS)
+lib_win32concore lib		$(tinfo)	$(HEADER_DEPS)
+lib_win32conpty  lib        $(tinfo)    $(HEADER_DEPS)
+lib_win32util    lib        $(tinfo)    $(HEADER_DEPS)
+wcwidth		     lib        $(win32con)	$(HEADER_DEPS)
+
 @ port_tinfo
 tinfo_driver	lib		$(tinfo)	$(HEADER_DEPS)	$(INCDIR)/tic.h
 
