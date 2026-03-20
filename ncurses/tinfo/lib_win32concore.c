@@ -111,9 +111,7 @@ _nc_conpty_supported(void)
 	} else
 	    result = TRUE;
     }
-#ifdef SIMULATE_OLD_WINDOWS
-    result = FALSE;
-#endif
+    
     if (result == TRUE) {
 		HANDLE hOut = GetStdHandle(STD_OUTPUT_HANDLE);
 		if (hOut == INVALID_HANDLE_VALUE) {
