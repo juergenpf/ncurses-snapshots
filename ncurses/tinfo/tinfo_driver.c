@@ -633,10 +633,6 @@ drv_mode(TERMINAL_CONTROL_BLOCK * TCB, int progFlag, int defFlag)
 		    if (sp->_keypad_on)
 			_nc_keypad(sp, TRUE);
 		}
-#if USE_LEGACY_CONSOLE && JPF
-		if (!WINCONSOLE.buffered)
-		    _nc_console_set_scrollback(FALSE, &WINCONSOLE.SBI);
-#endif
 		code = OK;
 	    }
 	}
@@ -665,10 +661,6 @@ drv_mode(TERMINAL_CONTROL_BLOCK * TCB, int progFlag, int defFlag)
 		NCURSES_SP_NAME(_nc_flush) (sp);
 	    }
 	    code = drv_sgmode(TCB, TRUE, &(_term->Ottyb));
-#if USE_LEGACY_CONSOLE && JPF
-	    if (!_nc_console_restore())
-		code = ERR;
-#endif
 	}
     }
     returnCode(code);
@@ -962,18 +954,11 @@ drv_testmouse(TERMINAL_CONTROL_BLOCK * TCB,
     } else
 #endif
     {
-#if USE_LEGACY_CONSOLE && JPF
-	rc = _nc_console_testmouse(sp,
-				   (HANDLE)((intptr_t)_get_osfhandle(sp->_ifd)),
-				   delay
-				   EVENTLIST_2nd(evl));
-#else
 	rc = TCBOf(sp)->drv->td_twait(TCBOf(sp),
 				      TWAIT_MASK,
 				      delay,
 				      (int *) 0
 				      EVENTLIST_2nd(evl));
-#endif
 #if USE_SYSMOUSE
 	if ((sp->_mouse_type == M_SYSMOUSE)
 	    && (sp->_sysmouse_head < sp->_sysmouse_tail)
@@ -1271,15 +1256,7 @@ drv_twait(TERMINAL_CONTROL_BLOCK * TCB,
 
     AssertTCB();
     SetSP();
-#if USE_LEGACY_CONSOLE && JPF
-    return _nc_console_twait(sp,
-			     (HANDLE)((intptr_t)_get_osfhandle(sp->_ifd)),
-			     mode,
-			     milliseconds,
-			     timeleft EVENTLIST_2nd(evl));
-#else
     return _nc_timed_wait(sp, mode, milliseconds, timeleft EVENTLIST_2nd(evl));
-#endif
 }
 
 static int
@@ -1294,17 +1271,9 @@ drv_read(TERMINAL_CONTROL_BLOCK * TCB, int *buf)
     SetSP();
 
     _nc_set_read_thread(TRUE);
-#if USE_LEGACY_CONSOLE && JPF
-    n = _nc_console_read(sp,
-			 (HANDLE)((intptr_t)_get_osfhandle(sp->_ifd)),
-			 buf);
-#else
     n = (int) NC_READ(sp->_ifd, &c2, (size_t) 1);
-#endif
     _nc_set_read_thread(FALSE);
-//#if !defined(USE_WIN32CON_DRIVER) || 1 // JPF
     *buf = (int) c2;
-//#endif
     return n;
 }
 
