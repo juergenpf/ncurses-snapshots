@@ -720,6 +720,7 @@ METHOD(size, void) (int *Lines, int *Cols)
 	    *Cols = (int) (LEGACYCONSOLE.SBI.srWindow.Right + 1 -
 			   LEGACYCONSOLE.SBI.srWindow.Left);
 	}
+	T(("win32_driver::legacy_size() returns %d lines, %d cols", *Lines, *Cols));
     }
 }
 
@@ -1843,9 +1844,11 @@ wcon_init(TERMINAL_CONTROL_BLOCK * TCB)
 
     AssertTCB();
     if (!console_initialized) {
+	T(("... Console not initialized, cannot initialize TCB"));
 	returnVoid;
     }
     if (TCB) {
+	T(("... initializing TCB info"));
 	TCB->info.initcolor = TRUE;
 	TCB->info.canchange = FALSE;
 	TCB->info.hascolor = TRUE;
@@ -1861,7 +1864,6 @@ wcon_init(TERMINAL_CONTROL_BLOCK * TCB)
 
 	TCB->info.numbuttons = LEGACYCONSOLE.numButtons;
 	TCB->info.defaultPalette = _nc_cga_palette;
-
     }
     returnVoid;
 }
