@@ -151,7 +151,7 @@ MapAttr(WORD res, attr_t ch)
 		if (p >= 0 && p < CON_NUMPAIRS)
 		{
 			WORD a;
-			a = console_MapColor(TRUE, p);
+			a = LEGACYCONSOLE.pairs[p];
 			res = (WORD)((res & 0xff00) | a);
 		}
 	}
@@ -1746,25 +1746,25 @@ METHOD(init, BOOL)(int fdOut, int fdIn)
 			returnBool(FALSE);
 		}
 
-		hasConsole = AllocConsole();
+		hasConsole = AttachConsole(ATTACH_PARENT_PROCESS);
 		if (!hasConsole)
 		{
 			last_error = GetLastError();
-			T(("AllocConsole() failed with error %#lx", (unsigned long)last_error));
-			hasConsole = AttachConsole(ATTACH_PARENT_PROCESS);
+			T(("AttachConsole() failed with error %#lx", (unsigned long)last_error));
+			hasConsole = AllocConsole();
 			if (!hasConsole)
 			{
 				last_error = GetLastError();
-				T(("AllocConsole() and AttachConsole() failed with error %#lx", (unsigned long)last_error));
-				T(("We continue and try to use any inheritedt console handles."));
+				T(("AttachConsole() and AllocConsole() failed with error %#lx", (unsigned long)last_error));
+				T(("We continue and try to use any inherited console handles."));
 			}
 		}
 
 		stdin_handle = GetDirectHandle("CONIN$", FILE_SHARE_READ);
-		stdout_handle = GetDirectHandle("CONOUT$", FILE_SHARE_WRITE);
 
 		if (getenv("NCGDB") || getenv("NCURSES_CONSOLE2"))
 		{
+			stdout_handle = GetDirectHandle("CONOUT$", FILE_SHARE_WRITE);
 			buffered = FALSE;
 			T(("... will not buffer console"));
 		}
@@ -2155,10 +2155,6 @@ wcon_cursorSet(TERMINAL_CONTROL_BLOCK *TCB GCC_UNUSED, int mode)
 	SetConsoleCursorInfo(LEGACYCONSOLE.core.ConsoleHandleOut, &this_CI);
 	returnCode(res);
 }
-
-#define AdjustY() (LEGACYCONSOLE.buffered \
-					   ? 0                \
-					   : (int)LEGACYCONSOLE.SBI.srWindow.Top)
 
 #define BUTTON_MASK (FROM_LEFT_1ST_BUTTON_PRESSED | \
 					 FROM_LEFT_2ND_BUTTON_PRESSED | \
