@@ -388,7 +388,7 @@ handle_sysmouse(int sig GCC_UNUSED)
 }
 #endif /* USE_SYSMOUSE */
 
-#if USE_CONPTY
+#if USE_MODERN_CONSOLE
 #define xterm_kmous "\033[M"
 
 static void
@@ -445,7 +445,7 @@ init_xterm_mouse(SCREEN *sp)
 	}
     }
 }
-#endif /* USE_CONPTY */
+#endif /* USE_MODERN_CONSOLE */
 
 static void
 enable_xterm_mouse(SCREEN *sp, bool enable)
@@ -465,7 +465,7 @@ enable_xterm_mouse(SCREEN *sp, bool enable)
 static void
 enable_win32_mouse(SCREEN *sp, bool enable)
 {
-#if USE_CONPTY
+#if USE_MODERN_CONSOLE
     enable_xterm_mouse(sp, enable);
 #endif
 #if USE_LEGACY_CONSOLE
@@ -766,7 +766,7 @@ initialize_mousetype(SCREEN *sp)
 #if USE_TERM_DRIVER
     CallDriver(sp, td_initmouse);
 #endif
-#if USE_CONPTY
+#if USE_MODERN_CONSOLE
     /* we know how to recognize mouse events under "xterm" */
     if (NonEmpty(key_mouse)) {
 	init_xterm_mouse(sp);

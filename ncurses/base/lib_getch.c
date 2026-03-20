@@ -274,18 +274,7 @@ fifo_push(SCREEN *sp EVENTLIST_2nd(_nc_eventlist * evl))
     {				/* Can block... */
 #if USE_TERM_DRIVER
 	int buf;
-#if JPF
-# if USE_CONPTY || defined(_NC_WINDOWS_NATIVE)
-	if (NC_ISATTY(sp->_ifd) && IsTermInfoOnConsole(sp) && IsCbreak(sp)) {
-	    _nc_set_read_thread(TRUE);
-	    n = _nc_console_read(sp,
-				(HANDLE)((intptr_t)_get_osfhandle(sp->_ifd)),
-				 &buf);
-	    _nc_set_read_thread(FALSE);
-	} else
-# endif	/* USE_CONPTY */
-#endif	/* JPF */
-	    n = CallDriver_1(sp, td_read, &buf);
+	n = CallDriver_1(sp, td_read, &buf);
 	ch = buf;
 #else /* !USE_TERM_DRIVER */
 	unsigned char c2 = 0;

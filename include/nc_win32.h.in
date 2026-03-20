@@ -238,8 +238,6 @@ typedef struct {
     CONSOLE_SCREEN_BUFFER_INFO SBI;
     CONSOLE_SCREEN_BUFFER_INFO save_SBI;
     CONSOLE_CURSOR_INFO save_CI;
-    ConsoleMode originalMode;
-
 } LegacyConsoleInterface;
 
 extern NCURSES_EXPORT_VAR(LegacyConsoleInterface *) _nc_LEGACYCONSOLE;

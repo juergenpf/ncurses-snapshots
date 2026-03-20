@@ -432,14 +432,14 @@ typedef TRIES {
 #endif /* TERMIOS */
 #endif /* USE_TERM_DRIVER */
 
+#undef USE_MODERN_CONSOLE
 #if USE_NAMED_PIPES || USE_CONPTY
 #  if defined(TERMIOS)
 #     error Unsupported configuration: named pipes and conpty are only supported on Windows
 #  endif
-#  undef  USE_CONPTY
-#  define USE_CONPTY 1
-#  undef  USE_NAMED_PIPES
-#  define  USE_NAMED_PIPES 1
+#  define USE_MODERN_CONSOLE 1
+#else
+#  define USE_MODERN_CONSOLE 0
 #endif /* USE_NAMED_PIPES || USE_CONPTY */
 
 #if defined(USE_WIN32CON_DRIVER)
@@ -448,7 +448,7 @@ typedef TRIES {
 # define USE_LEGACY_CONSOLE 0
 #endif /* USE_WIN32CON_DRIVER */
 
-#if USE_CONPTY || USE_LEGACY_CONSOLE
+#if USE_MODERN_CONSOLE || USE_LEGACY_CONSOLE
   // We define USE_CONSOLE_API to describe that we use either conpty or legacy.
 # define USE_CONSOLE_API 1	
   //  Although Windows doesn't have SIGWINCH actually, we can use the console API
@@ -2327,7 +2327,7 @@ extern NCURSES_EXPORT(int) _nc_eventlist_timeout(_nc_eventlist *);
  */
 #if USE_WIDEC_SUPPORT
 
-#if defined(_NC_WINDOWS_NATIVE) && !defined(_NC_MSC) && !USE_CONPTY // JPF check
+#if defined(_NC_WINDOWS_NATIVE) && !defined(_NC_MSC) && !USE_MODERN_CONSOLE // JPF check
 /*
  * MinGW has wide-character functions, but they do not work correctly.
  */
@@ -2561,7 +2561,7 @@ extern NCURSES_EXPORT(int)      TINFO_MVCUR(SCREEN*, int, int, int, int);
 #define TINFO_HAS_KEY           NCURSES_SP_NAME(has_key)
 #define TINFO_DOUPDATE          NCURSES_SP_NAME(doupdate)
 #define TINFO_MVCUR             NCURSES_SP_NAME(_nc_mvcur)
-#endif
+#endif /* USE_TERM_DRIVER */
 
 #ifdef _NC_WINDOWS
 #if USE_WIDEC_SUPPORT
@@ -2603,27 +2603,15 @@ extern NCURSES_EXPORT_VAR(TERM_DRIVER) _nc_WIN_DRIVER;
 extern NCURSES_EXPORT_VAR(TERM_DRIVER) _nc_TINFO_DRIVER;
 #endif /* USE_TERM_DRIVER */
 
-#if  USE_CONPTY || defined(USE_LEGACY_CONSOLE)
+#if  USE_CONSOLE_API
 extern NCURSES_EXPORT(BOOL) _nc_console_setup(void);
 #endif
 
-#if USE_CONPTY
+#if USE_MODERN_CONSOLE
 #define NC_READ(fd, buf, count) WINCONPTY.read(fd,buf,count)
 #else
 #define NC_READ(fd, buf, count) read(fd, buf, count)
 #endif
-
-#if USE_LEGACY_CONSOLE
-#if JPF
-extern NCURSES_EXPORT(bool)  _nc_console_checkinit(bool assumeTermInfo);
-extern NCURSES_EXPORT(void*) _nc_console_fd2handle(int fd);
-extern NCURSES_EXPORT(int)  _nc_console_flush(void* handle);
-extern NCURSES_EXPORT(int)  _nc_console_isatty(int fd);
-extern NCURSES_EXPORT(int)  _nc_console_test(int fd);
-#endif
-#else
-// JPF #error unsupported driver configuration
-#endif /* USE_LEGACY_CONSOLE */
 
 #define NC_ISATTY(fd) isatty(fd)
 

@@ -461,7 +461,7 @@ _nc_check_screensize(SCREEN *sp, TERMINAL *termp, int *linep, int *colp)
 #endif
 #else
 #define _nc_check_screensize(sp, termp, linep, colp)	/* nothing */
-#endif /* !(USE_TERM_DRIVER || USE_CONPTY) */
+#endif /* !(USE_TERM_DRIVER || USE_CONSOLE_API) */
 
 NCURSES_EXPORT(void)
 _nc_get_screensize(SCREEN *sp,
@@ -497,7 +497,7 @@ _nc_get_screensize(SCREEN *sp,
     bool useTioctl = _nc_prescreen.use_tioctl;
 
     T((T_CALLED("_nc_get_screensize (%p)"), (void *) sp));
-#if USE_CONPTY
+#if USE_CONSOLE_API
     /* If we are here, then Windows console is used in terminfo mode.
        We need to figure out the size using the console API
      */

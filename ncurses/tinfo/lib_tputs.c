@@ -58,7 +58,7 @@ NCURSES_EXPORT_VAR(char) PC = 0;              /* used by termcap library */
 NCURSES_EXPORT_VAR(NCURSES_OSPEED) ospeed = 0;        /* used by termcap library */
 
 NCURSES_EXPORT_VAR(int) _nc_nulls_sent = 0;
-#if USE_CONPTY
+#if USE_MODERN_CONSOLE
 #define write(fd,buf,len) WINCONPTY.write(fd, buf, len)
 #endif
 

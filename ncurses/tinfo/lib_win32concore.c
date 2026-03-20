@@ -147,7 +147,7 @@ _nc_console_setup(void) {
 
 	T((T_CALLED("lib_win32concore::_nc_console_setup()")));
 	if (_nc_conpty_supported()) {
-#if USE_CONPTY
+#if USE_MODERN_CONSOLE
 		_nc_CORECONSOLE = & (WINCONPTY.core);
 		CORECONSOLE.is_conpty = TRUE;
 #endif

@@ -82,7 +82,7 @@ static BOOL get_SBI(void);
 static void set_scrollback(bool normal, CONSOLE_SCREEN_BUFFER_INFO * info);
 static int console_keyok(int keycode, int flag);
 static BOOL console_keyExist(int keycode);
-static WORD console_MapColor(bool fore, int color);
+static WORD console_MapColor(BOOL fore, int color);
 static BOOL console_restore(void);
 static int console_test(int fd);
 
@@ -136,8 +136,7 @@ static LegacyConsoleInterface legacyCONSOLE =
     .save_region = {0, 0, 0, 0},
     .SBI = {0},
     .save_SBI = {0},
-    .save_CI = {0},
-    .originalMode = {0}
+    .save_CI = {0}
 };
 
 NCURSES_EXPORT_VAR(LegacyConsoleInterface *) 
@@ -150,7 +149,7 @@ MapAttr(WORD res, attr_t ch)
 	int p;
 
 	p = PairNumber(ch);
-	if (p > 0 && p < CON_NUMPAIRS) {
+	if (p >= 0 && p < CON_NUMPAIRS) {
 	    WORD a;
 	    a = console_MapColor(TRUE, p);
 	    res = (WORD) ((res & 0xff00) | a);
@@ -377,7 +376,7 @@ wcon_keyok(TERMINAL_CONTROL_BLOCK * TCB,
 // ------------------------------- Color related definitions and functions -----------------------------------
 
 static WORD
-console_MapColor(bool fore, int color)
+console_MapColor(BOOL fore, int color)
 {
     static const int _cmap[] =
     {0, 4, 2, 6, 1, 5, 3, 7};
@@ -399,8 +398,8 @@ wcon_setcolor(TERMINAL_CONTROL_BLOCK * TCB,
 {
     (void) TCB;
     if (ValidateConsole()) {
-	WORD a = console_MapColor(fore, color);
-	a |= (WORD) ((LEGACYCONSOLE.SBI.wAttributes) & (fore ? 0xfff8 : 0xff8f));
+	WORD a = console_MapColor((BOOL)fore, color);
+	a |= (WORD) ((LEGACYCONSOLE.SBI.wAttributes) & ((BOOL)fore ? 0xfff8 : 0xff8f));
 	SetConsoleTextAttribute(LEGACYCONSOLE.core.ConsoleHandleOut, a);
 	get_SBI();
     }
@@ -460,8 +459,9 @@ wcon_initpair(TERMINAL_CONTROL_BLOCK * TCB,
 	if ((pair > 0) && (pair < CON_NUMPAIRS) && (f >= 0) && (f < 8)
 	    && (b >= 0) && (b < 8)) {
 	    LEGACYCONSOLE.pairs[pair] =
-		console_MapColor(true, f) |
-		console_MapColor(false, b);
+		console_MapColor(TRUE, f) |
+		console_MapColor(FALSE, b);
+	    T(("... wcon_initpair: pair %d: fg=%d, bg=%d", pair, f, b));	
 	}
     }
 }
@@ -1568,6 +1568,7 @@ wcon_mode(TERMINAL_CONTROL_BLOCK * TCB, int progFlag, int defFlag)
 	if (progFlag) /* prog mode */  {
 	    if (defFlag) {
 		if ((wcon_sgmode(TCB, FALSE, &(_term->Nttyb)) == OK)) {
+		    CORECONSOLE.defmode(&(_term->Nttyb),TTY_MODE_PROGRAM);
 		    code = OK;
 		}
 	    } else {
@@ -1584,11 +1585,12 @@ wcon_mode(TERMINAL_CONTROL_BLOCK * TCB, int progFlag, int defFlag)
 		}
 	    }
 	    T(("... buffered:%d, clear:%d",
-	       LEGACYCONSOLE.buffered, CurScreen(sp)->_clear));
+	    	LEGACYCONSOLE.buffered, CurScreen(sp)->_clear));
 	} else {		/* shell mode */
 	    if (defFlag) {
 		/* def_shell_mode */
 		if (wcon_sgmode(TCB, FALSE, &(_term->Ottyb)) == OK) {
+		    CORECONSOLE.defmode(&(_term->Nttyb),TTY_MODE_SHELL);		
 		    code = OK;
 		}
 	    } else {
@@ -1795,8 +1797,8 @@ METHOD(init, BOOL) (int fdOut, int fdIn)
 	else 
 	    LEGACYCONSOLE.numButtons = 1;
 
-	a = console_MapColor(true, COLOR_WHITE) |
-	    console_MapColor(false, COLOR_BLACK);
+	a = console_MapColor(TRUE, COLOR_WHITE) |
+	    console_MapColor(FALSE, COLOR_BLACK);
 	for (i = 0; i < CON_NUMPAIRS; i++)
 	    LEGACYCONSOLE.pairs[i] = a;
 
