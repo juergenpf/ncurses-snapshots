@@ -48,7 +48,7 @@ MODULE_ID("$Id: win32_driver.c,v 1.20 2025/12/30 19:34:50 tom Exp $")
 #define WINMAGIC NCDRV_MAGIC(NCDRV_WINCONSOLE)
 #define EXP_OPTIMIZE 0
 
-#define  console_initialized LEGACYCONSOLE.core.initialized
+#define  console_initialized (TRUE==LEGACYCONSOLE.core.initialized)
 
 #define AssertTCB() assert(TCB != NULL && (TCB->magic == WINMAGIC))
 #define ValidateConsole() (1)
@@ -1694,7 +1694,7 @@ METHOD(init, BOOL) (int fdOut, int fdIn)
 	    if (!hasConsole) {
 		last_error = GetLastError();
 	    	T(("AllocConsole() and AttachConsole() failed with error %#lx", (unsigned long) last_error));
-	    	//returnBool(FALSE);
+		T(("We continue and try to use any inheritedt console handles."));
 	    }
 	}
 	
@@ -1842,11 +1842,9 @@ wcon_init(TERMINAL_CONTROL_BLOCK * TCB)
     T((T_CALLED("win32_driver::wcon_init(%p)"), TCB));
 
     AssertTCB();
-#if JPF
-    if (!(console_initialized = _nc_console_checkinit(USE_NAMED_PIPES))) {
+    if (!console_initialized) {
 	returnVoid;
     }
-#endif
     if (TCB) {
 	TCB->info.initcolor = TRUE;
 	TCB->info.canchange = FALSE;
