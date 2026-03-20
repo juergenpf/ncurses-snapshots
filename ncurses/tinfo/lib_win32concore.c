@@ -111,7 +111,7 @@ _nc_conpty_supported(void)
 	} else
 	    result = TRUE;
     }
-#if !JPF
+#ifdef SIMULATE_OLD_WINDOWS
     result = FALSE;
 #endif
     if (result == TRUE) {
