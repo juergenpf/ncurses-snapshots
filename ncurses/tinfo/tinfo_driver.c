@@ -550,8 +550,16 @@ drv_getsize(TERMINAL_CONTROL_BLOCK * TCB, int *l, int *c)
 {
     AssertTCB();
     assert(l != NULL && c != NULL);
+#if USE_MODERN_CONSOLE
+    /* This is NOT a call into the Console Driver, but the interface of the
+     * conpty implementation to handle the special case toget size information
+     * through the console meta-data services.
+      */ 
+    WINCONPTY.core.size(l, c);
+#else
     *l = lines;
     *c = columns;
+#endif
     return OK;
 }
 
