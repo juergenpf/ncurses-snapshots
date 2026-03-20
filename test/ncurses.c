@@ -490,7 +490,7 @@ ShellOut(bool message)
 	addstr("Shelling out...");
     def_prog_mode();
     endwin();
-#ifdef _NC_WINDOWS
+#if defined(_NC_WINDOWS) || defined(__WIN32) || defined(__WIN64)
     system("cmd.exe");
 #else
     IGNORE_RC(system("sh"));
