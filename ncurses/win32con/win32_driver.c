@@ -124,6 +124,7 @@ static LegacyConsoleInterface legacyCONSOLE =
 		.buffered = FALSE,
 		.window_only = FALSE,
 		.progMode = FALSE,
+		.hOriginalConOut = INVALID_HANDLE_VALUE,
 		.numButtons = 0,
 		.ansi_map = NULL,
 		.map = NULL,
@@ -139,6 +140,7 @@ static LegacyConsoleInterface legacyCONSOLE =
 	};
 NCURSES_EXPORT_VAR(LegacyConsoleInterface *)
 _nc_LEGACYCONSOLE = &legacyCONSOLE;
+
 
 static WORD
 MapAttr(WORD res, attr_t ch)
@@ -1607,7 +1609,13 @@ wcon_mode(TERMINAL_CONTROL_BLOCK *TCB, int progFlag, int defFlag)
 	sp = TCB->csp;
 
 	LEGACYCONSOLE.progMode = progFlag;
-	SetConsoleActiveScreenBuffer(LEGACYCONSOLE.core.ConsoleHandleOut);
+	/* Only activate the ncurses screen buffer when entering prog mode.
+	 * The reverse switch (back to the original buffer) is done below
+	 * in the reset_shell_mode path. */
+	if (progFlag && LEGACYCONSOLE.buffered)
+	{
+		SetConsoleActiveScreenBuffer(LEGACYCONSOLE.core.ConsoleHandleOut);
+	}
 
 	if (progFlag) /* prog mode */
 	{
@@ -1632,6 +1640,11 @@ wcon_mode(TERMINAL_CONTROL_BLOCK *TCB, int progFlag, int defFlag)
 				if (!LEGACYCONSOLE.buffered)
 				{
 					set_scrollback(FALSE, &LEGACYCONSOLE.SBI);
+				}
+				else if (LEGACYCONSOLE.core.ConsoleHandleOut != INVALID_HANDLE_VALUE)
+				{
+					SetConsoleActiveScreenBuffer(LEGACYCONSOLE.core.ConsoleHandleOut);
+					SetConsoleCursorInfo(LEGACYCONSOLE.core.ConsoleHandleOut, &LEGACYCONSOLE.save_CI);
 				}
 				code = OK;
 			}
@@ -1664,8 +1677,13 @@ wcon_mode(TERMINAL_CONTROL_BLOCK *TCB, int progFlag, int defFlag)
 				set_scrollback(TRUE, &LEGACYCONSOLE.save_SBI);
 				if (!restore_original_screen())
 					code = ERR;
+				SetConsoleCursorInfo(LEGACYCONSOLE.core.ConsoleHandleOut, &LEGACYCONSOLE.save_CI);
 			}
-			SetConsoleCursorInfo(LEGACYCONSOLE.core.ConsoleHandleOut, &LEGACYCONSOLE.save_CI);
+			else if (LEGACYCONSOLE.hOriginalConOut != INVALID_HANDLE_VALUE)
+			{
+				SetConsoleActiveScreenBuffer(LEGACYCONSOLE.hOriginalConOut);
+				SetConsoleCursorInfo(LEGACYCONSOLE.hOriginalConOut, &LEGACYCONSOLE.save_CI);
+			}
 		}
 	}
 
@@ -1771,6 +1789,9 @@ METHOD(init, BOOL)(int fdOut, int fdIn)
 		else
 		{
 			T(("... creating console buffer"));
+			/* Save the original active screen buffer handle so we can switch
+			 * back to it when endwin() / reset_shell_mode is called. */
+			LEGACYCONSOLE.hOriginalConOut = GetDirectHandle("CONOUT$", FILE_SHARE_WRITE);
 			stdout_handle =
 				CreateConsoleScreenBuffer(GENERIC_READ | GENERIC_WRITE,
 										  FILE_SHARE_READ | FILE_SHARE_WRITE,

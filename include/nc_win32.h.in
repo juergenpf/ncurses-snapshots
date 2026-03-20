@@ -226,6 +226,7 @@ typedef struct {
     BOOL buffered;
     BOOL window_only;
     BOOL progMode;
+    HANDLE hOriginalConOut;
     int numButtons;
     LPDWORD ansi_map;
     LPDWORD map;
