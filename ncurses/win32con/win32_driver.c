@@ -56,7 +56,9 @@ MODULE_ID("$Id: win32_driver.c,v 1.20 2025/12/30 19:34:50 tom Exp $")
 	sp = TCB->csp;            \
 	(void)sp
 
-#define AdjustY() (LEGACYCONSOLE.buffered \
+#define IsBuffered() (LEGACYCONSOLE.buffered)
+
+#define AdjustY() (IsBuffered() \
 					   ? 0                \
 					   : (int)LEGACYCONSOLE.SBI.srWindow.Top)
 
@@ -80,8 +82,8 @@ METHOD(defmode, int)(TTY *arg, short kind);
 METHOD(flush, int)(int fd);
 
 static BOOL get_SBI(void);
-static void set_scrollback(bool normal, CONSOLE_SCREEN_BUFFER_INFO *info);
-static bool restore_original_screen(void);
+static void set_scrollback(BOOL normal, CONSOLE_SCREEN_BUFFER_INFO *info);
+static BOOL restore_original_screen(void);
 static int console_keyok(int keycode, int flag);
 static BOOL console_keyExist(int keycode);
 static WORD console_MapColor(BOOL fore, int color);
@@ -596,7 +598,7 @@ METHOD(setmode, int)(int fd GCC_UNUSED, const TTY *arg)
 				NCURSES_SP_NAME(_nc_flush)(sp);
 			}
 		
-			if (!LEGACYCONSOLE.buffered)
+			if (!IsBuffered())
 			{
 				set_scrollback(TRUE, &LEGACYCONSOLE.save_SBI);
 				if (!restore_original_screen())
@@ -628,7 +630,7 @@ METHOD(setmode, int)(int fd GCC_UNUSED, const TTY *arg)
 					_nc_keypad(sp, TRUE);
 			}
 		
-			if (!LEGACYCONSOLE.buffered)
+			if (!IsBuffered())
 			{
 				set_scrollback(FALSE, &LEGACYCONSOLE.SBI);
 			}
@@ -731,7 +733,7 @@ get_SBI(void)
 		   LEGACYCONSOLE.SBI.srWindow.Bottom,
 		   LEGACYCONSOLE.SBI.srWindow.Left,
 		   LEGACYCONSOLE.SBI.srWindow.Right));
-		if (LEGACYCONSOLE.buffered)
+		if (IsBuffered())
 		{
 			LEGACYCONSOLE.origin.X = 0;
 			LEGACYCONSOLE.origin.Y = 0;
@@ -754,7 +756,7 @@ METHOD(size, void)(int *Lines, int *Cols)
 {
 	if (Lines != NULL && Cols != NULL)
 	{
-		if (LEGACYCONSOLE.buffered)
+		if (IsBuffered())
 		{
 			*Lines = (int)(LEGACYCONSOLE.SBI.dwSize.Y);
 			*Cols = (int)(LEGACYCONSOLE.SBI.dwSize.X);
@@ -839,7 +841,7 @@ wcon_setsize(TERMINAL_CONTROL_BLOCK *TCB GCC_UNUSED,
 
 // ------------------------------ Screen Save/Restore definitions and functions ---------------------------------
 
-static bool
+static BOOL
 read_screen_data(void)
 {
 	bool result = FALSE;
@@ -895,7 +897,7 @@ read_screen_data(void)
  * says that the data which can be read is limited to 64Kb (and may be
  * less).
  */
-static bool
+static BOOL
 save_original_screen(void)
 {
 	bool result = FALSE;
@@ -911,7 +913,6 @@ save_original_screen(void)
 	}
 	else
 	{
-
 		LEGACYCONSOLE.save_region.Top = LEGACYCONSOLE.SBI.srWindow.Top;
 		LEGACYCONSOLE.save_region.Left = LEGACYCONSOLE.SBI.srWindow.Left;
 		LEGACYCONSOLE.save_region.Bottom = LEGACYCONSOLE.SBI.srWindow.Bottom;
@@ -929,7 +930,7 @@ save_original_screen(void)
 	return result;
 }
 
-static bool
+static BOOL
 restore_original_screen(void)
 {
 	COORD bufferCoord;
@@ -1024,11 +1025,11 @@ dump_screen(const char *fn, int ln)
  * In "normal" mode, reset the buffer- and window-sizes back to their original values.
  */
 static void
-set_scrollback(bool normal, CONSOLE_SCREEN_BUFFER_INFO *info)
+set_scrollback(BOOL normal, CONSOLE_SCREEN_BUFFER_INFO *info)
 {
 	SMALL_RECT rect;
 	COORD coord;
-	bool changed = FALSE;
+	BOOL changed = FALSE;
 
 	T((T_CALLED("win32_driver::set_scrollback(%s)"),
 	   (normal
@@ -1112,7 +1113,7 @@ console_restore(void)
 	if (LEGACYCONSOLE.core.ConsoleHandleOut != INVALID_HANDLE_VALUE)
 	{
 		res = TRUE;
-		if (!LEGACYCONSOLE.buffered)
+		if (!IsBuffered())
 		{
 			set_scrollback(TRUE, &LEGACYCONSOLE.save_SBI);
 			if (!restore_original_screen())
