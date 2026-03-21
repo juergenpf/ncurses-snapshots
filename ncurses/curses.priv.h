@@ -2484,10 +2484,8 @@ typedef struct term_driver {
     void   (*td_init)(struct DriverTCB*);
     void   (*td_release)(struct DriverTCB*);
     int    (*td_size)(struct DriverTCB*, int* Line, int *Cols);
-    int    (*td_sgmode)(struct DriverTCB*, int setFlag, TTY*);
     chtype (*td_conattr)(struct DriverTCB*);
     int    (*td_hwcur)(struct DriverTCB*, int yold, int xold, int y, int x);
-    int    (*td_mode)(struct DriverTCB*, int progFlag, int defFlag);
     bool   (*td_rescol)(struct DriverTCB*);
     bool   (*td_rescolors)(struct DriverTCB*);
     void   (*td_color)(struct DriverTCB*, int fore, int color, int(*)(SCREEN*, int));

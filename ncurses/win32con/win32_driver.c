@@ -1628,80 +1628,6 @@ wcon_rescol(TERMINAL_CONTROL_BLOCK *TCB)
 	return res;
 }
 
-static int
-wcon_sgmode(TERMINAL_CONTROL_BLOCK *TCB, int setFlag, TTY *buf)
-{
-	int result = ERR;
-
-	T((T_CALLED("win32_driver::wcon_sgmode(TCB=(%p),setFlag=%d,TTY=(%p)"),
-	   TCB, setFlag, buf));
-	if (buf != NULL)
-	{
-
-		if (setFlag)
-		{
-			DispatchMethod(setmode)(fileno(stdout), buf);
-		}
-		else
-		{
-			DispatchMethod(getmode)(fileno(stdout), buf);
-		}
-		result = OK;
-	}
-	returnCode(result);
-}
-
-static int
-wcon_mode(TERMINAL_CONTROL_BLOCK *TCB, int progFlag, int defFlag)
-{
-	SCREEN *sp;
-	TERMINAL *_term = (TERMINAL *)TCB;
-	int code = ERR;
-
-	T((T_CALLED("win32_driver::wcon_mode(%p, progFlag=%d, defFlag=%d)"),
-	   TCB, progFlag, defFlag));
-
-	sp = TCB->csp;
-
-	if (progFlag) /* prog mode */
-	{
-		if (defFlag)
-		{
-			if ((wcon_sgmode(TCB, FALSE, &(_term->Nttyb)) == OK))
-			{
-				CORECONSOLE.defmode(&(_term->Nttyb), TTY_MODE_PROGRAM);
-				code = OK;
-			}
-		}
-		else
-		{
-			/* reset_prog_mode */
-			code = wcon_sgmode(TCB, TRUE, &(_term->Nttyb));
-		}
-		T(("... buffered:%d, clear:%d",
-		   LEGACYCONSOLE.buffered, CurScreen(sp)->_clear));
-	}
-	else
-	{ /* shell mode */
-		if (defFlag)
-		{
-			/* def_shell_mode */
-			if (wcon_sgmode(TCB, FALSE, &(_term->Ottyb)) == OK)
-			{
-				CORECONSOLE.defmode(&(_term->Ottyb), TTY_MODE_SHELL);
-				code = OK;
-			}
-		}
-		else
-		{
-			/* reset_shell_mode */
-			code = wcon_sgmode(TCB, TRUE, &(_term->Ottyb));
-		}
-	}
-
-	returnCode(code);
-}
-
 static void
 wcon_screen_init(SCREEN *sp GCC_UNUSED)
 {
@@ -2626,10 +2552,8 @@ _nc_WIN_DRIVER = {
 	wcon_init,			/* init          */
 	wcon_release,		/* release       */
 	wcon_size,			/* size          */
-	wcon_sgmode,		/* sgmode        */
 	wcon_conattr,		/* conattr       */
 	wcon_mvcur,			/* hwcur         */
-	wcon_mode,			/* mode          */
 	wcon_rescol,		/* rescol        */
 	wcon_rescolors,		/* rescolors     */
 	wcon_setcolor,		/* color         */

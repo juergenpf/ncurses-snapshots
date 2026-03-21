@@ -572,112 +572,6 @@ drv_setsize(TERMINAL_CONTROL_BLOCK * TCB, int l, int c)
     return OK;
 }
 
-static int
-drv_sgmode(TERMINAL_CONTROL_BLOCK * TCB, int setFlag, TTY * buf)
-{
-    SCREEN *sp = TCB->csp;
-    TERMINAL *_term = (TERMINAL *) TCB;
-    int result = OK;
-
-    AssertTCB();
-    if (setFlag) {
-	for (;;) {
-	    if (SET_TTY(_term->Filedes, buf) != 0) {
-		if (errno == EINTR)
-		    continue;
-		if (errno == ENOTTY) {
-		    if (sp)
-			sp->_notty = TRUE;
-		}
-		result = ERR;
-	    }
-	    break;
-	}
-    } else {
-	for (;;) {
-	    if (GET_TTY(_term->Filedes, buf) != 0) {
-		if (errno == EINTR)
-		    continue;
-		result = ERR;
-	    }
-	    break;
-	}
-    }
-    return result;
-}
-
-static int
-drv_mode(TERMINAL_CONTROL_BLOCK * TCB, int progFlag, int defFlag)
-{
-    SCREEN *sp;
-    TERMINAL *_term = (TERMINAL *) TCB;
-    int code = ERR;
-
-    AssertTCB();
-    sp = TCB->csp;
-
-    T((T_CALLED("tinfo:drv_mode(%p,%d,%d)"), (void *) sp, progFlag, defFlag));
-
-    if (progFlag)		/* prog mode */
-    {
-	if (defFlag) {
-	    /* def_prog_mode */
-	    /*
-	     * Turn off the XTABS bit in the tty structure if it was on.
-	     */
-	    if ((drv_sgmode(TCB, FALSE, &(_term->Nttyb)) == OK)) {
-#ifdef TERMIOS
-		_term->Nttyb.c_oflag &= (unsigned) ~OFLAGS_TABS;
-#elif USE_MODERN_CONSOLE
-		// Again, NOT a call into the Console Driver, but the interface of the
-		// conpty implementation to handle the special case of setting the mode.
-		WINCONPTY.core.defmode(&(_term->Nttyb),TTY_MODE_PROGRAM);
-#else
-		_term->Nttyb.sg_flags &= (unsigned) ~XTABS;
-#endif
-		code = OK;
-	    }
-	} else {
-	    /* reset_prog_mode */
-	    if (drv_sgmode(TCB, TRUE, &(_term->Nttyb)) == OK) {
-		if (sp) {
-		    if (sp->_keypad_on)
-			_nc_keypad(sp, TRUE);
-		}
-		code = OK;
-	    }
-	}
-    } else {			/* shell mode */
-	if (defFlag) {
-	    /* def_shell_mode */
-	    /*
-	     * If XTABS was on, remove the tab and backtab capabilities.
-	     */
-	    if (drv_sgmode(TCB, FALSE, &(_term->Ottyb)) == OK) {
-#ifdef TERMIOS
-		if (_term->Ottyb.c_oflag & OFLAGS_TABS)
-		    tab = back_tab = NULL;
-#elif USE_MODERN_CONSOLE
-		// Again, NOT a call into the Console Driver, but the interface of the
-		// conpty implementation to handle the special case of setting the mode.
-		WINCONPTY.core.defmode(&(_term->Ottyb),TTY_MODE_SHELL);
-#else
-		if (_term->Ottyb.sg_flags & XTABS)
-		    tab = back_tab = NULL;
-#endif
-		code = OK;
-	    }
-	} else {
-	    /* reset_shell_mode */
-	    if (sp) {
-		_nc_keypad(sp, FALSE);
-		NCURSES_SP_NAME(_nc_flush) (sp);
-	    }
-	    code = drv_sgmode(TCB, TRUE, &(_term->Ottyb));
-	}
-    }
-    returnCode(code);
-}
 
 static void
 drv_wrap(SCREEN *sp)
@@ -773,7 +667,7 @@ drv_init(TERMINAL_CONTROL_BLOCK * TCB)
      * baudrate.
      */
     if (NC_ISATTY(trm->Filedes)) {
-	TCB->drv->td_mode(TCB, TRUE, TRUE);
+	NCURSES_SP_NAME(def_prog_mode) (TCB->csp);	
     }
 }
 
@@ -1448,10 +1342,8 @@ NCURSES_EXPORT_VAR (TERM_DRIVER) _nc_TINFO_DRIVER = {
 	drv_init,		/* init */
 	drv_release,		/* release */
 	drv_size,		/* size */
-	drv_sgmode,		/* sgmode */
 	drv_conattr,		/* conattr */
 	drv_mvcur,		/* hwcur */
-	drv_mode,		/* mode */
 	drv_rescol,		/* rescol */
 	drv_rescolors,		/* rescolors */
 	drv_setcolor,		/* color */
