@@ -585,11 +585,21 @@ METHOD(setmode, int)(int fd GCC_UNUSED, const TTY *arg)
 	{
 		T(("Shell mode set"));
 		LEGACYCONSOLE.progMode = FALSE;
+		if (LEGACYCONSOLE.hOriginalConOut != INVALID_HANDLE_VALUE)
+		{
+			SetConsoleActiveScreenBuffer(LEGACYCONSOLE.hOriginalConOut);
+			SetConsoleCursorInfo(LEGACYCONSOLE.hOriginalConOut, &LEGACYCONSOLE.save_CI);
+		}
 	}
 	else if (arg->kind == TTY_MODE_PROGRAM)
 	{
 		T(("Program mode set"));
 		LEGACYCONSOLE.progMode = TRUE;
+		if (LEGACYCONSOLE.core.ConsoleHandleOut != INVALID_HANDLE_VALUE)
+		{
+			SetConsoleActiveScreenBuffer(LEGACYCONSOLE.core.ConsoleHandleOut);
+			SetConsoleCursorInfo(LEGACYCONSOLE.core.ConsoleHandleOut, &LEGACYCONSOLE.save_CI);
+		}
 	}
 
 	// Handle errors
@@ -1641,11 +1651,6 @@ wcon_mode(TERMINAL_CONTROL_BLOCK *TCB, int progFlag, int defFlag)
 				{
 					set_scrollback(FALSE, &LEGACYCONSOLE.SBI);
 				}
-				else if (LEGACYCONSOLE.core.ConsoleHandleOut != INVALID_HANDLE_VALUE)
-				{
-					SetConsoleActiveScreenBuffer(LEGACYCONSOLE.core.ConsoleHandleOut);
-					SetConsoleCursorInfo(LEGACYCONSOLE.core.ConsoleHandleOut, &LEGACYCONSOLE.save_CI);
-				}
 				code = OK;
 			}
 		}
@@ -1679,11 +1684,7 @@ wcon_mode(TERMINAL_CONTROL_BLOCK *TCB, int progFlag, int defFlag)
 					code = ERR;
 				SetConsoleCursorInfo(LEGACYCONSOLE.core.ConsoleHandleOut, &LEGACYCONSOLE.save_CI);
 			}
-			else if (LEGACYCONSOLE.hOriginalConOut != INVALID_HANDLE_VALUE)
-			{
-				SetConsoleActiveScreenBuffer(LEGACYCONSOLE.hOriginalConOut);
-				SetConsoleCursorInfo(LEGACYCONSOLE.hOriginalConOut, &LEGACYCONSOLE.save_CI);
-			}
+			code = OK;
 		}
 	}
 
@@ -1745,12 +1746,10 @@ METHOD(init, BOOL)(int fdOut, int fdIn)
 		DWORD dwFlag;
 		HANDLE stdin_handle = INVALID_HANDLE_VALUE;
 		HANDLE stdout_handle = INVALID_HANDLE_VALUE;
-		BOOL hasConsole = FALSE;
 		BOOL buffered = FALSE;
 		WORD a;
 		int i;
 		DWORD num_buttons;
-		DWORD last_error;
 
 		if (_nc_conpty_supported())
 		{
@@ -1764,42 +1763,10 @@ METHOD(init, BOOL)(int fdOut, int fdIn)
 			returnBool(FALSE);
 		}
 
-		hasConsole = AttachConsole(ATTACH_PARENT_PROCESS);
-		if (!hasConsole)
-		{
-			last_error = GetLastError();
-			T(("AttachConsole() failed with error %#lx", (unsigned long)last_error));
-			hasConsole = AllocConsole();
-			if (!hasConsole)
-			{
-				last_error = GetLastError();
-				T(("AttachConsole() and AllocConsole() failed with error %#lx", (unsigned long)last_error));
-				T(("We continue and try to use any inherited console handles."));
-			}
-		}
-
 		stdin_handle = GetDirectHandle("CONIN$", FILE_SHARE_READ);
+		stdout_handle = GetDirectHandle("CONOUT$", FILE_SHARE_WRITE);
+		LEGACYCONSOLE.hOriginalConOut = stdout;
 
-		if (getenv("NCGDB") || getenv("NCURSES_CONSOLE2"))
-		{
-			stdout_handle = GetDirectHandle("CONOUT$", FILE_SHARE_WRITE);
-			buffered = FALSE;
-			T(("... will not buffer console"));
-		}
-		else
-		{
-			T(("... creating console buffer"));
-			/* Save the original active screen buffer handle so we can switch
-			 * back to it when endwin() / reset_shell_mode is called. */
-			LEGACYCONSOLE.hOriginalConOut = GetDirectHandle("CONOUT$", FILE_SHARE_WRITE);
-			stdout_handle =
-				CreateConsoleScreenBuffer(GENERIC_READ | GENERIC_WRITE,
-										  FILE_SHARE_READ | FILE_SHARE_WRITE,
-										  NULL,
-										  CONSOLE_TEXTMODE_BUFFER,
-										  NULL);
-			buffered = TRUE;
-		}
 
 		/* Especially with UCRT and wide mode, make sure we use an UTF-8 capable locale.
 		 * At least we set the codepage to a proper value that's either compatible with
@@ -1916,6 +1883,24 @@ METHOD(init, BOOL)(int fdOut, int fdIn)
 		DWORD dwFlagOut;
 		DWORD dwFlagIn;
 
+		if (getenv("NCGDB") || getenv("NCURSES_CONSOLE2"))
+		{
+			LEGACYCONSOLE.buffered = FALSE;
+			T(("... will not buffer console"));
+		}
+		else
+		{
+			T(("... creating console buffer"));
+			/* Save the original active screen buffer handle so we can switch
+			 * back to it when endwin() / reset_shell_mode is called. */
+			LEGACYCONSOLE.core.ConsoleHandleOut =
+				CreateConsoleScreenBuffer(GENERIC_READ | GENERIC_WRITE,
+										  FILE_SHARE_READ | FILE_SHARE_WRITE,
+										  NULL,
+										  CONSOLE_TEXTMODE_BUFFER,
+										  NULL);
+			LEGACYCONSOLE.buffered = TRUE;
+		}
 		if (GetConsoleMode(LEGACYCONSOLE.core.ConsoleHandleOut, &dwFlagOut) == 0)
 		{
 			T(("Output handle is not a console"));
