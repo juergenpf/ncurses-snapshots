@@ -228,8 +228,11 @@ typedef struct {
 
     BOOL buffered;
     BOOL window_only;
-    BOOL progMode;
-    HANDLE hOriginalConOut;
+    BOOL progMode;                            // TRUE if we are in prog mode.
+
+    HANDLE hShellMode;                        // Screebuffer handle in shell mode.
+    HANDLE hProgMode;                         // Screen buffer handle in prog mode.
+    
     int numButtons;
     LPDWORD ansi_map;
     LPDWORD map;

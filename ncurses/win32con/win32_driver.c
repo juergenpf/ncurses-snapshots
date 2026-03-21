@@ -126,7 +126,8 @@ static LegacyConsoleInterface legacyCONSOLE =
 		.buffered = FALSE,
 		.window_only = FALSE,
 		.progMode = FALSE,
-		.hOriginalConOut = INVALID_HANDLE_VALUE,
+		.hShellMode = INVALID_HANDLE_VALUE,
+		.hProgMode = INVALID_HANDLE_VALUE,
 		.numButtons = 0,
 		.ansi_map = NULL,
 		.map = NULL,
@@ -587,43 +588,62 @@ METHOD(setmode, int)(int fd GCC_UNUSED, const TTY *arg)
 	if (arg->kind == TTY_MODE_SHELL)
 	{
 		T(("Shell mode set"));
-		LEGACYCONSOLE.progMode = FALSE;
-		if (sp)
-		{
-			_nc_keypad(sp, FALSE);
-			NCURSES_SP_NAME(_nc_flush)(sp);
-		}
-		if (!LEGACYCONSOLE.buffered)
-		{
-			set_scrollback(TRUE, &LEGACYCONSOLE.save_SBI);
-			if (!restore_original_screen())
-				returnCode(ERR);
-			SetConsoleCursorInfo(LEGACYCONSOLE.core.ConsoleHandleOut, &LEGACYCONSOLE.save_CI);
-		}
+		if (LEGACYCONSOLE.progMode==TRUE) {
+			LEGACYCONSOLE.progMode = FALSE;
+			if (sp)
+			{
+				_nc_keypad(sp, FALSE);
+				NCURSES_SP_NAME(_nc_flush)(sp);
+			}
+		
+			if (!LEGACYCONSOLE.buffered)
+			{
+				set_scrollback(TRUE, &LEGACYCONSOLE.save_SBI);
+				if (!restore_original_screen())
+					returnCode(ERR);
+				SetConsoleCursorInfo(LEGACYCONSOLE.core.ConsoleHandleOut, &LEGACYCONSOLE.save_CI);
+			}
 
-		if (LEGACYCONSOLE.hOriginalConOut != INVALID_HANDLE_VALUE)
-		{
-			SetConsoleActiveScreenBuffer(LEGACYCONSOLE.hOriginalConOut);
-			SetConsoleCursorInfo(LEGACYCONSOLE.hOriginalConOut, &LEGACYCONSOLE.save_CI);
+			if (LEGACYCONSOLE.hShellMode != INVALID_HANDLE_VALUE)
+			{
+				T(("... LEGACYCONSOLE: switching to shell mode buffer"));
+				LEGACYCONSOLE.core.ConsoleHandleOut = LEGACYCONSOLE.hShellMode;
+				SetConsoleActiveScreenBuffer(LEGACYCONSOLE.core.ConsoleHandleOut);
+				SetConsoleCursorInfo(LEGACYCONSOLE.core.ConsoleHandleOut, &LEGACYCONSOLE.save_CI);
+			} else {
+				T(("... LEGACYCONSOLE: no valid shell mode buffer"));
+			}
+		} else {
+			T(("... LEGACYCONSOLE: Already in shell mode"));
 		}
 	}
 	else if (arg->kind == TTY_MODE_PROGRAM)
 	{
 		T(("Program mode set"));
-		LEGACYCONSOLE.progMode = TRUE;
-		if (sp)
-		{
-			if (sp->_keypad_on)
-				_nc_keypad(sp, TRUE);
-		}
-		if (!LEGACYCONSOLE.buffered)
-		{
-			set_scrollback(FALSE, &LEGACYCONSOLE.SBI);
-		}
-		if (LEGACYCONSOLE.core.ConsoleHandleOut != INVALID_HANDLE_VALUE)
-		{
-			SetConsoleActiveScreenBuffer(LEGACYCONSOLE.core.ConsoleHandleOut);
-			SetConsoleCursorInfo(LEGACYCONSOLE.core.ConsoleHandleOut, &LEGACYCONSOLE.save_CI);
+		if (LEGACYCONSOLE.progMode==FALSE) {
+			LEGACYCONSOLE.progMode = TRUE;
+			if (sp)
+			{
+				if (sp->_keypad_on)
+					_nc_keypad(sp, TRUE);
+			}
+		
+			if (!LEGACYCONSOLE.buffered)
+			{
+				set_scrollback(FALSE, &LEGACYCONSOLE.SBI);
+			}
+		
+			if (LEGACYCONSOLE.hProgMode != INVALID_HANDLE_VALUE)
+			{
+				T(("... LEGACYCONSOLE: switching to program mode buffer"));
+				LEGACYCONSOLE.core.ConsoleHandleOut = LEGACYCONSOLE.hProgMode;
+				SetConsoleActiveScreenBuffer(LEGACYCONSOLE.core.ConsoleHandleOut);
+				SetConsoleCursorInfo(LEGACYCONSOLE.core.ConsoleHandleOut, &LEGACYCONSOLE.save_CI);
+			} else {
+				T(("... LEGACYCONSOLE: no valid program mode buffer"));
+			}
+		} else {
+			T(("... LEGACYCONSOLE: Already in program mode"));
 		}
 	}
 
@@ -1643,15 +1663,6 @@ wcon_mode(TERMINAL_CONTROL_BLOCK *TCB, int progFlag, int defFlag)
 
 	sp = TCB->csp;
 
-	LEGACYCONSOLE.progMode = progFlag;
-	/* Only activate the ncurses screen buffer when entering prog mode.
-	 * The reverse switch (back to the original buffer) is done below
-	 * in the reset_shell_mode path. */
-	if (progFlag && LEGACYCONSOLE.buffered)
-	{
-		SetConsoleActiveScreenBuffer(LEGACYCONSOLE.core.ConsoleHandleOut);
-	}
-
 	if (progFlag) /* prog mode */
 	{
 		if (defFlag)
@@ -1677,7 +1688,7 @@ wcon_mode(TERMINAL_CONTROL_BLOCK *TCB, int progFlag, int defFlag)
 			/* def_shell_mode */
 			if (wcon_sgmode(TCB, FALSE, &(_term->Ottyb)) == OK)
 			{
-				CORECONSOLE.defmode(&(_term->Nttyb), TTY_MODE_SHELL);
+				CORECONSOLE.defmode(&(_term->Ottyb), TTY_MODE_SHELL);
 				code = OK;
 			}
 		}
@@ -1763,10 +1774,19 @@ METHOD(init, BOOL)(int fdOut, int fdIn)
 			returnBool(FALSE);
 		}
 
-		stdin_handle = GetDirectHandle("CONIN$", FILE_SHARE_READ);
-		stdout_handle = GetDirectHandle("CONOUT$", FILE_SHARE_WRITE);
-		LEGACYCONSOLE.hOriginalConOut = stdout;
+		stdin_handle = CreateFileA(
+			"CONIN$", 
+			GENERIC_READ | GENERIC_WRITE, 
+			FILE_SHARE_READ, 
+			NULL, OPEN_EXISTING, 0, NULL);
 
+		stdout_handle = CreateFileA(
+			"CONOUT$", 
+			GENERIC_READ | GENERIC_WRITE, 
+			FILE_SHARE_WRITE, 
+			NULL, OPEN_EXISTING, 0, NULL);
+
+		LEGACYCONSOLE.hShellMode = stdout_handle;
 
 		/* Especially with UCRT and wide mode, make sure we use an UTF-8 capable locale.
 		 * At least we set the codepage to a proper value that's either compatible with
@@ -1872,6 +1892,8 @@ METHOD(init, BOOL)(int fdOut, int fdIn)
 		   (LEGACYCONSOLE.save_CI.bVisible ? "" : "not-"),
 		   (int)LEGACYCONSOLE.save_CI.dwSize));
 
+		LEGACYCONSOLE.core.ConsoleHandleIn = stdin_handle;
+		LEGACYCONSOLE.core.ConsoleHandleOut = stdout_handle;
 		LEGACYCONSOLE.core.initialized = TRUE;
 		result = TRUE;
 	}
@@ -1887,13 +1909,14 @@ METHOD(init, BOOL)(int fdOut, int fdIn)
 		{
 			LEGACYCONSOLE.buffered = FALSE;
 			T(("... will not buffer console"));
+			LEGACYCONSOLE.hProgMode = GetStdHandle(STD_OUTPUT_HANDLE);
 		}
 		else
 		{
 			T(("... creating console buffer"));
 			/* Save the original active screen buffer handle so we can switch
 			 * back to it when endwin() / reset_shell_mode is called. */
-			LEGACYCONSOLE.core.ConsoleHandleOut =
+			LEGACYCONSOLE.hProgMode =
 				CreateConsoleScreenBuffer(GENERIC_READ | GENERIC_WRITE,
 										  FILE_SHARE_READ | FILE_SHARE_WRITE,
 										  NULL,
