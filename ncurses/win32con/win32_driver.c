@@ -81,6 +81,7 @@ METHOD(flush, int)(int fd);
 
 static BOOL get_SBI(void);
 static void set_scrollback(bool normal, CONSOLE_SCREEN_BUFFER_INFO *info);
+static bool restore_original_screen(void);
 static int console_keyok(int keycode, int flag);
 static BOOL console_keyExist(int keycode);
 static WORD console_MapColor(BOOL fore, int color);
@@ -113,6 +114,7 @@ static LegacyConsoleInterface legacyCONSOLE =
 				.ConsoleHandleOut = INVALID_HANDLE_VALUE,
 				.sbi_lines = -1,
 				.sbi_cols = -1,
+				.sp = 0,
 				Dispatch(init),
 				Dispatch(size),
 				Dispatch(size_changed),
@@ -504,6 +506,7 @@ METHOD(setmode, int)(int fd GCC_UNUSED, const TTY *arg)
 	HANDLE output_target = LEGACYCONSOLE.core.ConsoleHandleOut;
 	BOOL input_ok = FALSE;
 	BOOL output_ok = FALSE;
+	SCREEN *sp = ConsoleScreen();
 
 	T((T_CALLED("win32_driver::legacy_setmode(fd=%d, TTY*=%p)"), fd, arg));
 
@@ -585,6 +588,19 @@ METHOD(setmode, int)(int fd GCC_UNUSED, const TTY *arg)
 	{
 		T(("Shell mode set"));
 		LEGACYCONSOLE.progMode = FALSE;
+		if (sp)
+		{
+			_nc_keypad(sp, FALSE);
+			NCURSES_SP_NAME(_nc_flush)(sp);
+		}
+		if (!LEGACYCONSOLE.buffered)
+		{
+			set_scrollback(TRUE, &LEGACYCONSOLE.save_SBI);
+			if (!restore_original_screen())
+				returnCode(ERR);
+			SetConsoleCursorInfo(LEGACYCONSOLE.core.ConsoleHandleOut, &LEGACYCONSOLE.save_CI);
+		}
+
 		if (LEGACYCONSOLE.hOriginalConOut != INVALID_HANDLE_VALUE)
 		{
 			SetConsoleActiveScreenBuffer(LEGACYCONSOLE.hOriginalConOut);
@@ -595,6 +611,15 @@ METHOD(setmode, int)(int fd GCC_UNUSED, const TTY *arg)
 	{
 		T(("Program mode set"));
 		LEGACYCONSOLE.progMode = TRUE;
+		if (sp)
+		{
+			if (sp->_keypad_on)
+				_nc_keypad(sp, TRUE);
+		}
+		if (!LEGACYCONSOLE.buffered)
+		{
+			set_scrollback(FALSE, &LEGACYCONSOLE.SBI);
+		}
 		if (LEGACYCONSOLE.core.ConsoleHandleOut != INVALID_HANDLE_VALUE)
 		{
 			SetConsoleActiveScreenBuffer(LEGACYCONSOLE.core.ConsoleHandleOut);
@@ -1640,19 +1665,7 @@ wcon_mode(TERMINAL_CONTROL_BLOCK *TCB, int progFlag, int defFlag)
 		else
 		{
 			/* reset_prog_mode */
-			if (wcon_sgmode(TCB, TRUE, &(_term->Nttyb)) == OK)
-			{
-				if (sp)
-				{
-					if (sp->_keypad_on)
-						_nc_keypad(sp, TRUE);
-				}
-				if (!LEGACYCONSOLE.buffered)
-				{
-					set_scrollback(FALSE, &LEGACYCONSOLE.SBI);
-				}
-				code = OK;
-			}
+			code = wcon_sgmode(TCB, TRUE, &(_term->Nttyb));
 		}
 		T(("... buffered:%d, clear:%d",
 		   LEGACYCONSOLE.buffered, CurScreen(sp)->_clear));
@@ -1671,20 +1684,7 @@ wcon_mode(TERMINAL_CONTROL_BLOCK *TCB, int progFlag, int defFlag)
 		else
 		{
 			/* reset_shell_mode */
-			if (sp)
-			{
-				_nc_keypad(sp, FALSE);
-				NCURSES_SP_NAME(_nc_flush)(sp);
-			}
 			code = wcon_sgmode(TCB, TRUE, &(_term->Ottyb));
-			if (!LEGACYCONSOLE.buffered)
-			{
-				set_scrollback(TRUE, &LEGACYCONSOLE.save_SBI);
-				if (!restore_original_screen())
-					code = ERR;
-				SetConsoleCursorInfo(LEGACYCONSOLE.core.ConsoleHandleOut, &LEGACYCONSOLE.save_CI);
-			}
-			code = OK;
 		}
 	}
 

@@ -78,6 +78,7 @@ static ConPtyInterface defaultCONPTY =
             .ConsoleHandleOut = INVALID_HANDLE_VALUE,
             .sbi_lines = -1,
             .sbi_cols = -1,
+	    .sp = 0,
  	    Dispatch(init),
     	    Dispatch(size),
             Dispatch(size_changed),

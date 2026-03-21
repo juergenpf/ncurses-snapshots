@@ -204,6 +204,8 @@ typedef struct {
     int sbi_lines;                   /* Cached console size */
     int sbi_cols;                    /* Cached console size */
 
+    intptr_t sp;                     /* Screen pointer */
+
     // Methods
     BOOL (*init)(int fdOut, int fdIn);                 /* Initialize with I/O file descriptors. fdIn maybe -1 in first call */
     void (*size)(int *Lines, int *Cols);               /* Query console size. Safe to be called before init */ 
@@ -216,7 +218,8 @@ typedef struct {
 
 extern NCURSES_EXPORT_VAR(ConsoleCoreInterface*) _nc_CORECONSOLE;
 #define CORECONSOLE (*_nc_CORECONSOLE)
-#define IsConPTY() CORECONSOLE.is_conpty
+#define IsConPTY() (CORECONSOLE.is_conpty)
+#define ConsoleScreen() ((SCREEN*)(intptr_t)CORECONSOLE.sp)
 
 #if defined(USE_WIN32CON_DRIVER)
 #define CON_NUMPAIRS 64

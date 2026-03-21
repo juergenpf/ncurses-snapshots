@@ -1075,6 +1075,9 @@ TINFO_SETUP_TERM(TERMINAL **tp,
 		   myname, free(myname));
     }
 #endif
+#if USE_CONSOLE_API
+    CORECONSOLE.sp = (intptr_t) sp;
+#endif
     free(myname);
     returnCode(code);
 }
