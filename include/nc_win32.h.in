@@ -272,7 +272,7 @@ typedef struct {
   // Properties
     ConsoleCoreInterface core;                                        /* The common part for ConPTY as well as legacy console API*/
   // Methods
-    int (*read)(int fd, unsigned char* result, size_t count);         /* Read bytes from the input stream. */
+    int (*read)(int fd, void* result, size_t count);         /* Read bytes from the input stream. */
     int (*write)(int fd, const void *buf, size_t count);              /* Write bytes to the output stream. */
     int (*start_input_subsystem)(void);                               /* In prog mode, we control the input stream */
     int (*stop_input_subsystem)(void);                                /* In shell mode, we leave it to the C runtime */

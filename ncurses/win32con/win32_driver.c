@@ -1809,11 +1809,6 @@ METHOD(init, BOOL)(int fdOut, int fdIn)
 		LEGACYCONSOLE.buffered = buffered;
 		get_SBI();
 		LEGACYCONSOLE.save_SBI = LEGACYCONSOLE.SBI;
-		if (!buffered)
-		{
-			save_original_screen();
-			set_scrollback(FALSE, &LEGACYCONSOLE.SBI);
-		}
 		GetConsoleCursorInfo(LEGACYCONSOLE.core.ConsoleHandleOut, &LEGACYCONSOLE.save_CI);
 		T(("... initial cursor is %svisible, %d%%",
 		   (LEGACYCONSOLE.save_CI.bVisible ? "" : "not-"),
@@ -1834,24 +1829,28 @@ METHOD(init, BOOL)(int fdOut, int fdIn)
 
 		if (getenv("NCGDB") || getenv("NCURSES_CONSOLE2"))
 		{
-			LEGACYCONSOLE.buffered = FALSE;
 			T(("... will not buffer console"));
+			LEGACYCONSOLE.buffered = FALSE;
 			LEGACYCONSOLE.hProgMode = GetStdHandle(STD_OUTPUT_HANDLE);
+			save_original_screen();
+			set_scrollback(FALSE, &LEGACYCONSOLE.SBI);
 		}
 		else
 		{
-			T(("... creating console buffer"));
-			/* Save the original active screen buffer handle so we can switch
-			 * back to it when endwin() / reset_shell_mode is called. */
-			LEGACYCONSOLE.hProgMode =
-				CreateConsoleScreenBuffer(GENERIC_READ | GENERIC_WRITE,
+			if (LEGACYCONSOLE.hProgMode == INVALID_HANDLE_VALUE) {
+				T(("... creating console buffer"));
+				/* Save the original active screen buffer handle so we can switch
+				 * back to it when endwin() / reset_shell_mode is called. */
+				LEGACYCONSOLE.hProgMode =
+					CreateConsoleScreenBuffer(GENERIC_READ | GENERIC_WRITE,
 										  FILE_SHARE_READ | FILE_SHARE_WRITE,
 										  NULL,
 										  CONSOLE_TEXTMODE_BUFFER,
 										  NULL);
-			LEGACYCONSOLE.buffered = TRUE;
+				LEGACYCONSOLE.buffered = TRUE;
+			}
 		}
-		if (GetConsoleMode(LEGACYCONSOLE.core.ConsoleHandleOut, &dwFlagOut) == 0)
+		if (GetConsoleMode(LEGACYCONSOLE.hProgMode, &dwFlagOut) == 0)
 		{
 			T(("Output handle is not a console"));
 			returnBool(FALSE);
@@ -1861,7 +1860,6 @@ METHOD(init, BOOL)(int fdOut, int fdIn)
 			T(("Input handle is not a console"));
 			returnBool(FALSE);
 		}
-		LEGACYCONSOLE.core.ttyflags.dwFlagOut = dwFlagOut;
 		LEGACYCONSOLE.core.ttyflags.dwFlagIn = dwFlagIn;
 
 		result = TRUE;

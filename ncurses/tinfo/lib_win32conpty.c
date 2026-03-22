@@ -59,7 +59,7 @@ METHOD(setmode, int) (int fd, const TTY * arg);
 METHOD(getmode, int) (int fd, TTY * arg);
 METHOD(defmode, int) (TTY * arg, short kind);
 METHOD(flush, int) (int fd);
-METHOD(read, int) (int fd, unsigned char *result, size_t count);
+METHOD(read, int) (int fd, void *result, size_t count);
 METHOD(write, int) (int fd, const void *buf, size_t count);
 METHOD(start_input_subsystem, int) (void);
 METHOD(stop_input_subsystem, int) (void);
@@ -736,7 +736,7 @@ METHOD(poll, int) (struct pty_pollfd * fds, nfds_t nfds, int timeout_ms)
  * error, it returns -1.
  *
  * The basic assumption is, that this will only be called when in prog mode. */
-METHOD(read, int) (int fd GCC_UNUSED, unsigned char *result, size_t count)
+METHOD(read, int) (int fd GCC_UNUSED, void *result, size_t count)
 {
     int byte;
     size_t i;
@@ -755,7 +755,7 @@ METHOD(read, int) (int fd GCC_UNUSED, unsigned char *result, size_t count)
 	byte = get_byte_blocking();
 	if (byte == -1)
 	    return (int) i;	// Return the number of bytes read so far, which may be 0 if we fail on the first byte
-	result[i] = (unsigned char) byte;
+	((unsigned char *)result)[i] = (unsigned char) byte;
     }
     return (int) count;
 }
