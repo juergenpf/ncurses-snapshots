@@ -71,14 +71,6 @@ METHOD(poll, int) (struct pty_pollfd * fds, nfds_t nfds, int timeout_ms);
 static ConPtyInterface defaultCONPTY =
 {
     .core = {
-	    .initialized = FALSE,
-	    .is_conpty = TRUE,
-    	    .ttyflags = {0, 0, TTY_MODE_UNSPECIFIED},
-            .ConsoleHandleIn = INVALID_HANDLE_VALUE,
-            .ConsoleHandleOut = INVALID_HANDLE_VALUE,
-            .sbi_lines = -1,
-            .sbi_cols = -1,
-	    .sp = 0,
  	    Dispatch(init),
     	    Dispatch(size),
             Dispatch(size_changed),
@@ -117,7 +109,16 @@ NCURSES_EXPORT_VAR (ConPtyInterface *)
  * We implement a standard ring buffer for the input, and use Windows events to signal between
  * the threads when input is available or when the thread should shut down. We also implement
  * a simple lazy read model, where the input thread only reads from the console when the main
- * thread signals that it wants to read. */
+ * thread signals that it wants to read. 
+ * 
+ * Please not, that although we are in a pseudo-console context, the hConsole... handles are not
+ * really pipes and must not be used as such, but they are still console handles that we can read 
+ * from and write to using the console API calls ReadFile and WriteFile, and we can also call 
+ * GetConsoleMode and other console API calls on them to query metadata, but we should avoid to use
+ * ReadConsoleInput or WriteConsoleOutput or similar API calls that are not compatible with the 
+ * pipe I/O model, because those calls might not work properly with the pseudo-console handles and 
+ * could cause issues. 
+ * */
 
 #define INPUT_BUFFER_SIZE 4096
 typedef struct {
@@ -134,8 +135,8 @@ static HANDLE g_read_request_event = NULL;	// Signal: "Thread, please call ReadF
 static HANDLE g_input_available_event = NULL;	// Signal: "Data available in ring buffer"
 static HANDLE g_shutdown_event = NULL;	// Signal: "Shutdown system"
 
-/* Our handle is always the consoles input handle (actually a pipe handle provided by
- * ConPTY), which we read from in the input thread. We need it to call ReadFile and to
+/* Our handle is always the consoles input handle (actually a pseudo-console handle provided 
+ * by ConPTY), which we read from in the input thread. We need it to call ReadFile and to
  * cancel the I/O when shutting down. */
 #define g_stdin_handle defaultCONPTY.core.ConsoleHandleIn
 
@@ -242,9 +243,9 @@ METHOD(init, BOOL) (int fdOut, int fdIn)
 	DWORD dwFlag;
 
 	/* Note, this are pseudo-console handles provided by ConPTY, which we will use for all
-	 * console I/O operations. Essentially, this are pipe handles that ConPTY gives us, which
-	 * we can read from and write to, and ConPTY will forward the data to the actual console.
-	 * This allows us to stay in the pipe I/O model. */
+	 * console I/O operations. Essentially, this are pseudo-console handles that ConPTY gives 
+	 * us, which we can read from and write to, and ConPTY will forward the data to the actual 
+	 * console. This allows us to stay in the pipe I/O model. */
 	HANDLE stdin_hdl = GetStdHandle(STD_INPUT_HANDLE);
 	HANDLE stdout_hdl = GetStdHandle(STD_OUTPUT_HANDLE);
 

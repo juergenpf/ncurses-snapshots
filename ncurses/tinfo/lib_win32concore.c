@@ -99,10 +99,10 @@ _nc_conpty_supported(void)
     if (!get_real_windows_version(&major, &minor, &build)) {
 	T(("RtlGetVersion failed"));
 	returnBool(FALSE);
+    } else {
+	T(("Windows version detected: %d.%d (build %d)", (int) major, (int) minor, (int) build));
     }
     if (major >= REQUIRED_MAJOR_V) {
-	T(("Windows version detected: %d.%d (build %d)", (int) major, (int)
-	   minor, (int) build));
 	if (major == REQUIRED_MAJOR_V) {
 	    if (((minor == REQUIRED_MINOR_V) &&
 		 (build >= REQUIRED_BUILD)) ||
@@ -164,6 +164,7 @@ _nc_console_setup(void) {
 		CORECONSOLE.ttyflags.kind = TTY_MODE_UNSPECIFIED;
 		CORECONSOLE.sbi_lines = -1;
 		CORECONSOLE.sbi_cols = -1;
+		CORECONSOLE.sp = 0;
 		res = TRUE;
 	}
 	returnBool(res);

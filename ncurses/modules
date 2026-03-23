@@ -248,6 +248,7 @@ lib_win32concore   lib		$(tinfo)	$(HEADER_DEPS)
 wcwidth		       lib             $(win32con)	$(HEADER_DEPS)
 widechars	       lib             $(wide)		$(HEADER_DEPS)
 win32_driver	   lib             $(win32con)	$(HEADER_DEPS)
+win32_console	   lib        $(win32con)	$(HEADER_DEPS)
 
 # MinGW-W64, using Console API and named pipes
 @ port_win32
@@ -256,6 +257,7 @@ lib_win32concore lib		$(tinfo)	$(HEADER_DEPS)
 lib_win32conpty	 lib		$(tinfo)	$(HEADER_DEPS)
 wcwidth		     lib        $(win32con)	$(HEADER_DEPS)
 win32_driver	 lib        $(win32con)	$(HEADER_DEPS)
+win32_console	 lib        $(win32con)	$(HEADER_DEPS)
 
 # MinGW-W64 or Windows native, using ConPTY
 @ port_win32_conpty

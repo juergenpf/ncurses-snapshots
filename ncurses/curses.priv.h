@@ -2611,6 +2611,10 @@ extern NCURSES_EXPORT(BOOL) _nc_console_setup(void);
 #define NC_READ(fd, buf, count) read(fd, buf, count)
 #endif
 
+#if USE_LEGACY_CONSOLE
+extern NCURSES_EXPORT(void) _nc_legacy_console_init(void);
+#endif
+
 #define NC_ISATTY(fd) isatty(fd)
 
 /*
