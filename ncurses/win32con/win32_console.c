@@ -112,8 +112,9 @@ METHOD(setmode, int)(int fd GCC_UNUSED, const TTY *arg)
 			 * what they would expect from a typical command prompt or terminal window, with
 			 * features like line editing and input processing enabled. */
 			mode |= (ENABLE_LINE_INPUT | ENABLE_PROCESSED_INPUT | ENABLE_ECHO_INPUT);
+			mode &= ~(ENABLE_MOUSE_INPUT | ENABLE_WINDOW_INPUT);
 		}
-		else
+		else if (arg->kind == TTY_MODE_PROGRAM)
 		{
 			/* In program mode, we want to enable VT input. */
 			mode |= ENABLE_MOUSE_INPUT | ENABLE_WINDOW_INPUT;
@@ -467,14 +468,12 @@ METHOD(init, BOOL)(int fdOut, int fdIn)
 									  NULL,
 									  CONSOLE_TEXTMODE_BUFFER,
 									  NULL);
-		}
-		
+		}		
 		if (LEGACYCONSOLE.hProgMode==INVALID_HANDLE_VALUE || GetConsoleMode(LEGACYCONSOLE.hProgMode, &dwFlagOut) == 0)
 		{
 			T(("Output handle is not a console"));
 			returnBool(FALSE);
 		}
-
 		result = TRUE;
 	}
 	returnBool(result);
