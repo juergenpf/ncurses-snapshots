@@ -876,8 +876,8 @@ typedef enum {
 #if USE_SYSMOUSE
 	,M_SYSMOUSE		/* FreeBSD sysmouse on console */
 #endif
-#if USE_TERM_DRIVER
-	,M_TERM_DRIVER		/* Win32 console, etc */
+#if USE_LEGACY_CONSOLE
+	,M_LEGACY_CONSOLE		/* Win32 console, etc */
 #endif
 } MouseType;
 

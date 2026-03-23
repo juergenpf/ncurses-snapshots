@@ -211,6 +211,7 @@ typedef struct {
 
     // Methods
     BOOL (*init)(int fdOut, int fdIn);                 /* Initialize with I/O file descriptors. fdIn maybe -1 in first call */
+    BOOL (*getSBI)(CONSOLE_SCREEN_BUFFER_INFO *sbi);   /* Get the current console size. Returns FALSE on failure. */
     void (*size)(int *Lines, int *Cols);               /* Query console size. Safe to be called before init */ 
     BOOL (*size_changed)(void);                        /* Return TRUE if the console has been resized */
     int (*setmode)(int fd, const ConsoleMode *arg);    /* Our SET_TTY implementation */
@@ -231,8 +232,8 @@ typedef struct {
 
     BOOL progMode;                            // TRUE if we are in prog mode.
 
-    HANDLE hProgMode;                         // Screebuffer handle in prog mode..
     HANDLE hShellMode;                        // Screebuffer handle in shell mode..
+    HANDLE hProgMode;                         // Screebuffer handle in prog mode..
     
     int numButtons;
     LPDWORD ansi_map;

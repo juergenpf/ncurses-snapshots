@@ -139,6 +139,31 @@ _nc_conpty_supported(void)
 NCURSES_EXPORT_VAR(ConsoleCoreInterface*) 
 _nc_CORECONSOLE = NULL;
 
+/* Helper routine for getting the console size. We try to get the console size from
+ * multiple handles, because in some cases (like when running in Windows Terminal)
+ * the standard output handle might not be the one that actually provides the console
+ * size information, but another handle does. This routine tries to get the console
+ * size from the main output handle, and if that fails, it tries the standard output
+ * and standard error handles as well. If all attempts fail, it returns FALSE. */
+static BOOL
+get_sbi(CONSOLE_SCREEN_BUFFER_INFO * csbi)
+{
+    HANDLE test_handles[] = {
+		CORECONSOLE.ConsoleHandleOut, 
+		GetStdHandle(STD_OUTPUT_HANDLE),
+     		GetStdHandle(STD_ERROR_HANDLE)
+	};
+    HANDLE hdl;
+
+    for (size_t i = 0; i < sizeof(test_handles) / sizeof(test_handles[0]); ++i) {
+	hdl = test_handles[i];
+	if (hdl != INVALID_HANDLE_VALUE && GetConsoleScreenBufferInfo(hdl, csbi)) {
+	    return TRUE;
+	}
+    }
+    return FALSE;
+}
+
 NCURSES_EXPORT(BOOL)
 _nc_console_setup(void) {
 	BOOL res = FALSE;
@@ -165,6 +190,9 @@ _nc_console_setup(void) {
 		CORECONSOLE.sbi_lines = -1;
 		CORECONSOLE.sbi_cols = -1;
 		CORECONSOLE.sp = 0;
+
+		CORECONSOLE.getSBI = get_sbi;
+
 		res = TRUE;
 	}
 	returnBool(res);

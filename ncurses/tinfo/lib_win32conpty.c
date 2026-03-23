@@ -246,8 +246,17 @@ METHOD(init, BOOL) (int fdOut, int fdIn)
 	 * console I/O operations. Essentially, this are pseudo-console handles that ConPTY gives 
 	 * us, which we can read from and write to, and ConPTY will forward the data to the actual 
 	 * console. This allows us to stay in the pipe I/O model. */
-	HANDLE stdin_hdl = GetStdHandle(STD_INPUT_HANDLE);
-	HANDLE stdout_hdl = GetStdHandle(STD_OUTPUT_HANDLE);
+	HANDLE stdin_hdl = CreateFileA(
+			"CONIN$", 
+			GENERIC_READ | GENERIC_WRITE, 
+			FILE_SHARE_READ, 
+			NULL, OPEN_EXISTING, 0, NULL);
+
+	HANDLE stdout_hdl = CreateFileA(
+			"CONOUT$", 
+			GENERIC_READ | GENERIC_WRITE, 
+			FILE_SHARE_WRITE, 
+			NULL, OPEN_EXISTING, 0, NULL);
 
 	if (!_nc_conpty_supported()) {
 	    T(("Windows version does not support ConPTY"));
@@ -326,30 +335,6 @@ METHOD(init, BOOL) (int fdOut, int fdIn)
     returnBool(result);
 }
 
-/* Helper routine for getting the console size. We try to get the console size from
- * multiple handles, because in some cases (like when running in Windows Terminal)
- * the standard output handle might not be the one that actually provides the console
- * size information, but another handle does. This routine tries to get the console
- * size from the main output handle, and if that fails, it tries the standard output
- * and standard error handles as well. If all attempts fail, it returns FALSE. */
-static BOOL
-get_sbi(CONSOLE_SCREEN_BUFFER_INFO * csbi)
-{
-    HANDLE test_handles[] = {
-		CORECONSOLE.ConsoleHandleOut, 
-		GetStdHandle(STD_OUTPUT_HANDLE),
-     		GetStdHandle(STD_ERROR_HANDLE)
-	};
-    HANDLE hdl;
-
-    for (size_t i = 0; i < sizeof(test_handles) / sizeof(test_handles[0]); ++i) {
-	hdl = test_handles[i];
-	if (hdl != INVALID_HANDLE_VALUE && GetConsoleScreenBufferInfo(hdl, csbi)) {
-	    return TRUE;
-	}
-    }
-    return FALSE;
-}
 
 /* Get the current size of the Windows Console in lines and columns.
  * This method must not alter the cached values stored in ConsoleInfo.
@@ -365,7 +350,7 @@ get_sbi(CONSOLE_SCREEN_BUFFER_INFO * csbi)
 
     if (Lines != NULL && Cols != NULL) {
 	CONSOLE_SCREEN_BUFFER_INFO csbi;
-	if (get_sbi(&csbi)) {
+	if (CORECONSOLE.getSBI(&csbi)) {
 	    *Lines = (int) (csbi.srWindow.Bottom + 1 - csbi.srWindow.Top);
 	    *Cols = (int) (csbi.srWindow.Right + 1 - csbi.srWindow.Left);
 	    return;

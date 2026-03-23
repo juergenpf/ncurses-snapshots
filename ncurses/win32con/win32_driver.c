@@ -66,12 +66,9 @@ MODULE_ID("$Id: win32_driver.c,v 1.20 2025/12/30 19:34:50 tom Exp $")
 
 
 static BOOL get_SBI(void);
-static void set_scrollback(BOOL normal, CONSOLE_SCREEN_BUFFER_INFO *info);
-static BOOL restore_original_screen(void);
 static int console_keyok(int keycode, int flag);
 static BOOL console_keyExist(int keycode);
 static WORD console_MapColor(BOOL fore, int color);
-static BOOL console_restore(void);
 static int console_twait(
 	const SCREEN *sp,
 	HANDLE hdl,
@@ -433,7 +430,7 @@ static BOOL
 get_SBI(void)
 {
 	bool rc = FALSE;
-	if (GetConsoleScreenBufferInfo(LEGACYCONSOLE.core.ConsoleHandleOut, &(LEGACYCONSOLE.SBI)))
+	if (CORECONSOLE.getSBI(&(LEGACYCONSOLE.SBI)))
 	{
 		T(("GetConsoleScreenBufferInfo"));
 		T(("... buffer(X:%d Y:%d)",
@@ -1113,7 +1110,7 @@ wcon_initmouse(TERMINAL_CONTROL_BLOCK *TCB)
 
 	SetSP();
 
-	sp->_mouse_type = M_TERM_DRIVER;
+	sp->_mouse_type = M_LEGACY_CONSOLE;
 	returnVoid;
 }
 

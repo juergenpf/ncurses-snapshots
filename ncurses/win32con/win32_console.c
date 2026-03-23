@@ -60,8 +60,8 @@ static LegacyConsoleInterface legacyCONSOLE =
 				Dispatch(flush)
 			},
 		.progMode = FALSE,
-		.hProgMode = INVALID_HANDLE_VALUE,
 		.hShellMode = INVALID_HANDLE_VALUE,
+		.hProgMode = INVALID_HANDLE_VALUE,
 		.numButtons = 0,
 		.ansi_map = NULL,
 		.map = NULL,

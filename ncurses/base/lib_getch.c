@@ -256,8 +256,8 @@ fifo_push(SCREEN *sp EVENTLIST_2nd(_nc_eventlist * evl))
 	n = 1;
     } else
 #endif
-#if USE_TERM_DRIVER
-	if ((sp->_mouse_type == M_TERM_DRIVER)
+#if USE_LEGACY_CONSOLE
+	if ((sp->_mouse_type == M_LEGACY_CONSOLE)
 	    && (sp->_drv_mouse_head < sp->_drv_mouse_tail)) {
 	sp->_mouse_event(sp);
 	ch = KEY_MOUSE;

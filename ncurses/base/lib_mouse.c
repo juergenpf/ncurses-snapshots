@@ -461,18 +461,6 @@ enable_xterm_mouse(SCREEN *sp, bool enable)
     sp->_mouse_active = enable;
 }
 
-#if USE_TERM_DRIVER && USE_CONSOLE_API
-static void
-enable_win32_mouse(SCREEN *sp, bool enable)
-{
-#if USE_MODERN_CONSOLE
-    enable_xterm_mouse(sp, enable);
-#endif
-#if USE_LEGACY_CONSOLE
-    sp->_mouse_active = enable;
-#endif
-}
-#endif /* USE_TERM_DRIVER && USE_CONSOLE_API */
 
 #if USE_GPM_SUPPORT
 static bool
@@ -914,8 +902,8 @@ _nc_mouse_event(SCREEN *sp)
 	break;
 #endif /* USE_SYSMOUSE */
 
-#if USE_TERM_DRIVER
-    case M_TERM_DRIVER:
+#if USE_LEGACY_CONSOLE
+    case M_LEGACY_CONSOLE:
 	while (sp->_drv_mouse_head < sp->_drv_mouse_tail) {
 	    /*
 	     * Point the fifo-head to the next possible location.  If there
@@ -1450,9 +1438,9 @@ mouse_activate(SCREEN *sp, bool on)
 	    sp->_mouse_active = TRUE;
 	    break;
 #endif
-#if USE_TERM_DRIVER && USE_CONSOLE_API
-	case M_TERM_DRIVER:
-	    enable_win32_mouse(sp, TRUE);
+#if USE_LEGACY_CONSOLE
+	case M_LEGACY_CONSOLE:
+	    sp->_mouse_active = TRUE;
 	    break;
 #endif
 	case M_NONE:
@@ -1487,9 +1475,9 @@ mouse_activate(SCREEN *sp, bool on)
 	    sp->_mouse_active = FALSE;
 	    break;
 #endif
-#if USE_TERM_DRIVER && USE_CONSOLE_API
-	case M_TERM_DRIVER:
-	    enable_win32_mouse(sp, FALSE);
+#if USE_LEGACY_CONSOLE
+	case M_LEGACY_CONSOLE:
+	    sp->_mouse_active = FALSE;
 	    break;
 #endif
 	case M_NONE:
@@ -1805,8 +1793,8 @@ _nc_mouse_wrap(SCREEN *sp)
 	mouse_activate(sp, FALSE);
 	break;
 #endif
-#if USE_TERM_DRIVER
-    case M_TERM_DRIVER:
+#if USE_LEGACY_CONSOLE
+    case M_LEGACY_CONSOLE:
 	mouse_activate(sp, FALSE);
 	break;
 #endif
@@ -1842,8 +1830,8 @@ _nc_mouse_resume(SCREEN *sp)
 	break;
 #endif
 
-#if USE_TERM_DRIVER && USE_CONSOLE_API
-    case M_TERM_DRIVER:
+#if USE_LEGACY_CONSOLE
+    case M_LEGACY_CONSOLE:
 	mouse_activate(sp, TRUE);
 	break;
 #endif
