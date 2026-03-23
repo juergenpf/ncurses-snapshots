@@ -143,7 +143,6 @@ check_mouse_activity(SCREEN *sp, int delay EVENTLIST_2nd(_nc_eventlist * evl))
     int rc;
 
 #if USE_TERM_DRIVER
-    TERMINAL_CONTROL_BLOCK *TCB = TCBOf(sp);
     rc = TCBOf(sp)->drv->td_testmouse(TCBOf(sp), delay EVENTLIST_2nd(evl));
 #else /* !USE_TERM_DRIVER */
 # if USE_SYSMOUSE

@@ -164,6 +164,17 @@ get_sbi(CONSOLE_SCREEN_BUFFER_INFO * csbi)
     return FALSE;
 }
 
+/* This function flushes the console input buffer. It is called by the main thread when it
+ * wants to discard any pending input in the console. The function returns OK on success. */
+static int
+flush_input(int fd GCC_UNUSED)
+{
+	int code = OK;
+	T((T_CALLED("lib_win32concore::flush_input(fd=%d)"), fd));
+	FlushConsoleInputBuffer(GetStdHandle(STD_INPUT_HANDLE));
+	returnCode(code);
+}
+
 NCURSES_EXPORT(BOOL)
 _nc_console_setup(void) {
 	BOOL res = FALSE;
@@ -192,6 +203,7 @@ _nc_console_setup(void) {
 		CORECONSOLE.sp = 0;
 
 		CORECONSOLE.getSBI = get_sbi;
+		CORECONSOLE.flush = flush_input;
 
 		res = TRUE;
 	}

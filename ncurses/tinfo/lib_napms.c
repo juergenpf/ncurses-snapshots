@@ -62,9 +62,10 @@ NCURSES_SP_NAME(napms) (NCURSES_SP_DCLx int ms)
     if (ms > MAX_DELAY_MSECS)
 	ms = MAX_DELAY_MSECS;
 
-#if USE_TERM_DRIVER
-    CallDriver_1(SP_PARM, td_nap, ms);
-#else /* !USE_TERM_DRIVER */
+#if USE_CONSOLE_API
+    if (IsLegacyConsole())
+        returnCode(LEGACYCONSOLE.napms(ms));
+#endif
 #if NCURSES_SP_FUNCS
     (void) sp;
 #endif
@@ -81,7 +82,6 @@ NCURSES_SP_NAME(napms) (NCURSES_SP_DCLx int ms)
 #else
     _nc_timed_wait(NULL, TW_NONE, ms, (int *) 0 EVENTLIST_2nd(NULL));
 #endif
-#endif /* !USE_TERM_DRIVER */
 
     returnCode(OK);
 }

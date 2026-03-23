@@ -751,19 +751,23 @@ initialize_mousetype(SCREEN *sp)
     }
 #endif /* USE_SYSMOUSE */
 
-#if USE_TERM_DRIVER
-    CallDriver(sp, td_initmouse);
+#if USE_CONSOLE_API
+#if USE_LEGACY_CONSOLE
+    if (IsLegacyConsole()) {
+	sp->_mouse_type = M_LEGACY_CONSOLE;
+	returnVoid;
+    } 
 #endif
-#if USE_MODERN_CONSOLE
     /* we know how to recognize mouse events under "xterm" */
     if (NonEmpty(key_mouse)) {
 	init_xterm_mouse(sp);
     } else if (SP_TERMTYPE term_names != NULL
-	       && strstr(SP_TERMTYPE term_names, "xterm") != NULL) {
+	        && strstr(SP_TERMTYPE term_names, "xterm") != NULL) {
 	if (_nc_add_to_try(&(sp->_keytry), xterm_kmous, KEY_MOUSE) == OK)
 	    init_xterm_mouse(sp);
     }
-#endif
+    
+#endif /* USE_CONSOLE_API */
 
     returnVoid;
 }

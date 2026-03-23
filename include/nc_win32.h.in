@@ -223,9 +223,10 @@ typedef struct {
 extern NCURSES_EXPORT_VAR(ConsoleCoreInterface*) _nc_CORECONSOLE;
 #define CORECONSOLE (*_nc_CORECONSOLE)
 #define IsConPTY() (CORECONSOLE.is_conpty)
+#define IsLegacyConsole() (!CORECONSOLE.is_conpty)
 #define ConsoleScreen() ((SCREEN*)(intptr_t)CORECONSOLE.sp)
 
-#if defined(USE_WIN32CON_DRIVER)
+#if defined(USE_WIN32CON_DRIVER) || @USE_NAMED_PIPES@  /* USE_WIN32CON_DRIVER || USE_NAMED_PIPES */
 #define CON_NUMPAIRS 64
 typedef struct {
     ConsoleCoreInterface core;
@@ -242,6 +243,10 @@ typedef struct {
     WORD pairs[CON_NUMPAIRS];
     CONSOLE_SCREEN_BUFFER_INFO SBI;
     CONSOLE_CURSOR_INFO save_CI;
+
+    int (*napms)(int ms);                     // Pointer to the napms function used by the legacy console.
+    chtype (*termattrs)(void);                // Pointer to the termattrs function used by the legacy console.
+    int (*keypad)(BOOL);                      // Pointer to the keypad function used by the legacy console.
 } LegacyConsoleInterface;
 
 extern NCURSES_EXPORT_VAR(LegacyConsoleInterface *) _nc_LEGACYCONSOLE;

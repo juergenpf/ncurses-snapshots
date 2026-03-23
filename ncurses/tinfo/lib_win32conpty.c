@@ -58,7 +58,6 @@ METHOD(size_changed, BOOL) (void);
 METHOD(setmode, int) (int fd, const TTY * arg);
 METHOD(getmode, int) (int fd, TTY * arg);
 METHOD(defmode, int) (TTY * arg, short kind);
-METHOD(flush, int) (int fd);
 METHOD(read, int) (int fd, void *result, size_t count);
 METHOD(write, int) (int fd, const void *buf, size_t count);
 METHOD(start_input_subsystem, int) (void);
@@ -76,8 +75,7 @@ static ConPtyInterface defaultCONPTY =
             Dispatch(size_changed),
             Dispatch(setmode),
             Dispatch(getmode),
-            Dispatch(defmode),
-	    Dispatch(flush)
+            Dispatch(defmode)
     },
     Dispatch(read),
     Dispatch(write),
@@ -94,6 +92,11 @@ static ConPtyInterface defaultCONPTY =
  * or configuration. */
 NCURSES_EXPORT_VAR (ConPtyInterface *)
   _nc_currentCONPTY = &defaultCONPTY;
+
+#if !USE_LEGACY_CONSOLE
+NCURSES_EXPORT_VAR (LegacyConsoleInterface *)
+  _nc_LEGACYCONSOLE = NULL;
+#endif
 
 // ----------------------- The Input Subsystem ----------------------------------------------
 /* In order to stay strictly in the pipe I/O model of the Windows Console, we need to have
@@ -774,16 +777,6 @@ METHOD(write, int) (int fd GCC_UNUSED, const void *buf, size_t count)
     }
 
     return (int) written;
-}
-
-/* This function flushes the console input buffer. It is called by the main thread when it
- * wants to discard any pending input in the console. The function returns OK on success. */
-METHOD(flush, int) (int fd GCC_UNUSED)
-{
-    int code = OK;
-    T((T_CALLED("lib_win32conpty::pty_flush(fd=%d)"), fd));
-    FlushConsoleInputBuffer(GetStdHandle(STD_INPUT_HANDLE));
-    returnCode(code);
 }
 
 /* This function sets the console mode for the input and output handles. It is called by the main thread

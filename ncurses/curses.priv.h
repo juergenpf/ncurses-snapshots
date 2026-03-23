@@ -2484,7 +2484,6 @@ typedef struct term_driver {
     void   (*td_init)(struct DriverTCB*);
     void   (*td_release)(struct DriverTCB*);
     int    (*td_size)(struct DriverTCB*, int* Line, int *Cols);
-    chtype (*td_conattr)(struct DriverTCB*);
     int    (*td_hwcur)(struct DriverTCB*, int yold, int xold, int y, int x);
     bool   (*td_rescol)(struct DriverTCB*);
     bool   (*td_rescolors)(struct DriverTCB*);
@@ -2493,11 +2492,8 @@ typedef struct term_driver {
     void   (*td_initpair)(struct DriverTCB*, int, int, int);
     void   (*td_initcolor)(struct DriverTCB*, int, int, int, int);
     void   (*td_docolor)(struct DriverTCB*, int, int, int, int(*)(SCREEN*, int));
-    void   (*td_initmouse)(struct DriverTCB*);
     int    (*td_testmouse)(struct DriverTCB*, int EVENTLIST_2nd(_nc_eventlist*));
     void   (*td_setfilter)(struct DriverTCB*);
-    void   (*td_hwlabel)(struct DriverTCB*, int, char*);
-    void   (*td_hwlabelOnOff)(struct DriverTCB*, int);
     int    (*td_update)(struct DriverTCB*);
     int    (*td_defaultcolors)(struct DriverTCB*, int, int);
     int    (*td_print)(struct DriverTCB*, char*, int);
@@ -2508,8 +2504,6 @@ typedef struct term_driver {
     void   (*td_scexit)(SCREEN *);
     int    (*td_twait)(struct DriverTCB*, int, int, int* EVENTLIST_2nd(_nc_eventlist*));
     int    (*td_read)(struct DriverTCB*, int*);
-    int    (*td_nap)(struct DriverTCB*, int);
-    int    (*td_kpad)(struct DriverTCB*, int);
     int    (*td_kyOk)(struct DriverTCB*, int, int);
     bool   (*td_kyExist)(struct DriverTCB*, int);
     int    (*td_cursorSet)(struct DriverTCB*, int);

@@ -76,11 +76,6 @@ static int console_twait(
 	int milliseconds,
 	int *timeleft
 		EVENTLIST_2nd(_nc_eventlist *evl));
-static int console_testmouse(
-	const SCREEN *sp,
-	HANDLE hdl,
-	int delay
-		EVENTLIST_2nd(_nc_eventlist *evl));
 static int console_read(
 	SCREEN *sp,
 	HANDLE hdl,
@@ -288,22 +283,6 @@ wcon_kyExist(TERMINAL_CONTROL_BLOCK *TCB GCC_UNUSED, int keycode)
 	returnBool(found);
 }
 
-static int
-wcon_kpad(TERMINAL_CONTROL_BLOCK *TCB, int flag GCC_UNUSED)
-{
-	SCREEN *sp;
-	int code = ERR;
-
-	T((T_CALLED("win32_driver::wcon_kpad(%p, %d)"), TCB, flag));
-
-	SetSP();
-
-	if (sp)
-	{
-		code = OK;
-	}
-	returnCode(code);
-}
 
 static int
 wcon_keyok(TERMINAL_CONTROL_BLOCK *TCB,
@@ -1101,19 +1080,6 @@ wcon_init(TERMINAL_CONTROL_BLOCK *TCB)
 	returnVoid;
 }
 
-static void
-wcon_initmouse(TERMINAL_CONTROL_BLOCK *TCB)
-{
-	SCREEN *sp;
-
-	T((T_CALLED("win32_driver::wcon_initmouse(%p)"), TCB));
-
-	SetSP();
-
-	sp->_mouse_type = M_LEGACY_CONSOLE;
-	returnVoid;
-}
-
 static int
 wcon_testmouse(TERMINAL_CONTROL_BLOCK *TCB,
 			   int delay
@@ -1154,35 +1120,6 @@ wcon_mvcur(TERMINAL_CONTROL_BLOCK *TCB,
 	SetConsoleCursorPosition(LEGACYCONSOLE.core.ConsoleHandleOut, loc);
 	ret = OK;
 	return ret;
-}
-
-static void
-wcon_hwlabel(TERMINAL_CONTROL_BLOCK *TCB,
-			 int labnum GCC_UNUSED,
-			 char *text GCC_UNUSED)
-{
-	SCREEN *sp;
-
-	AssertTCB();
-	SetSP();
-}
-
-static void
-wcon_hwlabelOnOff(TERMINAL_CONTROL_BLOCK *TCB,
-				  int OnFlag GCC_UNUSED)
-{
-	SCREEN *sp;
-
-	AssertTCB();
-	SetSP();
-}
-
-static chtype
-wcon_conattr(TERMINAL_CONTROL_BLOCK *TCB GCC_UNUSED)
-{
-	chtype res = A_NORMAL;
-	res |= (A_BOLD | A_DIM | A_REVERSE | A_STANDOUT | A_COLOR);
-	return res;
 }
 
 static void
@@ -1281,13 +1218,6 @@ wcon_read(TERMINAL_CONTROL_BLOCK *TCB, int *buf)
 	returnCode(n);
 }
 
-static int
-wcon_nap(TERMINAL_CONTROL_BLOCK *TCB GCC_UNUSED, int ms)
-{
-	T((T_CALLED("win32_driver::wcon_nap(%p, %d)"), TCB, ms));
-	Sleep((DWORD)ms);
-	returnCode(OK);
-}
 
 static int
 wcon_cursorSet(TERMINAL_CONTROL_BLOCK *TCB GCC_UNUSED, int mode)
@@ -1325,6 +1255,8 @@ decode_mouse(const SCREEN *sp, int mask)
 	(void)sp;
 	assert(sp && console_initialized);
 
+	T((T_CALLED("decode_mouse(%p, %08x)"), sp, mask));
+
 	if (mask & FROM_LEFT_1ST_BUTTON_PRESSED)
 		result |= BUTTON1_PRESSED;
 	if (mask & FROM_LEFT_2ND_BUTTON_PRESSED)
@@ -1353,16 +1285,19 @@ decode_mouse(const SCREEN *sp, int mask)
 		}
 	}
 
-	return result;
+	returnCode(result);
 }
 
-static bool
+static BOOL
 handle_mouse(SCREEN *sp, MOUSE_EVENT_RECORD mer)
 {
 	MEVENT work;
-	bool result = FALSE;
+	BOOL result = FALSE;
 
 	assert(sp);
+
+	T((T_CALLED("handle_mouse(%p, {pos=(%d,%d) mask=%08x})"),
+	   sp, mer.dwMousePosition.X, mer.dwMousePosition.Y, mer.dwButtonState));
 
 	sp->_drv_mouse_old_buttons = sp->_drv_mouse_new_buttons;
 	sp->_drv_mouse_new_buttons = mer.dwButtonState & BUTTON_MASK;
@@ -1373,6 +1308,9 @@ handle_mouse(SCREEN *sp, MOUSE_EVENT_RECORD mer)
 	 */
 	if (sp->_drv_mouse_new_buttons != sp->_drv_mouse_old_buttons)
 	{
+		T(("... button state changed: old=%08x new=%08x",
+		   sp->_drv_mouse_old_buttons, sp->_drv_mouse_new_buttons));
+
 		memset(&work, 0, sizeof(work));
 
 		if (sp->_drv_mouse_new_buttons)
@@ -1381,6 +1319,7 @@ handle_mouse(SCREEN *sp, MOUSE_EVENT_RECORD mer)
 		}
 		else
 		{
+			T(("... button state cleared, reporting release"));
 			/* cf: BUTTON_PRESSED, BUTTON_RELEASED */
 			work.bstate |= (decode_mouse(sp, sp->_drv_mouse_old_buttons) >> 1);
 			result = TRUE;
@@ -1392,7 +1331,7 @@ handle_mouse(SCREEN *sp, MOUSE_EVENT_RECORD mer)
 		sp->_drv_mouse_fifo[sp->_drv_mouse_tail] = work;
 		sp->_drv_mouse_tail += 1;
 	}
-	return result;
+	returnBool(result);
 }
 
 static ULONGLONG
@@ -1626,32 +1565,6 @@ end:
 	return code;
 }
 
-GCC_UNUSED
-static int
-console_testmouse(
-	const SCREEN *sp,
-	HANDLE hdl,
-	int delay
-		EVENTLIST_2nd(_nc_eventlist *evl))
-{
-	int rc = 0;
-
-	assert(sp);
-
-	if (sp->_drv_mouse_head < sp->_drv_mouse_tail)
-	{
-		rc = TW_MOUSE;
-	}
-	else
-	{
-		rc = console_twait(sp,
-						   hdl,
-						   TWAIT_MASK,
-						   delay,
-						   (int *)0 EVENTLIST_2nd(evl));
-	}
-	return rc;
-}
 
 static int
 console_read(
@@ -1752,7 +1665,6 @@ _nc_WIN_DRIVER = {
 	wcon_init,			/* init          */
 	wcon_release,		/* release       */
 	wcon_size,			/* size          */
-	wcon_conattr,		/* conattr       */
 	wcon_mvcur,			/* hwcur         */
 	wcon_rescol,		/* rescol        */
 	wcon_rescolors,		/* rescolors     */
@@ -1761,11 +1673,8 @@ _nc_WIN_DRIVER = {
 	wcon_initpair,		/* initpair      */
 	wcon_initcolor,		/* initcolor     */
 	wcon_do_color,		/* docolor       */
-	wcon_initmouse,		/* initmouse     */
 	wcon_testmouse,		/* testmouse     */
 	wcon_setfilter,		/* setfilter     */
-	wcon_hwlabel,		/* hwlabel       */
-	wcon_hwlabelOnOff,	/* hwlabelOnOff  */
 	wcon_doupdate,		/* update        */
 	wcon_defaultcolors, /* defaultcolors */
 	wcon_print,			/* print         */
@@ -1776,8 +1685,6 @@ _nc_WIN_DRIVER = {
 	wcon_wrap,			/* scexit        */
 	wcon_twait,			/* twait         */
 	wcon_read,			/* read          */
-	wcon_nap,			/* nap           */
-	wcon_kpad,			/* kpad          */
 	wcon_keyok,			/* kyOk          */
 	wcon_kyExist,		/* kyExist       */
 	wcon_cursorSet		/* cursorSet     */

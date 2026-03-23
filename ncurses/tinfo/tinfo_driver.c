@@ -814,35 +814,6 @@ drv_do_color(TERMINAL_CONTROL_BLOCK * TCB,
     }
 }
 
-#define xterm_kmous "\033[M"
-static void
-init_xterm_mouse(SCREEN *sp)
-{
-    sp->_mouse_type = M_XTERM;
-    sp->_mouse_xtermcap = NCURSES_SP_NAME(tigetstr) (NCURSES_SP_ARGx UserCap(XM));
-    if (!VALID_STRING(sp->_mouse_xtermcap))
-	sp->_mouse_xtermcap = "\033[?1000%?%p1%{1}%=%th%el%;";
-}
-
-static void
-drv_initmouse(TERMINAL_CONTROL_BLOCK * TCB)
-{
-    SCREEN *sp;
-
-    AssertTCB();
-    SetSP();
-
-    /* we know how to recognize mouse events under "xterm" */
-    if (sp != NULL) {
-	if (NonEmpty(key_mouse)) {
-	    init_xterm_mouse(sp);
-	} else if (strstr(SP_TERMTYPE term_names, "xterm") != NULL) {
-	    if (_nc_add_to_try(&(sp->_keytry), xterm_kmous, KEY_MOUSE) == OK)
-		init_xterm_mouse(sp);
-	}
-    }
-}
-
 static int
 drv_testmouse(TERMINAL_CONTROL_BLOCK * TCB,
 	      int delay
@@ -886,75 +857,6 @@ drv_mvcur(TERMINAL_CONTROL_BLOCK * TCB, int yold, int xold, int ynew, int xnew)
     return NCURSES_SP_NAME(_nc_mvcur) (sp, yold, xold, ynew, xnew);
 }
 
-static void
-drv_hwlabel(TERMINAL_CONTROL_BLOCK * TCB, int labnum, char *text)
-{
-    SCREEN *sp = TCB->csp;
-
-    AssertTCB();
-    if (labnum > 0 && labnum <= num_labels) {
-	NCURSES_PUTP2("plab_norm",
-		      TPARM_2(plab_norm, labnum, text));
-    }
-}
-
-static void
-drv_hwlabelOnOff(TERMINAL_CONTROL_BLOCK * TCB, int OnFlag)
-{
-    SCREEN *sp = TCB->csp;
-
-    AssertTCB();
-    if (OnFlag) {
-	NCURSES_PUTP2("label_on", label_on);
-    } else {
-	NCURSES_PUTP2("label_off", label_off);
-    }
-}
-
-static chtype
-drv_conattr(TERMINAL_CONTROL_BLOCK * TCB)
-{
-    SCREEN *sp = TCB->csp;
-    chtype attrs = A_NORMAL;
-
-    AssertTCB();
-    if (enter_alt_charset_mode)
-	attrs |= A_ALTCHARSET;
-
-    if (enter_blink_mode)
-	attrs |= A_BLINK;
-
-    if (enter_bold_mode)
-	attrs |= A_BOLD;
-
-    if (enter_dim_mode)
-	attrs |= A_DIM;
-
-    if (enter_reverse_mode)
-	attrs |= A_REVERSE;
-
-    if (enter_standout_mode)
-	attrs |= A_STANDOUT;
-
-    if (enter_protected_mode)
-	attrs |= A_PROTECT;
-
-    if (enter_secure_mode)
-	attrs |= A_INVIS;
-
-    if (enter_underline_mode)
-	attrs |= A_UNDERLINE;
-
-    if (sp && sp->_coloron)
-	attrs |= A_COLOR;
-
-#if USE_ITALIC
-    if (enter_italics_mode)
-	attrs |= A_ITALIC;
-#endif
-
-    return (attrs);
-}
 
 static void
 drv_setfilter(TERMINAL_CONTROL_BLOCK * TCB)
@@ -1185,72 +1087,6 @@ drv_read(TERMINAL_CONTROL_BLOCK * TCB, int *buf)
 }
 
 static int
-drv_nap(TERMINAL_CONTROL_BLOCK * TCB GCC_UNUSED, int ms)
-{
-#if HAVE_NANOSLEEP
-    {
-	struct timespec request, remaining;
-	request.tv_sec = ms / 1000;
-	request.tv_nsec = (ms % 1000) * 1000000;
-	while (nanosleep(&request, &remaining) == -1
-	       && errno == EINTR) {
-	    request = remaining;
-	}
-    }
-#else
-    _nc_timed_wait(NULL, TW_NONE, ms, (int *) 0 EVENTLIST_2nd(NULL));
-#endif
-    return OK;
-}
-
-static int
-__nc_putp(SCREEN *sp, const char *name GCC_UNUSED, const char *value)
-{
-    int rc = ERR;
-
-    if (value) {
-	rc = NCURSES_PUTP2(name, value);
-    }
-    return rc;
-}
-
-static int
-__nc_putp_flush(SCREEN *sp, const char *name, const char *value)
-{
-    int rc = __nc_putp(sp, name, value);
-    if (rc != ERR) {
-	NCURSES_SP_NAME(_nc_flush) (sp);
-    }
-    return rc;
-}
-
-static int
-drv_kpad(TERMINAL_CONTROL_BLOCK * TCB, int flag)
-{
-    int ret = ERR;
-    SCREEN *sp;
-
-    AssertTCB();
-
-    sp = TCB->csp;
-
-    if (sp) {
-	if (flag) {
-	    (void) __nc_putp_flush(sp, "keypad_xmit", keypad_xmit);
-	} else if (!flag && keypad_local) {
-	    (void) __nc_putp_flush(sp, "keypad_local", keypad_local);
-	}
-	if (flag && !sp->_tried) {
-	    _nc_init_keytry(sp);
-	    sp->_tried = TRUE;
-	}
-	ret = OK;
-    }
-
-    return ret;
-}
-
-static int
 drv_keyok(TERMINAL_CONTROL_BLOCK * TCB, int c, int flag)
 {
     SCREEN *sp;
@@ -1342,7 +1178,6 @@ NCURSES_EXPORT_VAR (TERM_DRIVER) _nc_TINFO_DRIVER = {
 	drv_init,		/* init */
 	drv_release,		/* release */
 	drv_size,		/* size */
-	drv_conattr,		/* conattr */
 	drv_mvcur,		/* hwcur */
 	drv_rescol,		/* rescol */
 	drv_rescolors,		/* rescolors */
@@ -1351,11 +1186,8 @@ NCURSES_EXPORT_VAR (TERM_DRIVER) _nc_TINFO_DRIVER = {
 	drv_initpair,		/* initpair */
 	drv_initcolor,		/* initcolor */
 	drv_do_color,		/* docolor */
-	drv_initmouse,		/* initmouse */
 	drv_testmouse,		/* testmouse */
 	drv_setfilter,		/* setfilter */
-	drv_hwlabel,		/* hwlabel */
-	drv_hwlabelOnOff,	/* hwlabelOnOff */
 	drv_doupdate,		/* update */
 	drv_defaultcolors,	/* defaultcolors */
 	drv_print,		/* print */
@@ -1366,8 +1198,6 @@ NCURSES_EXPORT_VAR (TERM_DRIVER) _nc_TINFO_DRIVER = {
 	drv_wrap,		/* scexit */
 	drv_twait,		/* twait  */
 	drv_read,		/* read */
-	drv_nap,		/* nap */
-	drv_kpad,		/* kpad */
 	drv_keyok,		/* kyOk */
 	drv_kyExist,		/* kyExist */
 	drv_cursorSet		/* cursorSet */

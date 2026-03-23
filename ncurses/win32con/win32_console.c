@@ -45,7 +45,9 @@ METHOD(size_changed, BOOL)(void);
 METHOD(getmode, int)(int fd GCC_UNUSED, TTY *arg);
 METHOD(setmode, int)(int fd GCC_UNUSED, const TTY *arg);
 METHOD(defmode, int)(TTY *arg, short kind);
-METHOD(flush, int)(int fd);
+METHOD(napms, int)(int ms);
+METHOD(termattrs, chtype)(void);
+METHOD(keypad, int)(BOOL flag);
 
 static LegacyConsoleInterface legacyCONSOLE =
 	{
@@ -56,8 +58,7 @@ static LegacyConsoleInterface legacyCONSOLE =
 				Dispatch(size_changed),
 				Dispatch(setmode),
 				Dispatch(getmode),
-				Dispatch(defmode),
-				Dispatch(flush)
+				Dispatch(defmode)
 			},
 		.progMode = FALSE,
 		.hShellMode = INVALID_HANDLE_VALUE,
@@ -68,20 +69,45 @@ static LegacyConsoleInterface legacyCONSOLE =
 		.rmap = NULL,
 		.pairs = {0},
 		.SBI = {},
-		.save_CI = {0}
+		.save_CI = {0},
+
+		Dispatch(napms),
+		Dispatch(termattrs),
+		Dispatch(keypad)
 	};
 NCURSES_EXPORT_VAR(LegacyConsoleInterface *)
 _nc_LEGACYCONSOLE = &legacyCONSOLE;
 
-/* This function flushes the console input buffer. It is called by the main thread when it
- * wants to discard any pending input in the console. The function returns OK on success. */
-METHOD(flush, int)(int fd GCC_UNUSED)
+METHOD(napms,int)(int ms)
 {
-	int code = OK;
-	T((T_CALLED("win32_driver::legacy_flush(fd=%d)"), fd));
-	FlushConsoleInputBuffer(GetStdHandle(STD_INPUT_HANDLE));
+	T((T_CALLED("win32_console::legacy_napms(%d)"), ms));
+	Sleep((DWORD)ms);
+	returnCode(OK);
+}
+
+METHOD(termattrs, chtype)(void)
+{
+	chtype res = A_NORMAL;
+	res |= (A_BOLD | A_DIM | A_REVERSE | A_STANDOUT | A_COLOR);
+	return res;
+}
+
+
+METHOD(keypad, int)(BOOL flag)
+{
+	int code = ERR;
+	SCREEN *sp = ConsoleScreen();
+
+	T((T_CALLED("win32_console::legacy_keypad(%d)"), flag));
+
+	if (sp)
+	{
+		sp->_keypad_on = flag;
+		code = OK;
+	}
 	returnCode(code);
 }
+
 
 /* This function sets the console mode for the input and output handles. It is called by the main thread
  * when it wants to change the console mode. The function takes a TTY structure that contains the desired
@@ -112,7 +138,7 @@ METHOD(setmode, int)(int fd GCC_UNUSED, const TTY *arg)
 			 * what they would expect from a typical command prompt or terminal window, with
 			 * features like line editing and input processing enabled. */
 			mode |= (ENABLE_LINE_INPUT | ENABLE_PROCESSED_INPUT | ENABLE_ECHO_INPUT);
-			mode &= ~(ENABLE_MOUSE_INPUT | ENABLE_WINDOW_INPUT);
+			//mode &= ~(ENABLE_MOUSE_INPUT | ENABLE_WINDOW_INPUT);
 		}
 		else if (arg->kind == TTY_MODE_PROGRAM)
 		{
@@ -478,5 +504,4 @@ METHOD(init, BOOL)(int fdOut, int fdIn)
 	}
 	returnBool(result);
 }
-
 #endif

@@ -354,11 +354,10 @@ _nc_keypad(SCREEN *sp, bool flag)
 	} else
 #endif
 	{
-#if USE_TERM_DRIVER
-	    rc = CallDriver_1(sp, td_kpad, flag);
-	    if (rc == OK)
-		sp->_keypad_on = flag;
-#else
+#if USE_CONSOLE_API
+	    if (IsLegacyConsole()) 
+		return(LEGACYCONSOLE.keypad(flag));
+#endif
 	    if (flag) {
 		(void) NCURSES_PUTP2_FLUSH("keypad_xmit", keypad_xmit);
 	    } else if (keypad_local) {
@@ -371,7 +370,6 @@ _nc_keypad(SCREEN *sp, bool flag)
 	    }
 	    sp->_keypad_on = flag;
 	    rc = OK;
-#endif
 	}
     }
     return (rc);
