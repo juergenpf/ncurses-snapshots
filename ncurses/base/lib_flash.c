@@ -63,19 +63,18 @@ NCURSES_SP_NAME(flash) (NCURSES_SP_DCL0)
     int res = ERR;
 
     T((T_CALLED("flash(%p)"), (void *) SP_PARM));
-#if USE_TERM_DRIVER
-    if (SP_PARM != NULL)
-	res = CallDriver_1(SP_PARM, td_doBeepOrFlash, FALSE);
-#else
-    if (HasTerminal(SP_PARM)) {
-	/* FIXME: should make sure that we are not in altchar mode */
-	if (flash_screen) {
-	    res = NCURSES_PUTP2_FLUSH("flash_screen", flash_screen);
-	} else if (bell) {
-	    res = NCURSES_PUTP2_FLUSH("bell", bell);
-	}
-    }
+#if USE_LEGACY_CONSOLE
+    if (IsLegacyConsole())
+        returnCode(LEGACYCONSOLE.beeporflash(FALSE));
 #endif
+    if (HasTerminal(SP_PARM)) {
+	    /* FIXME: should make sure that we are not in altchar mode */
+	    if (flash_screen) {
+	        res = NCURSES_PUTP2_FLUSH("flash_screen", flash_screen);
+	    } else if (bell) {
+	        res = NCURSES_PUTP2_FLUSH("bell", bell);
+	    }
+    }
     returnCode(res);
 }
 

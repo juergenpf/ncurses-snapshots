@@ -328,9 +328,6 @@ NCURSES_SP_NAME(newterm) (NCURSES_SP_DCLx
 	    SP_PARM->_keytry = NULL;
 
 	    /* compute movement costs so we can do better move optimization */
-#if USE_TERM_DRIVER
-	    TCBOf(SP_PARM)->drv->td_scinit(SP_PARM);
-#else /* ! USE_TERM_DRIVER */
 	    /*
 	     * Check for mismatched graphic-rendition capabilities.  Most SVr4
 	     * terminfo trees contain entries that have rmul or rmso equated to
@@ -352,7 +349,6 @@ NCURSES_SP_NAME(newterm) (NCURSES_SP_DCLx
 
 	    /* initialize terminal to a sane state */
 	    _nc_screen_init();
-#endif /* USE_TERM_DRIVER */
 
 	    /* Initialize the terminal line settings. */
 	    _nc_initscr(NCURSES_SP_ARG);

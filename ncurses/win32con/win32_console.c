@@ -49,6 +49,7 @@ METHOD(AdjustSize,BOOL)(void);
 METHOD(napms, int)(int ms);
 METHOD(termattrs, chtype)(void);
 METHOD(keypad, int)(BOOL flag);
+METHOD(beeporflash, int)(BOOL beep);
 
 static LegacyConsoleInterface legacyCONSOLE =
 	{
@@ -74,10 +75,16 @@ static LegacyConsoleInterface legacyCONSOLE =
 		Dispatch(AdjustSize),
 		Dispatch(napms),
 		Dispatch(termattrs),
-		Dispatch(keypad)
+		Dispatch(keypad),
+		Dispatch(beeporflash)
+
 	};
 NCURSES_EXPORT_VAR(LegacyConsoleInterface *)
 _nc_LEGACYCONSOLE = &legacyCONSOLE;
+
+#define RevAttr(attr) (WORD)(((attr) & 0xff00) |       \
+							 ((((attr) & 0x07) << 4) | \
+							  (((attr) & 0x70) >> 4)))
 
 METHOD(AdjustSize, BOOL)(void)
 {
@@ -146,6 +153,65 @@ METHOD(keypad, int)(BOOL flag)
 	returnCode(code);
 }
 
+METHOD(beeporflash, int)(BOOL beepFlag)
+{
+	int res = ERR;
+
+	int high = (LEGACYCONSOLE.SBI.srWindow.Bottom -
+				LEGACYCONSOLE.SBI.srWindow.Top + 1);
+	int wide = (LEGACYCONSOLE.SBI.srWindow.Right -
+				LEGACYCONSOLE.SBI.srWindow.Left + 1);
+	int max_cells = (high * wide);
+	int i;
+
+	MakeArray(this_screen, CHAR_INFO, max_cells);
+	MakeArray(that_screen, CHAR_INFO, max_cells);
+	COORD this_size;
+	SMALL_RECT this_region;
+	COORD bufferCoord;
+
+	this_region.Top = LEGACYCONSOLE.SBI.srWindow.Top;
+	this_region.Left = LEGACYCONSOLE.SBI.srWindow.Left;
+	this_region.Bottom = LEGACYCONSOLE.SBI.srWindow.Bottom;
+	this_region.Right = LEGACYCONSOLE.SBI.srWindow.Right;
+
+	this_size.X = (SHORT)wide;
+	this_size.Y = (SHORT)high;
+
+	bufferCoord.X = this_region.Left;
+	bufferCoord.Y = this_region.Top;
+
+	if (!beepFlag &&
+		read_screen(LEGACYCONSOLE.core.ConsoleHandleOut,
+					this_screen,
+					this_size,
+					bufferCoord,
+					&this_region))
+	{
+
+		memcpy(that_screen,
+			   this_screen,
+			   sizeof(CHAR_INFO) * (size_t)max_cells);
+
+		for (i = 0; i < max_cells; i++)
+		{
+			that_screen[i].Attributes =
+				RevAttr(that_screen[i].Attributes);
+		}
+
+		write_screen(LEGACYCONSOLE.core.ConsoleHandleOut, that_screen, this_size,
+					 bufferCoord, &this_region);
+		Sleep(200);
+		write_screen(LEGACYCONSOLE.core.ConsoleHandleOut, this_screen, this_size,
+					 bufferCoord, &this_region);
+	}
+	else
+	{
+		MessageBeep(MB_ICONWARNING); /* MB_OK might be better */
+	}
+	res = OK;
+	return res;
+}
 
 /* This function sets the console mode for the input and output handles. It is called by the main thread
  * when it wants to change the console mode. The function takes a TTY structure that contains the desired

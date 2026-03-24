@@ -876,70 +876,6 @@ wcon_CanHandle(TERMINAL_CONTROL_BLOCK *TCB,
 }
 
 static int
-wcon_dobeepflash(TERMINAL_CONTROL_BLOCK *TCB,
-				 int beepFlag)
-{
-	SCREEN *sp;
-	int res = ERR;
-
-	int high = (LEGACYCONSOLE.SBI.srWindow.Bottom -
-				LEGACYCONSOLE.SBI.srWindow.Top + 1);
-	int wide = (LEGACYCONSOLE.SBI.srWindow.Right -
-				LEGACYCONSOLE.SBI.srWindow.Left + 1);
-	int max_cells = (high * wide);
-	int i;
-
-	MakeArray(this_screen, CHAR_INFO, max_cells);
-	MakeArray(that_screen, CHAR_INFO, max_cells);
-	COORD this_size;
-	SMALL_RECT this_region;
-	COORD bufferCoord;
-
-	SetSP();
-	this_region.Top = LEGACYCONSOLE.SBI.srWindow.Top;
-	this_region.Left = LEGACYCONSOLE.SBI.srWindow.Left;
-	this_region.Bottom = LEGACYCONSOLE.SBI.srWindow.Bottom;
-	this_region.Right = LEGACYCONSOLE.SBI.srWindow.Right;
-
-	this_size.X = (SHORT)wide;
-	this_size.Y = (SHORT)high;
-
-	bufferCoord.X = this_region.Left;
-	bufferCoord.Y = this_region.Top;
-
-	if (!beepFlag &&
-		read_screen(LEGACYCONSOLE.core.ConsoleHandleOut,
-					this_screen,
-					this_size,
-					bufferCoord,
-					&this_region))
-	{
-
-		memcpy(that_screen,
-			   this_screen,
-			   sizeof(CHAR_INFO) * (size_t)max_cells);
-
-		for (i = 0; i < max_cells; i++)
-		{
-			that_screen[i].Attributes =
-				RevAttr(that_screen[i].Attributes);
-		}
-
-		write_screen(LEGACYCONSOLE.core.ConsoleHandleOut, that_screen, this_size,
-					 bufferCoord, &this_region);
-		Sleep(200);
-		write_screen(LEGACYCONSOLE.core.ConsoleHandleOut, this_screen, this_size,
-					 bufferCoord, &this_region);
-	}
-	else
-	{
-		MessageBeep(MB_ICONWARNING); /* MB_OK might be better */
-	}
-	res = OK;
-	return res;
-}
-
-static int
 wcon_print(TERMINAL_CONTROL_BLOCK *TCB,
 		   char *data GCC_UNUSED,
 		   int len GCC_UNUSED)
@@ -965,15 +901,6 @@ wcon_rescol(TERMINAL_CONTROL_BLOCK *TCB)
 	return res;
 }
 
-static void
-wcon_screen_init(SCREEN *sp GCC_UNUSED)
-{
-}
-
-static void
-wcon_wrap(SCREEN *sp GCC_UNUSED)
-{
-}
 
 static void
 wcon_release(TERMINAL_CONTROL_BLOCK *TCB)
@@ -1686,7 +1613,6 @@ _nc_WIN_DRIVER = {
 	wcon_rescol,		/* rescol        */
 	wcon_rescolors,		/* rescolors     */
 	wcon_setcolor,		/* color         */
-	wcon_dobeepflash,	/* DoBeepFlash   */
 	wcon_initpair,		/* initpair      */
 	wcon_initcolor,		/* initcolor     */
 	wcon_do_color,		/* docolor       */
@@ -1697,8 +1623,6 @@ _nc_WIN_DRIVER = {
 	wcon_print,			/* print         */
 	wcon_setsize,		/* setsize       */
 	wcon_initacs,		/* initacs       */
-	wcon_screen_init,	/* scinit        */
-	wcon_wrap,			/* scexit        */
 	wcon_twait,			/* twait         */
 	wcon_read,			/* read          */
 	wcon_keyok,			/* kyOk          */

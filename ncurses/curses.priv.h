@@ -2488,7 +2488,6 @@ typedef struct term_driver {
     bool   (*td_rescol)(struct DriverTCB*);
     bool   (*td_rescolors)(struct DriverTCB*);
     void   (*td_color)(struct DriverTCB*, int fore, int color, int(*)(SCREEN*, int));
-    int    (*td_doBeepOrFlash)(struct DriverTCB*, int);
     void   (*td_initpair)(struct DriverTCB*, int, int, int);
     void   (*td_initcolor)(struct DriverTCB*, int, int, int, int);
     void   (*td_docolor)(struct DriverTCB*, int, int, int, int(*)(SCREEN*, int));
@@ -2499,8 +2498,6 @@ typedef struct term_driver {
     int    (*td_print)(struct DriverTCB*, char*, int);
     int    (*td_setsize)(struct DriverTCB*, int, int);
     void   (*td_initacs)(struct DriverTCB*, chtype*, chtype*);
-    void   (*td_scinit)(SCREEN *);
-    void   (*td_scexit)(SCREEN *);
     int    (*td_twait)(struct DriverTCB*, int, int, int* EVENTLIST_2nd(_nc_eventlist*));
     int    (*td_read)(struct DriverTCB*, int*);
     int    (*td_kyOk)(struct DriverTCB*, int, int);
@@ -2725,12 +2722,29 @@ typedef struct {
     int (*napms)(int ms);                     // Pointer to the napms function used by the legacy console.
     chtype (*termattrs)(void);                // Pointer to the termattrs function used by the legacy console.
     int (*keypad)(BOOL);                      // Pointer to the keypad function used by the legacy console.
+    int (*beeporflash)(BOOL);                 // Pointer to the beep or flash function used by the legacy console.
 } LegacyConsoleInterface;
 extern NCURSES_EXPORT_VAR(LegacyConsoleInterface *) _nc_LEGACYCONSOLE;
 #define LEGACYCONSOLE (*_nc_LEGACYCONSOLE)
+
+#if USE_WIDEC_SUPPORT
+#define write_screen WriteConsoleOutputW
+#define read_screen  ReadConsoleOutputW
+#define read_keycode ReadConsoleInputW
+#define KeyEventChar KeyEvent.uChar.UnicodeChar
+#define CharInfoChar Char.UnicodeChar
+#else
+#define write_screen WriteConsoleOutput
+#define read_screen  ReadConsoleOutput
+#define read_keycode ReadConsoleInput
+#define KeyEventChar KeyEvent.uChar.AsciiChar
+#define CharInfoChar Char.AsciiChar
+#endif /* USE_WIDEC_SUPPORT */
+
 #endif /* USE_LEGACY_CONSOLE */
 
 #if USE_MODERN_CONSOLE
+
 #if !defined(POLLIN)
 # define POLLIN  0x0001  // Input available (for stdin/pipe)
 # define POLLOUT 0x0004  // Output available (for stdout/pipe, optional)
@@ -2762,6 +2776,7 @@ typedef struct {
 extern NCURSES_EXPORT_VAR(ConPtyInterface*) _nc_currentCONPTY;
 #define WINCONPTY (*_nc_currentCONPTY)
 #endif /* USE_MODERN_CONSOLE */
+
 #endif /* USE_CONSOLE_API */
 
 /*
@@ -2857,21 +2872,6 @@ extern NCURSES_EXPORT(int) _nc_conv_to_utf8(unsigned char *, unsigned, unsigned)
 extern NCURSES_EXPORT(int) _nc_conv_to_utf32(unsigned *, const char *, unsigned);
 #endif
 
-#if USE_LEGACY_CONSOLE
-#if USE_WIDEC_SUPPORT
-#define write_screen WriteConsoleOutputW
-#define read_screen  ReadConsoleOutputW
-#define read_keycode ReadConsoleInputW
-#define KeyEventChar KeyEvent.uChar.UnicodeChar
-#define CharInfoChar Char.UnicodeChar
-#else
-#define write_screen WriteConsoleOutput
-#define read_screen  ReadConsoleOutput
-#define read_keycode ReadConsoleInput
-#define KeyEventChar KeyEvent.uChar.AsciiChar
-#define CharInfoChar Char.AsciiChar
-#endif
-#endif /* USE_LEGACY_CONSOLE */
 
 #ifdef __cplusplus
 }

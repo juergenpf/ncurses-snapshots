@@ -254,36 +254,6 @@ drv_CanHandle(TERMINAL_CONTROL_BLOCK * TCB, const char *tname, int *errret)
     returnBool(result);
 }
 
-static int
-drv_dobeepflash(TERMINAL_CONTROL_BLOCK * TCB, int beepFlag)
-{
-    SCREEN *sp;
-    int res = ERR;
-
-    AssertTCB();
-    SetSP();
-
-    /* FIXME: should make sure that we are not in altchar mode */
-    if (beepFlag) {
-	if (bell) {
-	    res = NCURSES_PUTP2("bell", bell);
-	    NCURSES_SP_NAME(_nc_flush) (sp);
-	} else if (flash_screen) {
-	    res = NCURSES_PUTP2("flash_screen", flash_screen);
-	    NCURSES_SP_NAME(_nc_flush) (sp);
-	}
-    } else {
-	if (flash_screen) {
-	    res = NCURSES_PUTP2("flash_screen", flash_screen);
-	    NCURSES_SP_NAME(_nc_flush) (sp);
-	} else if (bell) {
-	    res = NCURSES_PUTP2("bell", bell);
-	    NCURSES_SP_NAME(_nc_flush) (sp);
-	}
-    }
-    return res;
-}
-
 /*
  * SVr4 curses is known to interchange color codes (1,4) and (3,6), possibly
  * to maintain compatibility with a pre-ANSI scheme.  The same scheme is
@@ -545,7 +515,6 @@ drv_size(TERMINAL_CONTROL_BLOCK * TCB, int *linep, int *colp)
     return OK;
 }
 
-
 static int
 drv_setsize(TERMINAL_CONTROL_BLOCK * TCB, int l, int c)
 {
@@ -555,61 +524,9 @@ drv_setsize(TERMINAL_CONTROL_BLOCK * TCB, int l, int c)
     return OK;
 }
 
-
-static void
-drv_wrap(SCREEN *sp)
-{
-    if (sp) {
-	sp->_mouse_wrap(sp);
-	NCURSES_SP_NAME(_nc_screen_wrap) (sp);
-	NCURSES_SP_NAME(_nc_mvcur_wrap) (sp);	/* wrap up cursor addressing */
-    }
-}
-
 static void
 drv_release(TERMINAL_CONTROL_BLOCK * TCB GCC_UNUSED)
 {
-}
-
-#  define SGR0_TEST(mode) (mode != NULL) && (exit_attribute_mode == NULL || strcmp(mode, exit_attribute_mode))
-
-static void
-drv_screen_init(SCREEN *sp)
-{
-    TERMINAL_CONTROL_BLOCK *TCB = TCBOf(sp);
-
-    AssertTCB();
-
-    /*
-     * Check for mismatched graphic-rendition capabilities.  Most SVr4
-     * terminfo trees contain entries that have rmul or rmso equated to
-     * sgr0 (Solaris curses copes with those entries).  We do this only
-     * for curses, since many termcap applications assume that
-     * smso/rmso and smul/rmul are paired, and will not function
-     * properly if we remove rmso or rmul.  Curses applications
-     * shouldn't be looking at this detail.
-     */
-    sp->_use_rmso = SGR0_TEST(exit_standout_mode);
-    sp->_use_rmul = SGR0_TEST(exit_underline_mode);
-
-    /*
-     * Check whether we can optimize scrolling under dumb terminals in
-     * case we do not have any of these capabilities, scrolling
-     * optimization will be useless.
-     */
-    sp->_scrolling = ((scroll_forward && scroll_reverse) ||
-		      ((parm_rindex ||
-			parm_insert_line ||
-			insert_line) &&
-		       (parm_index ||
-			parm_delete_line ||
-			delete_line)));
-
-    NCURSES_SP_NAME(baudrate) (sp);
-
-    NCURSES_SP_NAME(_nc_mvcur_init) (sp);
-    /* initialize terminal to a sane state */
-    NCURSES_SP_NAME(_nc_screen_init) (sp);
 }
 
 static void
@@ -1165,7 +1082,6 @@ NCURSES_EXPORT_VAR (TERM_DRIVER) _nc_TINFO_DRIVER = {
 	drv_rescol,		/* rescol */
 	drv_rescolors,		/* rescolors */
 	drv_setcolor,		/* color */
-	drv_dobeepflash,	/* doBeepOrFlash */
 	drv_initpair,		/* initpair */
 	drv_initcolor,		/* initcolor */
 	drv_do_color,		/* docolor */
@@ -1176,8 +1092,6 @@ NCURSES_EXPORT_VAR (TERM_DRIVER) _nc_TINFO_DRIVER = {
 	drv_print,		/* print */
 	drv_setsize,		/* setsize */
 	drv_initacs,		/* initacs */
-	drv_screen_init,	/* scinit */
-	drv_wrap,		/* scexit */
 	drv_twait,		/* twait  */
 	drv_read,		/* read */
 	drv_keyok,		/* kyOk */
