@@ -153,7 +153,7 @@ NCURSES_SP_NAME(cbreak) (NCURSES_SP_DCL0)
 	buf.c_cc[VMIN] = 1;
 	buf.c_cc[VTIME] = 0;
 #elif USE_CONSOLE_API
-	buf.dwFlagIn &= (unsigned long) ~(ENABLE_PROCESSED_INPUT | ENABLE_LINE_INPUT);
+	buf.dwFlagIn &= (unsigned long) ~(ENABLE_PROCESSED_INPUT | ENABLE_LINE_INPUT | ENABLE_QUICK_EDIT_MODE);
 #else
 	buf.sg_flags |= CBREAK;
 #endif

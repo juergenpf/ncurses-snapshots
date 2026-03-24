@@ -38,6 +38,7 @@ MODULE_ID("$Id$")
 #if USE_CONSOLE_API
 
 #include <winternl.h>
+#include <locale.h>
 
 /* AKA Windows 10 version 1809, which is the first version that introduced ConPTY.
  * We check for this version or higher to ensure that ConPTY is available, which is
@@ -148,7 +149,7 @@ has_limiuted_resize(void)
     if (!get_real_windows_version(&major, &minor, &build)) {
 	T(("RtlGetVersion failed"));
     } else {
-	result = (major >= 10) ? TRUE : FALSE; 
+	result = (major >= 10) ? FALSE : TRUE; 
     }
     return result;
 }
@@ -193,6 +194,66 @@ flush_input(int fd GCC_UNUSED)
 	returnCode(code);
 }
 
+#define CP_UTF8 65001
+
+/* MSVCRT doesn't support UTF-8 locales, but UCRT does. However, even with UCRT we can't rely
+ * on the locale being set to UTF-8 by default, so we need to set the code page explicitly for
+ * the console to ensure that it uses UTF-8 encoding.
+ * With UCRT, we enforce to use a proper UTF-8 capable locale, to ensure that the console can
+ * display and classify characters properly. */
+static void
+encoding_init(void)
+{
+#if defined(_UCRT)
+    char *newlocale = NULL;
+#endif
+    char *cur_loc = NULL;
+    char localebuf[16];
+    UINT cp;
+#if USE_WIDEC_SUPPORT
+    cp = CP_UTF8;
+#else
+    WCHAR buf[16];
+    /* We query the system for the default ANSI code page */
+    int len = GetLocaleInfoEx(
+				 LOCALE_NAME_SYSTEM_DEFAULT,
+				 LOCALE_IDEFAULTANSICODEPAGE,
+				 buf,
+				 16);
+    if (len > 0)
+	cp = (UINT) _wtoi(buf);
+    else
+	cp = 1252;		/* last line of defense if GetLocaleInfoEx fails is to assume a
+				 * reasonable default code page, which is the most common ANSI code
+				 * page on Western systems. This is not ideal, but there isn't much
+				 * else we can do in this case, and it at least allows the console
+				 * to function with a reasonable character set in most cases. */
+#endif
+    snprintf(localebuf, sizeof(localebuf), ".%u", cp);
+    cur_loc = setlocale(LC_CTYPE, NULL);
+
+    T((T_CALLED("lib_win32conpty::encoding_init() - code page will be set to %u"), cp));
+    T(("conpty Current locale: %s", cur_loc ? cur_loc : "NULL"));
+#if defined(_UCRT)
+    T(("conpty using UCRT"));
+
+    T(("conpty: Try setting locale according to desired codepage %s", localebuf));
+    newlocale = setlocale(LC_CTYPE, localebuf);
+    T(("conpty setlocale() result locale is %s", newlocale ? newlocale :
+       "NULL"));
+
+    cur_loc = setlocale(LC_CTYPE, NULL);
+    T(("conpty Current locale now %s, code page %u", cur_loc ? cur_loc :
+       "NULL", cp));
+#else
+    T(("conpty: Not using UCRT - relying on current locale for code page handling"));
+#endif /* defined(_UCRT ) */
+
+    SetConsoleCP(cp);
+    SetConsoleOutputCP(cp);
+}
+
+
 NCURSES_EXPORT(BOOL)
 _nc_console_setup(void) {
 	BOOL res = FALSE;
@@ -203,12 +264,33 @@ _nc_console_setup(void) {
 #if USE_MODERN_CONSOLE
 		_nc_CORECONSOLE = & (WINCONPTY.core);
 		status |= CONSOLE_STATUS_IS_CONPTY;
+		/* Especially with UCRT and wide mode, make sure we use an UTF-8 capable locale.
+	 	 * At least we set the codepage to a proper value that's either compatible with
+	 	 * ASCII or UTF-8, to ensure that the console can display characters properly.
+	 	 * The actual locale setting is not that important, as long as the code page is set
+	 	 * correctly, because we handle UTF-8 encoding and decoding ourselves and we don't
+	 	 * rely on the C runtime for that. */
+		encoding_init();
 #endif
 	} else {
 #if USE_LEGACY_CONSOLE
+		HWND hwnd = GetConsoleWindow();
+		LONG style = GetWindowLong(hwnd, GWL_STYLE);
+		style &= ~(WS_SIZEBOX | WS_MAXIMIZEBOX);
+		T(("lib_win32concore::_nc_console_setup - Legacy console detected, disabling resizing"));
+		SetWindowLong(hwnd, GWL_STYLE, style);
 		_nc_CORECONSOLE = & (LEGACYCONSOLE.core);
 		if (has_limiuted_resize()) {
+			T(("lib_win32concore::_nc_console_setup - Legacy console has resize limitations"));
 			status |= CONSOLE_STATUS_LIMITED_RESIZE;
+		} else {
+			CONSOLE_SCREEN_BUFFER_INFO csbi;
+			if (GetConsoleScreenBufferInfo(GetStdHandle(STD_OUTPUT_HANDLE), &csbi)) {
+			    COORD newSize;
+			    newSize.X = (short)(csbi.srWindow.Right - csbi.srWindow.Left + 1);
+			    newSize.Y = (short)(csbi.srWindow.Bottom - csbi.srWindow.Top + 1);
+			    SetConsoleScreenBufferSize(LEGACYCONSOLE.core.ConsoleHandleOut, newSize);
+			}
 		}
 #endif
 	}
@@ -225,6 +307,7 @@ _nc_console_setup(void) {
 
 		CORECONSOLE.getSBI = get_sbi;
 		CORECONSOLE.flush = flush_input;
+
 
 		res = TRUE;
 	}

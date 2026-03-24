@@ -36,7 +36,6 @@ MODULE_ID("$Id$")
 
 #if defined(_NC_WINDOWS_NATIVE) && USE_MODERN_CONSOLE
 #include <windows.h>
-#include <locale.h>
 #include <stdio.h>
 #include <string.h>
 #include <io.h>
@@ -143,66 +142,6 @@ static unsigned __stdcall input_thread(LPVOID param);
 
 // ---------------------------------------------------------------------------------------
 
-#define CP_UTF8 65001
-
-/* MSVCRT doesn't support UTF-8 locales, but UCRT does. However, even with UCRT we can't rely
- * on the locale being set to UTF-8 by default, so we need to set the code page explicitly for
- * the console to ensure that it uses UTF-8 encoding.
- * With UCRT, we enforce to use a proper UTF-8 capable locale, to ensure that the console can
- * display and classify characters properly. */
-static void
-encoding_init(void)
-{
-#if defined(_UCRT)
-    char *newlocale = NULL;
-#endif
-    char *cur_loc = NULL;
-    char localebuf[16];
-    UINT cp;
-#if USE_WIDEC_SUPPORT
-    cp = CP_UTF8;
-#else
-    WCHAR buf[16];
-    /* We query the system for the default ANSI code page */
-    int len = GetLocaleInfoEx(
-				 LOCALE_NAME_SYSTEM_DEFAULT,
-				 LOCALE_IDEFAULTANSICODEPAGE,
-				 buf,
-				 16);
-    if (len > 0)
-	cp = (UINT) _wtoi(buf);
-    else
-	cp = 1252;		/* last line of defense if GetLocaleInfoEx fails is to assume a
-				 * reasonable default code page, which is the most common ANSI code
-				 * page on Western systems. This is not ideal, but there isn't much
-				 * else we can do in this case, and it at least allows the console
-				 * to function with a reasonable character set in most cases. */
-#endif
-    snprintf(localebuf, sizeof(localebuf), ".%u", cp);
-    cur_loc = setlocale(LC_CTYPE, NULL);
-
-    T((T_CALLED("lib_win32conpty::encoding_init() - code page will be set to %u"), cp));
-    T(("conpty Current locale: %s", cur_loc ? cur_loc : "NULL"));
-#if defined(_UCRT)
-    T(("conpty using UCRT"));
-
-    T(("conpty: Try setting locale according to desired codepage %s", localebuf));
-    newlocale = setlocale(LC_CTYPE, localebuf);
-    T(("conpty setlocale() result locale is %s", newlocale ? newlocale :
-       "NULL"));
-
-    cur_loc = setlocale(LC_CTYPE, NULL);
-    T(("conpty Current locale now %s, code page %u", cur_loc ? cur_loc :
-       "NULL", cp));
-#else
-    T(("conpty: Not using UCRT - relying on current locale for code page handling"));
-#endif /* defined(_UCRT ) */
-
-    SetConsoleCP(cp);
-    SetConsoleOutputCP(cp);
-}
-
-
 /* This initializaton function can be called multiple time, and actually it is called from within
  * setupterm() the first time and potentially if we enter ncurses from newterm() the next time.
  * The main purpose is to initialize the defaultCONPTY structure when called the first time. The
@@ -260,14 +199,6 @@ METHOD(init, BOOL) (int fdOut, int fdIn)
 	    T(("In the first call fdIn is expected to be -1."));
 	    returnBool(FALSE);
 	}
-
-	/* Especially with UCRT and wide mode, make sure we use an UTF-8 capable locale.
-	 * At least we set the codepage to a proper value that's either compatible with
-	 * ASCII or UTF-8, to ensure that the console can display characters properly.
-	 * The actual locale setting is not that important, as long as the code page is set
-	 * correctly, because we handle UTF-8 encoding and decoding ourselves and we don't
-	 * rely on the C runtime for that. */
-	encoding_init();
 
 	if (stdout_hdl == INVALID_HANDLE_VALUE || GetConsoleMode(stdout_hdl,
 								 &dwFlag) == 0) {

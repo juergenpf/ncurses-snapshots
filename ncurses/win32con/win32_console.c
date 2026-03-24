@@ -85,29 +85,35 @@ METHOD(AdjustSize, BOOL)(void)
     COORD newSize;
     CONSOLE_SCREEN_BUFFER_INFO csbi;
     
-	if (HasConsoleResizeLimitations()) {
-		return res;
-	}
+    T((T_CALLED("win32_console::legacy_AdjustSize()")));
 
-	/*
-	* This piece is just for Windows 10 before the introduction of the new console:.
-	* In older Versions of Windows (before Windows 10), the conhost behaves differently 
-	* when resizing the console window. 
-	*/
+    if (HasConsoleResizeLimitations()) {
+	T(("Console has resize limitations, skipping AdjustSize"));
+	returnBool(res);
+    }
+
+    /*
+     * This piece is just for Windows 10 before the introduction of the new console:.
+     * In older Versions of Windows (before Windows 10), the conhost behaves differently 
+     * when resizing the console window. 
+     */
     if (!GetConsoleScreenBufferInfo(LEGACYCONSOLE.core.ConsoleHandleOut, &csbi)) {
-        return res;
+        T(("GetConsoleScreenBufferInfo failed"));
+        returnBool(res);
     }
 
     newSize.X = (short)(csbi.srWindow.Right - csbi.srWindow.Left + 1);
     newSize.Y = (short)(csbi.srWindow.Bottom - csbi.srWindow.Top + 1);
 
+    T(("New console size: %d x %d", newSize.X, newSize.Y));
     SetConsoleScreenBufferSize(LEGACYCONSOLE.core.ConsoleHandleOut, newSize);
+
     LEGACYCONSOLE.core.getSBI(&(LEGACYCONSOLE.SBI));
     LEGACYCONSOLE.core.sbi_lines = newSize.Y;
     LEGACYCONSOLE.core.sbi_cols = newSize.X;
     res = TRUE;
 
-    return res;
+    returnBool(res);
 }
 
 METHOD(napms,int)(int ms)
@@ -457,6 +463,7 @@ METHOD(init, BOOL)(int fdOut, int fdIn)
 		}
 		LEGACYCONSOLE.core.ttyflags.dwFlagOut = dwFlagOut;
 
+		dwFlagIn &= ~(ENABLE_QUICK_EDIT_MODE);
 		SetConsoleMode(stdin_handle, dwFlagIn);
 		/* We immediately read the console mode back to reflect any changes the
 		 * runtime may have added, so the saved value reflects the actual mode
