@@ -50,7 +50,7 @@ MODULE_ID("$Id$")
 
 typedef NTSTATUS(WINAPI * RtlGetVersionPtr) (PRTL_OSVERSIONINFOW);
 
-static bool
+static BOOL
 get_real_windows_version(DWORD * major, DWORD * minor, DWORD * build)
 {
     HMODULE ntdll = GetModuleHandle(TEXT("ntdll.dll"));
@@ -71,11 +71,11 @@ get_real_windows_version(DWORD * major, DWORD * minor, DWORD * build)
 		*major = osvi.dwMajorVersion;
 		*minor = osvi.dwMinorVersion;
 		*build = osvi.dwBuildNumber;
-		return true;
+		return TRUE;
 	    }
 	}
     }
-    return false;
+    return FALSE;
 }
 
 /* Check if the current Windows version supports ConPTY.
@@ -138,6 +138,7 @@ conpty_supported(void)
     returnBool(result);
 }
 
+#if USE_LEGACY_CONSOLE
 static BOOL
 has_limiuted_resize(void)
 {
@@ -151,6 +152,7 @@ has_limiuted_resize(void)
     }
     return result;
 }
+#endif /* USE_LEGACY_CONSOLE */
 
 NCURSES_EXPORT_VAR(ConsoleCoreInterface*) 
 _nc_CORECONSOLE = NULL;
@@ -200,13 +202,13 @@ _nc_console_setup(void) {
 	if (conpty_supported()) {
 #if USE_MODERN_CONSOLE
 		_nc_CORECONSOLE = & (WINCONPTY.core);
-		status |= CONSOLE_FLAG_IS_CONPTY;
+		status |= CONSOLE_STATUS_IS_CONPTY;
 #endif
 	} else {
 #if USE_LEGACY_CONSOLE
 		_nc_CORECONSOLE = & (LEGACYCONSOLE.core);
 		if (has_limiuted_resize()) {
-			status |= CONSOLE_FLAG_LIMITED_RESIZE;
+			status |= CONSOLE_STATUS_LIMITED_RESIZE;
 		}
 #endif
 	}
@@ -229,4 +231,13 @@ _nc_console_setup(void) {
 	returnBool(res);
 }
 
+NCURSES_EXPORT(int)
+_nc_console_gettty(int fd, ConsoleMode *buf) {
+	return CORECONSOLE.getmode(fd, buf);
+}
+
+NCURSES_EXPORT(int)
+_nc_console_settty(int fd, ConsoleMode *buf) {
+	return CORECONSOLE.setmode(fd, buf);
+}
 #endif // _NC_WINDOWS_NATIVE

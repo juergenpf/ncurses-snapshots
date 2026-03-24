@@ -380,7 +380,7 @@ NCURSES_SP_NAME(termattrs) (NCURSES_SP_DCL0)
     T((T_CALLED("termattrs(%p)"), (void *) SP_PARM));
 
     if (HasTerminal(SP_PARM)) {
-#if USE_CONSOLE_API
+#if USE_LEGACY_CONSOLE
 	if (IsLegacyConsole())
 	    returnChtype(LEGACYCONSOLE.termattrs());
 #endif

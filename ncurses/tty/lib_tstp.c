@@ -302,6 +302,9 @@ _nc_set_read_thread(bool enable)
 
 #if USE_SIGWINCH
 
+#if USE_CONSOLE_API
+GCC_UNUSED
+#endif
 static void
 handle_SIGWINCH(int sig GCC_UNUSED)
 {

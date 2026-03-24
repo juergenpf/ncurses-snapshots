@@ -93,11 +93,6 @@ static ConPtyInterface defaultCONPTY =
 NCURSES_EXPORT_VAR (ConPtyInterface *)
   _nc_currentCONPTY = &defaultCONPTY;
 
-#if !USE_LEGACY_CONSOLE
-NCURSES_EXPORT_VAR (LegacyConsoleInterface *)
-  _nc_LEGACYCONSOLE = NULL;
-#endif
-
 // ----------------------- The Input Subsystem ----------------------------------------------
 /* In order to stay strictly in the pipe I/O model of the Windows Console, we need to have
  * a dedicated thread that is responsible for reading input from the console handle and

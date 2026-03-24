@@ -116,37 +116,11 @@
                       : DEFAULT_TERM_ENV), \
          NonEmpty(term_env))
 
-#if  defined(USE_WIN32CON_DRIVER)
-  /*
-   * Various Console mode definitions
-   */
-
-  /* Flags to enable virtual Terminal processing */
-#define VT_FLAG_OUT ENABLE_VIRTUAL_TERMINAL_PROCESSING
-#define VT_FLAG_IN  ENABLE_VIRTUAL_TERMINAL_INPUT
-
-  /* Default flags for input/output modes */
-#define CONMODE_IN_DEFAULT (ENABLE_LINE_INPUT | ENABLE_PROCESSED_INPUT | ENABLE_WINDOW_INPUT | ENABLE_MOUSE_INPUT)
-#define CONMODE_OUT_DEFAULT (ENABLE_PROCESSED_OUTPUT | DISABLE_NEWLINE_AUTO_RETURN | ENABLE_LVB_GRID_WORLDWIDE)
-
-  /* Flags to reset from RAW/CBREAK */
-#define CONMODE_NORAW    (ENABLE_PROCESSED_INPUT|ENABLE_LINE_INPUT)
-#define CONMODE_NOCBREAK (ENABLE_LINE_INPUT)
-#endif /* USE_WIN32CON_DRIVER */
-
 #include <ncurses_dll.h>
 
 #ifdef __cplusplus
 extern "C" {
 #endif
-
-/*
-* Milliseconds to wait between checks for console resize events. 
-* We don't want to check too often, as that would be wasteful, but we 
-* also don't want to check too rarely, as that would make the UI feel 
-* unresponsive when resizing the console window.
-*/
-#define RESIZE_CHECK_THROTTLING_MS 100
 
 #define TTY_MODE_UNSPECIFIED 0
 #define TTY_MODE_SHELL 1
@@ -167,6 +141,8 @@ typedef struct
     uint8_t kind;          /* 0=unspecified, 1=shell, 2=prog, 3=auto */
 } ConsoleMode;
 
+NCURSES_EXPORT(int) _nc_console_gettty(int fd, ConsoleMode *buf);
+NCURSES_EXPORT(int) _nc_console_settty(int fd, ConsoleMode *buf);
 
 #if defined(CURSES_PRIV_H) || defined(TEST_PRIV_H)
 
@@ -192,106 +168,6 @@ extern NCURSES_EXPORT(int) _nc_wcwidth(uint32_t);
 extern NCURSES_EXPORT(int) _nc_wcswidth(const uint32_t *pwcs, size_t n);
 #endif
 
-// Flags describing certain capabilities of the console.
-#define CONSOLE_FLAG_INITIALIZED 0x0001
-#define CONSOLE_FLAG_IS_CONPTY      0x0002
-#define CONSOLE_FLAG_LIMITED_RESIZE 0x0004
-#define CONSOLE_FLAG_MASK (CONSOLE_FLAG_INITIALIZED | CONSOLE_FLAG_IS_CONPTY | CONSOLE_FLAG_LIMITED_RESIZE)
-typedef struct {
-    // Properties
-    DWORD status;                    /* Certain status flags defined above */
-
-    ConsoleMode ttyflags;            /* The desired state of the console  */
-    
-    HANDLE ConsoleHandleIn;          /* Pseudo-Console Handle actually used for input operations */
-    HANDLE ConsoleHandleOut;         /* Pseudo-Console Handle actually used for output operations */
-
-    int sbi_lines;                   /* Cached console size */
-    int sbi_cols;                    /* Cached console size */
-
-    intptr_t sp;                     /* Screen pointer */
-
-    // Methods
-    BOOL (*init)(int fdOut, int fdIn);                 /* Initialize with I/O file descriptors. fdIn maybe -1 in first call */
-    BOOL (*getSBI)(CONSOLE_SCREEN_BUFFER_INFO *sbi);   /* Get the current console size. Returns FALSE on failure. */
-    void (*size)(int *Lines, int *Cols);               /* Query console size. Safe to be called before init */ 
-    BOOL (*size_changed)(void);                        /* Return TRUE if the console has been resized */
-    int (*setmode)(int fd, const ConsoleMode *arg);    /* Our SET_TTY implementation */
-    int (*getmode)(int fd, ConsoleMode *arg);          /* Our GET_TTY implementation */
-    int (*defmode )(ConsoleMode *arg, short kind);     /* Used by shell-/prog-mode handling to manage start/stop of the I/O subsystem of ncurses */
-    int (*flush)(int fd);                              /* flush the console I/O stream denoted by the file descriptor. Actualy, we only flush the input. */
-} ConsoleCoreInterface;
-
-extern NCURSES_EXPORT_VAR(ConsoleCoreInterface*) _nc_CORECONSOLE;
-#define CORECONSOLE (*_nc_CORECONSOLE)
-#define ConsoleScreen() ((SCREEN*)(intptr_t)CORECONSOLE.sp)
-#define IsConsoleInitialized() (CORECONSOLE.status & CONSOLE_FLAG_INITIALIZED)
-#define MarkConsoleInitialized() (CORECONSOLE.status |= CONSOLE_FLAG_INITIALIZED)
-#define IsConPTY() (CORECONSOLE.status & CONSOLE_FLAG_IS_CONPTY)
-#define IsLegacyConsole() (!(CORECONSOLE.status & CONSOLE_FLAG_IS_CONPTY) )
-#define HasConsoleResizeLimitations() (CORECONSOLE.status & CONSOLE_FLAG_LIMITED_RESIZE)
-
-#if defined(USE_WIN32CON_DRIVER) || @USE_NAMED_PIPES@  /* USE_WIN32CON_DRIVER || USE_NAMED_PIPES */
-#define CON_NUMPAIRS 64
-typedef struct {
-    ConsoleCoreInterface core;
-
-    BOOL progMode;                            // TRUE if we are in prog mode.
-    BOOL reSizeEventPending;                  // TRUE if we have detected a resize event, but haven't processed it yet.
-
-    HANDLE hShellMode;                        // Screebuffer handle in shell mode..
-    HANDLE hProgMode;                         // Screebuffer handle in prog mode..
-    
-    int numButtons;
-    LPDWORD ansi_map;
-    LPDWORD map;
-    LPDWORD rmap;
-    WORD pairs[CON_NUMPAIRS];
-    CONSOLE_SCREEN_BUFFER_INFO SBI;
-    CONSOLE_CURSOR_INFO save_CI;
-
-    BOOL (*AdjustSize)(void);                 // Adjust the console buffer size.
-    int (*napms)(int ms);                     // Pointer to the napms function used by the legacy console.
-    chtype (*termattrs)(void);                // Pointer to the termattrs function used by the legacy console.
-    int (*keypad)(BOOL);                      // Pointer to the keypad function used by the legacy console.
-} LegacyConsoleInterface;
-
-extern NCURSES_EXPORT_VAR(LegacyConsoleInterface *) _nc_LEGACYCONSOLE;
-#define LEGACYCONSOLE (*_nc_LEGACYCONSOLE)
-#endif /* USE_WIN32CON_DRIVER */
-
-#if @USE_NAMED_PIPES@  /* USE_NAMED_PIPES */
-#ifndef POLLIN
-#define POLLIN  0x0001  // Input available (for stdin/pipe)
-#define POLLOUT 0x0004  // Output available (for stdout/pipe, optional)
-#define POLLERR 0x0008  // Error condition (for stdin/pipe)
-#endif /* POLLIN */
-
-// --- Structure similar to UNIX ---
-struct pty_pollfd {
-    int fd;         // only 0 (STDIN) supported)
-    short events;   // events to check
-    short revents;  // returned events
-};
-
-// --- Typ für Anzahl der FDs ---
-typedef unsigned long nfds_t;
-
-typedef struct {
-  // Properties
-    ConsoleCoreInterface core;                                        /* The common part for ConPTY as well as legacy console API*/
-  // Methods
-    int (*read)(int fd, void* result, size_t count);         /* Read bytes from the input stream. */
-    int (*write)(int fd, const void *buf, size_t count);              /* Write bytes to the output stream. */
-    int (*start_input_subsystem)(void);                               /* In prog mode, we control the input stream */
-    int (*stop_input_subsystem)(void);                                /* In shell mode, we leave it to the C runtime */
-    int (*poll)(struct pty_pollfd *fds, nfds_t nfds, int timeout_ms); /* Minimalistic clone of UNIX poll, just polling stdin console input */
-  } ConPtyInterface;
-
-// Guaranteed to be statically initialzed.
-extern NCURSES_EXPORT_VAR(ConPtyInterface*) _nc_currentCONPTY;
-#define WINCONPTY (*_nc_currentCONPTY)
-#endif /* USE_NAMED_PIPES */
 
 #ifdef __cplusplus
 }

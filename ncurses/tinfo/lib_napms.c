@@ -62,7 +62,7 @@ NCURSES_SP_NAME(napms) (NCURSES_SP_DCLx int ms)
     if (ms > MAX_DELAY_MSECS)
 	ms = MAX_DELAY_MSECS;
 
-#if USE_CONSOLE_API
+#if USE_LEGACY_CONSOLE
     if (IsLegacyConsole())
         returnCode(LEGACYCONSOLE.napms(ms));
 #endif

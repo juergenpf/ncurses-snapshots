@@ -32,7 +32,7 @@
 
 #include <curses.priv.h>
 
-#if USE_LEGACY_CONSOLE || 1
+#if USE_LEGACY_CONSOLE
 
 #define DispatchMethod(name) legacy_##name
 #define Dispatch(name) .name = DispatchMethod(name)
@@ -61,8 +61,6 @@ static LegacyConsoleInterface legacyCONSOLE =
 				Dispatch(getmode),
 				Dispatch(defmode)
 			},
-		.progMode = FALSE,
-		.reSizeEventPending = FALSE,
 		.hShellMode = INVALID_HANDLE_VALUE,
 		.hProgMode = INVALID_HANDLE_VALUE,
 		.numButtons = 0,
@@ -236,8 +234,8 @@ METHOD(setmode, int)(int fd GCC_UNUSED, const TTY *arg)
 	if (arg->kind == TTY_MODE_SHELL)
 	{
 		T(("Shell mode set"));
-		if (LEGACYCONSOLE.progMode==TRUE) {
-			LEGACYCONSOLE.progMode = FALSE;
+		if (IsConsoleProgMode()) {
+			ClearConsoleProgMode();
 			if (sp)
 			{
 				_nc_keypad(sp, FALSE);
@@ -260,8 +258,9 @@ METHOD(setmode, int)(int fd GCC_UNUSED, const TTY *arg)
 	else if (arg->kind == TTY_MODE_PROGRAM)
 	{
 		T(("Program mode set"));
-		if (LEGACYCONSOLE.progMode==FALSE) {
-			LEGACYCONSOLE.progMode = TRUE;
+		if (!IsConsoleProgMode())
+		{
+			SetConsoleProgMode();
 			if (sp)
 			{
 				if (sp->_keypad_on)
@@ -336,7 +335,7 @@ METHOD(defmode, int)(TTY *arg, short kind)
 
 	if (realMode == TTY_MODE_AUTO)
 	{
-		realMode = (LEGACYCONSOLE.progMode == TRUE) ? TTY_MODE_PROGRAM : TTY_MODE_SHELL;
+		realMode = IsConsoleProgMode() ? TTY_MODE_PROGRAM : TTY_MODE_SHELL;
 	}
 
 	arg->kind = realMode;
@@ -360,11 +359,11 @@ METHOD(size_changed, BOOL)(void)
 	BOOL resized = FALSE;
 	T((T_CALLED("win32_console::legacy_size_changed()")));
 
-	if (LEGACYCONSOLE.reSizeEventPending)
+	if (HasConsolePendingResize())
 	{
 		T(("Resize event pending, returning TRUE"));
 		resized = TRUE;
-		LEGACYCONSOLE.reSizeEventPending = FALSE;
+		ClearConsoleResizeLimitations();
 		_nc_globals.have_sigwinch = 1;
 	}
 	returnBool(resized);
@@ -503,4 +502,4 @@ METHOD(init, BOOL)(int fdOut, int fdIn)
 	}
 	returnBool(result);
 }
-#endif
+#endif /* USE_LEGACY_CONSOLE */

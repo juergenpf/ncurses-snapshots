@@ -354,7 +354,7 @@ _nc_keypad(SCREEN *sp, bool flag)
 	} else
 #endif
 	{
-#if USE_CONSOLE_API
+#if USE_LEGACY_CONSOLE
 	    if (IsLegacyConsole()) 
 		return(LEGACYCONSOLE.keypad(flag));
 #endif

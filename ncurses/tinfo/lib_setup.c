@@ -633,7 +633,7 @@ _nc_update_screensize(SCREEN *sp)
     int old_cols;
     TERMINAL *termp = cur_term;
 
-#if USE_CONSOLE_API
+#if USE_LEGACY_CONSOLE
     assert(sp != NULL);
     if (IsLegacyConsole()) {
 	old_lines = CORECONSOLE.sbi_lines;
@@ -643,7 +643,7 @@ _nc_update_screensize(SCREEN *sp)
 #endif
        old_lines = lines;
        old_cols = columns;
-#if USE_CONSOLE_API
+#if USE_LEGACY_CONSOLE
    }
 #endif
 

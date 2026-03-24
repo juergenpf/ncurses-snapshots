@@ -38,7 +38,7 @@
  */
 #include <curses.priv.h>
 
-#if USE_LEGACY_CONSOLE || 1
+#if USE_LEGACY_CONSOLE
 #include <windows.h>
 
 #define CUR TerminalType(my_term).
@@ -1338,7 +1338,7 @@ static void handle_resize()
 {
 	if (console_initialized)
 	{
-		LEGACYCONSOLE.reSizeEventPending = TRUE;
+		SetConsolePendingResize();
 	}
 }
 
@@ -1705,4 +1705,4 @@ _nc_WIN_DRIVER = {
 	wcon_kyExist,		/* kyExist       */
 	wcon_cursorSet		/* cursorSet     */
 };
-#endif
+#endif /* USE_LEGACY_CONSOLE */
