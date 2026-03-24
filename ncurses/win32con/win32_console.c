@@ -45,6 +45,7 @@ METHOD(size_changed, BOOL)(void);
 METHOD(getmode, int)(int fd GCC_UNUSED, TTY *arg);
 METHOD(setmode, int)(int fd GCC_UNUSED, const TTY *arg);
 METHOD(defmode, int)(TTY *arg, short kind);
+METHOD(AdjustSize,BOOL)(void);
 METHOD(napms, int)(int ms);
 METHOD(termattrs, chtype)(void);
 METHOD(keypad, int)(BOOL flag);
@@ -61,6 +62,7 @@ static LegacyConsoleInterface legacyCONSOLE =
 				Dispatch(defmode)
 			},
 		.progMode = FALSE,
+		.reSizeEventPending = FALSE,
 		.hShellMode = INVALID_HANDLE_VALUE,
 		.hProgMode = INVALID_HANDLE_VALUE,
 		.numButtons = 0,
@@ -71,12 +73,35 @@ static LegacyConsoleInterface legacyCONSOLE =
 		.SBI = {},
 		.save_CI = {0},
 
+		Dispatch(AdjustSize),
 		Dispatch(napms),
 		Dispatch(termattrs),
 		Dispatch(keypad)
 	};
 NCURSES_EXPORT_VAR(LegacyConsoleInterface *)
 _nc_LEGACYCONSOLE = &legacyCONSOLE;
+
+METHOD(AdjustSize, BOOL)(void)
+{
+    BOOL res = FALSE;
+    COORD newSize;
+    CONSOLE_SCREEN_BUFFER_INFO csbi;
+    
+    if (!GetConsoleScreenBufferInfo(LEGACYCONSOLE.core.ConsoleHandleOut, &csbi)) {
+        return res;
+    }
+
+    newSize.X = (short)(csbi.srWindow.Right - csbi.srWindow.Left + 1);
+    newSize.Y = (short)(csbi.srWindow.Bottom - csbi.srWindow.Top + 1);
+
+    SetConsoleScreenBufferSize(LEGACYCONSOLE.core.ConsoleHandleOut, newSize);
+    LEGACYCONSOLE.core.getSBI(&(LEGACYCONSOLE.SBI));
+    LEGACYCONSOLE.core.sbi_lines = newSize.Y;
+    LEGACYCONSOLE.core.sbi_cols = newSize.X;
+    res = TRUE;
+
+    return res;
+}
 
 METHOD(napms,int)(int ms)
 {
@@ -321,46 +346,51 @@ METHOD(size, void)(int *Lines, int *Cols)
 	}
 }
 
-/* Check if the Windows Console has been resized. Returns TRUE if a resize was detected.
- * We implement a simple throttling to ensure that we don't call GetConsoleScreenBufferInfo
- * too often, which could become expensive in a pseudo-console context because it involves
- * a round trip to the ConPTY backend. The throttling is implemented by keeping	 track of the
- * last time we checked for a resize, and if the function is called again within a certain
- * time frame, we simply return FALSE without checking. This allows us to avoid unnecessary
- * calls to GetConsoleScreenBufferInfo while still detecting resizes in a timely manner when
- * they occur. */
 METHOD(size_changed, BOOL)(void)
 {
-	static ULONGLONG lastCheck = 0;
-	int current_lines, current_cols;
-	ULONGLONG now = GetTickCount64();
-	bool resized = FALSE;
+	BOOL resized = FALSE;
+	T((T_CALLED("win32_console::legacy_size_changed()")));
 
-	T((T_CALLED("win32_driver::legacy_size_changed()")));
-
-	if (now - lastCheck < RESIZE_CHECK_THROTTLING_MS)
-		returnBool(FALSE);
-
-	DispatchMethod(size)(&current_lines, &current_cols);
-
-	if (CORECONSOLE.sbi_lines == -1 || CORECONSOLE.sbi_cols == -1)
+	if (LEGACYCONSOLE.reSizeEventPending)
 	{
-		CORECONSOLE.sbi_lines = current_lines;
-		CORECONSOLE.sbi_cols = current_cols;
+		T(("Resize event pending, returning TRUE"));
+		resized = TRUE;
+		LEGACYCONSOLE.reSizeEventPending = FALSE;
+		_nc_globals.have_sigwinch = 1;
 	}
 	else
 	{
-		if (current_lines != CORECONSOLE.sbi_lines || current_cols != CORECONSOLE.sbi_cols)
+		if (LEGACYCONSOLE.core.status & CONSOLE_FLAG_LIMITED_RESIZE)
 		{
-			CORECONSOLE.sbi_lines = current_lines;
-			CORECONSOLE.sbi_cols = current_cols;
+			static ULONGLONG lastCheck = 0;
+			int current_lines, current_cols;
+			ULONGLONG now = GetTickCount64();
+			CONSOLE_SCREEN_BUFFER_INFO csbi;
 
-			_nc_globals.have_sigwinch = 1;
+			if (now - lastCheck < RESIZE_CHECK_THROTTLING_MS)
+				returnBool(FALSE);
 
-			resized = TRUE;
+			if (CORECONSOLE.getSBI(&csbi))
+			{
+				current_lines = (int)(csbi.srWindow.Bottom + 1 - csbi.srWindow.Top);
+				current_cols = (int)(csbi.srWindow.Right + 1 - csbi.srWindow.Left);
+			}
+			else
+			{
+				returnBool(FALSE);
+			}
+
+			if (CORECONSOLE.sbi_lines != -1 && CORECONSOLE.sbi_cols != -1)
+			{
+				if (current_lines != CORECONSOLE.sbi_lines || current_cols != CORECONSOLE.sbi_cols)
+				{
+					_nc_globals.have_sigwinch = 1;
+					resized = TRUE;
+				}
+			}
+			lastCheck = GetTickCount64();
 		}
 	}
-	lastCheck = GetTickCount64();
 	returnBool(resized);
 }
 
@@ -385,7 +415,7 @@ METHOD(init, BOOL)(int fdOut, int fdIn)
 	T((T_CALLED("win32_driver::legacy_init(fdOut=%d, fdIn=%d)"), fdOut, fdIn));
 
 	/* initialize once, or not at all */
-	if (!LEGACYCONSOLE.core.initialized)
+	if (!IsConsoleInitialized())
 	{
 		/*
 		 * We set the console mode flags to the most basic ones that are required for ConPTY
@@ -396,12 +426,6 @@ METHOD(init, BOOL)(int fdOut, int fdIn)
 
 		HANDLE stdin_handle  = INVALID_HANDLE_VALUE;
 		HANDLE stdout_handle = INVALID_HANDLE_VALUE;
-
-		if (_nc_conpty_supported())
-		{
-			T(("Windows version does support ConPTY, please don't use the legacy API!"));
-			returnBool(FALSE);
-		}
 
 		if (fdIn != -1)
 		{
@@ -473,7 +497,7 @@ METHOD(init, BOOL)(int fdOut, int fdIn)
 
 		LEGACYCONSOLE.core.ConsoleHandleIn = stdin_handle;
 		LEGACYCONSOLE.core.ConsoleHandleOut = stdout_handle;
-		LEGACYCONSOLE.core.initialized = TRUE;
+		MarkConsoleInitialized();
 		result = TRUE;
 	}
 	else
@@ -482,7 +506,6 @@ METHOD(init, BOOL)(int fdOut, int fdIn)
 		 * that the provided fdIn and fdOut are valid pseudo-console handles, and if so we
 		 * update the defaultCONPTY structure to use the new handles. */
 		DWORD dwFlagOut;
-		DWORD dwFlagIn;
 
 		if (LEGACYCONSOLE.hProgMode == INVALID_HANDLE_VALUE) {
 			T(("... creating console buffer"));

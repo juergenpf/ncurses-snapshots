@@ -88,13 +88,13 @@ get_real_windows_version(DWORD * major, DWORD * minor, DWORD * build)
  * setting the registry key HKCU\Console\VirtualTerminalLevel to 0. In this case, we also return FALSE 
  * to indicate that ConPTY is not supported.
  */
-NCURSES_EXPORT(BOOL)
-_nc_conpty_supported(void)
+static BOOL
+conpty_supported(void)
 {
     int result = FALSE;
     DWORD major, minor, build;
 
-    T((T_CALLED("lib_win32conpty::conpty_supported")));
+    T((T_CALLED("lib_win32concore::conpty_supported")));
 
     if (!get_real_windows_version(&major, &minor, &build)) {
 	T(("RtlGetVersion failed"));
@@ -111,7 +111,9 @@ _nc_conpty_supported(void)
 	} else
 	    result = TRUE;
     }
-    
+#ifdef SIMULATE_CONPTY_UNSUPPORTED
+    result = FALSE;
+#endif
     if (result == TRUE) {
 		HANDLE hOut = GetStdHandle(STD_OUTPUT_HANDLE);
 		if (hOut == INVALID_HANDLE_VALUE) {
@@ -132,8 +134,22 @@ _nc_conpty_supported(void)
 				}
 	    	}
 		}
-	}	
+	}
     returnBool(result);
+}
+
+static BOOL
+has_limiuted_resize(void)
+{
+    BOOL result = TRUE;
+    DWORD major, minor, build;
+
+    if (!get_real_windows_version(&major, &minor, &build)) {
+	T(("RtlGetVersion failed"));
+    } else {
+	result = (major >= 10) ? TRUE : FALSE; 
+    }
+    return result;
 }
 
 NCURSES_EXPORT_VAR(ConsoleCoreInterface*) 
@@ -178,21 +194,24 @@ flush_input(int fd GCC_UNUSED)
 NCURSES_EXPORT(BOOL)
 _nc_console_setup(void) {
 	BOOL res = FALSE;
+	DWORD status = 0;
 
 	T((T_CALLED("lib_win32concore::_nc_console_setup()")));
-	if (_nc_conpty_supported()) {
+	if (conpty_supported()) {
 #if USE_MODERN_CONSOLE
 		_nc_CORECONSOLE = & (WINCONPTY.core);
-		CORECONSOLE.is_conpty = TRUE;
+		status |= CONSOLE_FLAG_IS_CONPTY;
 #endif
 	} else {
 #if USE_LEGACY_CONSOLE
 		_nc_CORECONSOLE = & (LEGACYCONSOLE.core);
-		CORECONSOLE.is_conpty = FALSE;
+		if (has_limiuted_resize()) {
+			status |= CONSOLE_FLAG_LIMITED_RESIZE;
+		}
 #endif
 	}
 	if (NULL!=_nc_CORECONSOLE) {
-		CORECONSOLE.initialized = FALSE;;
+		CORECONSOLE.status = status;
 		CORECONSOLE.ConsoleHandleIn = INVALID_HANDLE_VALUE;
 		CORECONSOLE.ConsoleHandleOut = INVALID_HANDLE_VALUE;
 		CORECONSOLE.ttyflags.dwFlagIn = 0;

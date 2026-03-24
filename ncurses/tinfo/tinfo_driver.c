@@ -545,23 +545,6 @@ drv_size(TERMINAL_CONTROL_BLOCK * TCB, int *linep, int *colp)
     return OK;
 }
 
-static int
-drv_getsize(TERMINAL_CONTROL_BLOCK * TCB, int *l, int *c)
-{
-    AssertTCB();
-    assert(l != NULL && c != NULL);
-#if USE_MODERN_CONSOLE
-    /* This is NOT a call into the Console Driver, but the interface of the
-     * conpty implementation to handle the special case toget size information
-     * through the console meta-data services.
-      */ 
-    WINCONPTY.core.size(l, c);
-#else
-    *l = lines;
-    *c = columns;
-#endif
-    return OK;
-}
 
 static int
 drv_setsize(TERMINAL_CONTROL_BLOCK * TCB, int l, int c)
@@ -1191,7 +1174,6 @@ NCURSES_EXPORT_VAR (TERM_DRIVER) _nc_TINFO_DRIVER = {
 	drv_doupdate,		/* update */
 	drv_defaultcolors,	/* defaultcolors */
 	drv_print,		/* print */
-	drv_getsize,		/* getsize */
 	drv_setsize,		/* setsize */
 	drv_initacs,		/* initacs */
 	drv_screen_init,	/* scinit */

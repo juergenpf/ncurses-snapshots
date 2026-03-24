@@ -177,8 +177,6 @@ extern NCURSES_EXPORT(int) _nc_gettimeofday(struct timeval *, void *);
 #define gettimeofday(tv,tz) _nc_gettimeofday(tv,tz)
 #endif
 
-extern NCURSES_EXPORT(BOOL) _nc_conpty_supported(void);
-
 #ifndef EVENTLIST_2nd
 #define EVENTLIST_2nd(param) /* nothing */
 #endif
@@ -194,10 +192,14 @@ extern NCURSES_EXPORT(int) _nc_wcwidth(uint32_t);
 extern NCURSES_EXPORT(int) _nc_wcswidth(const uint32_t *pwcs, size_t n);
 #endif
 
+// Flags describing certain capabilities of the console.
+#define CONSOLE_FLAG_INITIALIZED 0x0001
+#define CONSOLE_FLAG_IS_CONPTY      0x0002
+#define CONSOLE_FLAG_LIMITED_RESIZE 0x0004
+#define CONSOLE_FLAG_MASK (CONSOLE_FLAG_INITIALIZED | CONSOLE_FLAG_IS_CONPTY | CONSOLE_FLAG_LIMITED_RESIZE)
 typedef struct {
     // Properties
-    BOOL initialized;                /* Whether the console has been initialized */
-    BOOL is_conpty;                   /* Whether we are running on a ConPTY or on the legacy console API */
+    DWORD status;                    /* Certain status flags defined above */
 
     ConsoleMode ttyflags;            /* The desired state of the console  */
     
@@ -222,9 +224,12 @@ typedef struct {
 
 extern NCURSES_EXPORT_VAR(ConsoleCoreInterface*) _nc_CORECONSOLE;
 #define CORECONSOLE (*_nc_CORECONSOLE)
-#define IsConPTY() (CORECONSOLE.is_conpty)
-#define IsLegacyConsole() (!CORECONSOLE.is_conpty)
 #define ConsoleScreen() ((SCREEN*)(intptr_t)CORECONSOLE.sp)
+#define IsConsoleInitialized() (CORECONSOLE.status & CONSOLE_FLAG_INITIALIZED)
+#define MarkConsoleInitialized() (CORECONSOLE.status |= CONSOLE_FLAG_INITIALIZED)
+#define IsConPTY() (CORECONSOLE.status & CONSOLE_FLAG_IS_CONPTY)
+#define IsLegacyConsole() (!(CORECONSOLE.status & CONSOLE_FLAG_IS_CONPTY) )
+#define HasConsoleResizeLimitations() (CORECONSOLE.status & CONSOLE_FLAG_LIMITED_RESIZE)
 
 #if defined(USE_WIN32CON_DRIVER) || @USE_NAMED_PIPES@  /* USE_WIN32CON_DRIVER || USE_NAMED_PIPES */
 #define CON_NUMPAIRS 64
@@ -232,6 +237,7 @@ typedef struct {
     ConsoleCoreInterface core;
 
     BOOL progMode;                            // TRUE if we are in prog mode.
+    BOOL reSizeEventPending;                  // TRUE if we have detected a resize event, but haven't processed it yet.
 
     HANDLE hShellMode;                        // Screebuffer handle in shell mode..
     HANDLE hProgMode;                         // Screebuffer handle in prog mode..
@@ -244,6 +250,7 @@ typedef struct {
     CONSOLE_SCREEN_BUFFER_INFO SBI;
     CONSOLE_CURSOR_INFO save_CI;
 
+    BOOL (*AdjustSize)(void);                 // Adjust the console buffer size.
     int (*napms)(int ms);                     // Pointer to the napms function used by the legacy console.
     chtype (*termattrs)(void);                // Pointer to the termattrs function used by the legacy console.
     int (*keypad)(BOOL);                      // Pointer to the keypad function used by the legacy console.

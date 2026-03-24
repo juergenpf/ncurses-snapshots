@@ -2497,7 +2497,6 @@ typedef struct term_driver {
     int    (*td_update)(struct DriverTCB*);
     int    (*td_defaultcolors)(struct DriverTCB*, int, int);
     int    (*td_print)(struct DriverTCB*, char*, int);
-    int    (*td_getsize)(struct DriverTCB*, int*, int*);
     int    (*td_setsize)(struct DriverTCB*, int, int);
     void   (*td_initacs)(struct DriverTCB*, chtype*, chtype*);
     void   (*td_scinit)(SCREEN *);

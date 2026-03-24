@@ -629,19 +629,22 @@ _nc_update_screensize(SCREEN *sp)
 {
     int new_lines;
     int new_cols;
-
-#if USE_TERM_DRIVER
     int old_lines;
     int old_cols;
-
-    assert(sp != NULL);
-
-    CallDriver_2(sp, td_getsize, &old_lines, &old_cols);
-
-#else
     TERMINAL *termp = cur_term;
-    int old_lines = lines;
-    int old_cols = columns;
+
+#if USE_CONSOLE_API
+    assert(sp != NULL);
+    if (IsLegacyConsole()) {
+	old_lines = CORECONSOLE.sbi_lines;
+	old_cols = CORECONSOLE.sbi_cols;
+	LEGACYCONSOLE.AdjustSize();
+    } else {
+#endif
+       old_lines = lines;
+       old_cols = columns;
+#if USE_CONSOLE_API
+   }
 #endif
 
     if (sp != NULL) {

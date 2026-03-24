@@ -48,7 +48,7 @@ MODULE_ID("$Id: win32_driver.c,v 1.20 2025/12/30 19:34:50 tom Exp $")
 #define WINMAGIC NCDRV_MAGIC(NCDRV_WINCONSOLE)
 #define EXP_OPTIMIZE 0
 
-#define console_initialized (TRUE == LEGACYCONSOLE.core.initialized)
+#define console_initialized (IsConsoleInitialized())
 
 #define AssertTCB() assert(TCB != NULL && (TCB->magic == WINMAGIC))
 #define SetSP()               \
@@ -1334,6 +1334,14 @@ handle_mouse(SCREEN *sp, MOUSE_EVENT_RECORD mer)
 	returnBool(result);
 }
 
+static void handle_resize()
+{
+	if (console_initialized)
+	{
+		LEGACYCONSOLE.reSizeEventPending = TRUE;
+	}
+}
+
 static ULONGLONG
 tdiff(FILETIME fstart, FILETIME fend)
 {
@@ -1529,6 +1537,11 @@ console_twait(
 							}
 							continue;
 							/* e.g., FOCUS_EVENT */
+						case WINDOW_BUFFER_SIZE_EVENT:
+							T(("twait:event WINDOW_BUFFER_SIZE_EVENT"));
+							CONSUME();
+							handle_resize();
+							continue;
 						default:
 							T(("twait:event Type %d", inp_rec.EventType));
 							CONSUME();
@@ -1651,6 +1664,10 @@ console_read(
 					break;
 				}
 			}
+			else if (inp_rec.EventType == WINDOW_BUFFER_SIZE_EVENT)
+			{
+				handle_resize();
+			}
 			continue;
 		}
 	}
@@ -1678,7 +1695,6 @@ _nc_WIN_DRIVER = {
 	wcon_doupdate,		/* update        */
 	wcon_defaultcolors, /* defaultcolors */
 	wcon_print,			/* print         */
-	wcon_size,			/* getsize       */
 	wcon_setsize,		/* setsize       */
 	wcon_initacs,		/* initacs       */
 	wcon_screen_init,	/* scinit        */

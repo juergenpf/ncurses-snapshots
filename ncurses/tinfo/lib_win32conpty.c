@@ -34,7 +34,7 @@
 
 MODULE_ID("$Id$")
 
-#if defined(_NC_WINDOWS_NATIVE)
+#if defined(_NC_WINDOWS_NATIVE) && USE_MODERN_CONSOLE
 #include <windows.h>
 #include <locale.h>
 #include <stdio.h>
@@ -229,7 +229,7 @@ METHOD(init, BOOL) (int fdOut, int fdIn)
     T((T_CALLED("lib_win32conpty::pty_init(fdOut=%d, fdIn=%d)"), fdOut, fdIn));
 
     /* initialize once, or not at all */
-    if (!defaultCONPTY.core.initialized) {
+    if (!IsConsoleInitialized()) {
 	/*
 	 * We set the console mode flags to the most basic ones that are required for ConPTY
 	 * to function properly. */
@@ -260,11 +260,6 @@ METHOD(init, BOOL) (int fdOut, int fdIn)
 			GENERIC_READ | GENERIC_WRITE, 
 			FILE_SHARE_WRITE, 
 			NULL, OPEN_EXISTING, 0, NULL);
-
-	if (!_nc_conpty_supported()) {
-	    T(("Windows version does not support ConPTY"));
-	    returnBool(FALSE);
-	}
 
 	if (fdIn != -1) {
 	    T(("In the first call fdIn is expected to be -1."));
@@ -312,8 +307,7 @@ METHOD(init, BOOL) (int fdOut, int fdIn)
 	    returnBool(FALSE);
 	}
 	defaultCONPTY.core.ttyflags.dwFlagIn = dwFlagIn;
-
-	defaultCONPTY.core.initialized = TRUE;
+	MarkConsoleInitialized();
 	result = TRUE;
     } else {
 	/* This branch is called from newterm() when fdIn is provided, so we need to validate
@@ -932,4 +926,4 @@ METHOD(getmode, int) (int fd GCC_UNUSED, TTY * arg)
     returnCode(OK);
 }
 
-#endif /* defined(_NC_WINDOWS_NATIVE) */
+#endif /* defined(_NC_WINDOWS_NATIVE) && USE_MODERN_CONSOLE */
