@@ -166,9 +166,12 @@ NCURSES_SP_NAME(_nc_init_acs) (NCURSES_SP_DCL0)
     real_map['Y'] = '|';	/* vertical line */
     real_map['E'] = '+';	/* large plus or crossover */
 
-#if USE_TERM_DRIVER
-    CallDriver_2(SP_PARM, td_initacs, real_map, fake_map);
-#else
+#if USE_LEGACY_CONSOLE
+    if (IsLegacyConsole()) {
+        LEGACYCONSOLE.init_acs(real_map);
+        return;
+    }
+#endif
     if (ena_acs != NULL) {
 	NCURSES_PUTP2("ena_acs", ena_acs);
     }
@@ -245,7 +248,6 @@ NCURSES_SP_NAME(_nc_init_acs) (NCURSES_SP_DCL0)
 	_nc_unlock_global(tracef);
     }
 #endif /* TRACE */
-#endif
 }
 
 #if NCURSES_SP_FUNCS

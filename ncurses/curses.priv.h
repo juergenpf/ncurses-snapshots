@@ -2497,7 +2497,6 @@ typedef struct term_driver {
     int    (*td_update)(struct DriverTCB*);
     int    (*td_defaultcolors)(struct DriverTCB*, int, int);
     int    (*td_setsize)(struct DriverTCB*, int, int);
-    void   (*td_initacs)(struct DriverTCB*, chtype*, chtype*);
     int    (*td_twait)(struct DriverTCB*, int, int, int* EVENTLIST_2nd(_nc_eventlist*));
     int    (*td_read)(struct DriverTCB*, int*);
     int    (*td_cursorSet)(struct DriverTCB*, int);
@@ -2722,6 +2721,7 @@ typedef struct {
     int (*beeporflash)(BOOL);                 // Pointer to the beep or flash function used by the legacy console.
     int (*keyok)(int keycode,int flag);       // Pointer to the keyok function used by the legacy console.
     int (*has_key)(int keycode);              // Pointer to the has_key function used by the legacy console.
+    void (*init_acs)(chtype *acs);            // Pointer to the init_acs function used by the legacy console.
 } LegacyConsoleInterface;
 extern NCURSES_EXPORT_VAR(LegacyConsoleInterface *) _nc_LEGACYCONSOLE;
 #define LEGACYCONSOLE (*_nc_LEGACYCONSOLE)

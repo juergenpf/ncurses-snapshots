@@ -52,6 +52,7 @@ METHOD(keypad, int)(BOOL flag);
 METHOD(beeporflash, int)(BOOL beep);
 METHOD(keyok, int)(int keycode,int flag);
 METHOD(has_key, int)(int keycode);
+METHOD(init_acs, void)(chtype *acs);
 
 static LegacyConsoleInterface legacyCONSOLE =
 	{
@@ -80,7 +81,9 @@ static LegacyConsoleInterface legacyCONSOLE =
 		Dispatch(keypad),
 		Dispatch(beeporflash),
 		Dispatch(keyok),
-		Dispatch(has_key)
+		Dispatch(has_key),
+		Dispatch(init_acs)
+
 	};
 NCURSES_EXPORT_VAR(LegacyConsoleInterface *)
 _nc_LEGACYCONSOLE = &legacyCONSOLE;
@@ -434,6 +437,53 @@ METHOD(has_key, int)(int keycode)
 			found = TRUE;
 	}
 	returnCode(found ? OK : ERR);
+}
+
+METHOD(init_acs, void)(chtype *real_map)
+{
+#define DATA(a, b) \
+	{              \
+		a, b       \
+	}
+	static struct
+	{
+		int acs_code;
+		int use_code;
+	} table[] = {
+		DATA('a', 0xb1), /* ACS_CKBOARD  */
+		DATA('f', 0xf8), /* ACS_DEGREE   */
+		DATA('g', 0xf1), /* ACS_PLMINUS  */
+		DATA('j', 0xd9), /* ACS_LRCORNER */
+		DATA('l', 0xda), /* ACS_ULCORNER */
+		DATA('k', 0xbf), /* ACS_URCORNER */
+		DATA('m', 0xc0), /* ACS_LLCORNER */
+		DATA('n', 0xc5), /* ACS_PLUS     */
+		DATA('q', 0xc4), /* ACS_HLINE    */
+		DATA('t', 0xc3), /* ACS_LTEE     */
+		DATA('u', 0xb4), /* ACS_RTEE     */
+		DATA('v', 0xc1), /* ACS_BTEE     */
+		DATA('w', 0xc2), /* ACS_TTEE     */
+		DATA('x', 0xb3), /* ACS_VLINE    */
+		DATA('y', 0xf3), /* ACS_LEQUAL   */
+		DATA('z', 0xf2), /* ACS_GEQUAL   */
+		DATA('0', 0xdb), /* ACS_BLOCK    */
+		DATA('{', 0xe3), /* ACS_PI       */
+		DATA('}', 0x9c), /* ACS_STERLING */
+		DATA(',', 0xae), /* ACS_LARROW   */
+		DATA('+', 0xaf), /* ACS_RARROW   */
+		DATA('~', 0xf9), /* ACS_BULLET   */
+	};
+#undef DATA
+	unsigned n;
+	SCREEN *sp = ConsoleScreen();
+
+	for (n = 0; n < SIZEOF(table); ++n)
+	{
+		real_map[table[n].acs_code] =
+			(chtype)table[n].use_code | A_ALTCHARSET;
+		if (sp != NULL)
+			sp->_screen_acs_map[table[n].acs_code] = TRUE;
+	}
 }
 
 
