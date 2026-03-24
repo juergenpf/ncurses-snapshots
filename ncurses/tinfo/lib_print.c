@@ -52,6 +52,11 @@ NCURSES_SP_NAME(mcprint) (NCURSES_SP_DCLx char *data, int len)
     size_t onsize, offsize;
     size_t need;
 
+#if USE_LEGACY_CONSOLE
+    if (IsLegacyConsole()) {
+        return (ERR);           
+    }
+#endif
     errno = 0;
     if (!HasTInfoTerminal(SP_PARM)
 	|| len <= 0

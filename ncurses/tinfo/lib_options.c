@@ -200,9 +200,14 @@ NCURSES_SP_NAME(curs_set) (NCURSES_SP_DCLx int vis)
 	if (vis == cursor) {
 	    code = cursor;
 	} else {
-#if USE_TERM_DRIVER
-	    code = CallDriver_1(SP_PARM, td_cursorSet, vis);
-#else
+#if USE_LEGACY_CONSOLE
+	    if (IsLegacyConsole()) {
+		code = LEGACYCONSOLE.curs_set(vis);
+		if (code != ERR)
+		    SP_PARM->_cursor = vis;
+		returnCode(code);
+	    }
+#endif
 	    if (IsValidTIScreen(SP_PARM)) {
 		switch (vis) {
 		case 2:
@@ -221,7 +226,6 @@ NCURSES_SP_NAME(curs_set) (NCURSES_SP_DCLx int vis)
 	    } else {
 		code = ERR;
 	    }
-#endif
 	    if (code != ERR)
 		code = (cursor == -1 ? 1 : cursor);
 	    SP_PARM->_cursor = vis;

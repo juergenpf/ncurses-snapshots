@@ -2485,17 +2485,12 @@ typedef struct term_driver {
     void   (*td_init)(struct DriverTCB*);
     void   (*td_release)(struct DriverTCB*);
     int    (*td_hwcur)(struct DriverTCB*, int yold, int xold, int y, int x);
-    bool   (*td_rescolors)(struct DriverTCB*);
-    void   (*td_initcolor)(struct DriverTCB*, int, int, int, int);
-    void   (*td_docolor)(struct DriverTCB*, int, int, int, int(*)(SCREEN*, int));
     int    (*td_testmouse)(struct DriverTCB*, int EVENTLIST_2nd(_nc_eventlist*));
     void   (*td_setfilter)(struct DriverTCB*);
     int    (*td_update)(struct DriverTCB*);
     int    (*td_defaultcolors)(struct DriverTCB*, int, int);
-    int    (*td_setsize)(struct DriverTCB*, int, int);
     int    (*td_twait)(struct DriverTCB*, int, int, int* EVENTLIST_2nd(_nc_eventlist*));
     int    (*td_read)(struct DriverTCB*, int*);
-    int    (*td_cursorSet)(struct DriverTCB*, int);
 } TERM_DRIVER;
 
 typedef struct DriverTCB
@@ -2719,6 +2714,7 @@ typedef struct {
     BOOL (*reset_color_pair)(void);           // Pointer to the reset_color_pair function used by the legacy console.
     int (*init_pair)(int pair, int fg, int bg);       // Pointer to the init_pair function used by the legacy console.')
     void (*setcolor)(BOOL fg, int color);	   // Pointer to the setcolor function used by the legacy console.)
+    int (*curs_set)(int visibility);                // Pointer to the curs_set function used by the legacy console.
 } LegacyConsoleInterface;
 extern NCURSES_EXPORT_VAR(LegacyConsoleInterface *) _nc_LEGACYCONSOLE;
 #define LEGACYCONSOLE (*_nc_LEGACYCONSOLE)

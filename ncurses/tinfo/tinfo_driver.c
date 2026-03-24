@@ -355,31 +355,6 @@ drv_rescol(TERMINAL_CONTROL_BLOCK * TCB)
     return result;
 }
 
-static bool
-drv_rescolors(TERMINAL_CONTROL_BLOCK * TCB)
-{
-    int result = FALSE;
-    SCREEN *sp;
-
-    AssertTCB();
-    SetSP();
-
-    if (orig_colors != NULL) {
-	NCURSES_PUTP2("orig_colors", orig_colors);
-	result = TRUE;
-    }
-    return result;
-}
-
-
-static int
-drv_setsize(TERMINAL_CONTROL_BLOCK * TCB, int l, int c)
-{
-    AssertTCB();
-    lines = (short) l;
-    columns = (short) c;
-    return OK;
-}
 
 static void
 drv_release(TERMINAL_CONTROL_BLOCK * TCB GCC_UNUSED)
@@ -449,101 +424,6 @@ default_bg(SCREEN *sp)
 #else
     return COLOR_BLACK;
 #endif
-}
-
-static void
-drv_initcolor(TERMINAL_CONTROL_BLOCK * TCB,
-	      int color, int r, int g, int b)
-{
-    SCREEN *sp = TCB->csp;
-
-    AssertTCB();
-    if (initialize_color != NULL) {
-	NCURSES_PUTP2("initialize_color",
-		      TIPARM_4(initialize_color, color, r, g, b));
-    }
-}
-
-static void
-drv_do_color(TERMINAL_CONTROL_BLOCK * TCB,
-	     int old_pair,
-	     int pair,
-	     int reverse,
-	     NCURSES_SP_OUTC outc)
-{
-    SCREEN *sp = TCB->csp;
-    int fg = COLOR_DEFAULT;
-    int bg = COLOR_DEFAULT;
-    int old_fg, old_bg;
-
-    AssertTCB();
-    if (sp == NULL)
-	return;
-
-    if (pair < 0 || pair >= COLOR_PAIRS) {
-	return;
-    } else if (pair != 0) {
-	if (set_color_pair) {
-	    TPUTS_TRACE("set_color_pair");
-	    NCURSES_SP_NAME(tputs) (NCURSES_SP_ARGx
-				    TIPARM_1(set_color_pair, pair), 1, outc);
-	    return;
-	} else if (sp != NULL) {
-	    _nc_pair_content(SP_PARM, pair, &fg, &bg);
-	}
-    }
-
-    if (old_pair >= 0
-	&& sp != NULL
-	&& _nc_pair_content(SP_PARM, old_pair, &old_fg, &old_bg) != ERR) {
-	if ((isDefaultColor(fg) && !isDefaultColor(old_fg))
-	    || (isDefaultColor(bg) && !isDefaultColor(old_bg))) {
-#if NCURSES_EXT_FUNCS
-	    /*
-	     * A minor optimization - but extension.  If "AX" is specified in
-	     * the terminal description, treat it as screen's indicator of ECMA
-	     * SGR 39 and SGR 49, and assume the two sequences are independent.
-	     */
-	    if (sp->_has_sgr_39_49
-		&& isDefaultColor(old_bg)
-		&& !isDefaultColor(old_fg)) {
-		NCURSES_SP_NAME(tputs) (NCURSES_SP_ARGx "\033[39m", 1, outc);
-	    } else if (sp->_has_sgr_39_49
-		       && isDefaultColor(old_fg)
-		       && !isDefaultColor(old_bg)) {
-		NCURSES_SP_NAME(tputs) (NCURSES_SP_ARGx "\033[49m", 1, outc);
-	    } else
-#endif
-		drv_rescol(TCB);
-	}
-    } else {
-	drv_rescol(TCB);
-	if (old_pair < 0)
-	    return;
-    }
-
-#if NCURSES_EXT_FUNCS
-    if (isDefaultColor(fg))
-	fg = default_fg(sp);
-    if (isDefaultColor(bg))
-	bg = default_bg(sp);
-#endif
-
-    if (reverse) {
-	int xx = fg;
-	fg = bg;
-	bg = xx;
-    }
-
-    TR(TRACE_ATTRS, ("setting colors: pair = %d, fg = %d, bg = %d", pair,
-		     fg, bg));
-
-    if (!isDefaultColor(fg)) {
-	drv_setcolor(TCB, TRUE, fg, outc);
-    }
-    if (!isDefaultColor(bg)) {
-	drv_setcolor(TCB, FALSE, bg, outc);
-    }
 }
 
 static int
@@ -734,35 +614,6 @@ drv_read(TERMINAL_CONTROL_BLOCK * TCB, int *buf)
     return n;
 }
 
-static int
-drv_cursorSet(TERMINAL_CONTROL_BLOCK * TCB, int vis)
-{
-    SCREEN *sp;
-    int code = ERR;
-
-    AssertTCB();
-    SetSP();
-
-    T((T_CALLED("tinfo:drv_cursorSet(%p,%d)"), (void *) SP_PARM, vis));
-
-    if (SP_PARM != NULL && IsTermInfo(SP_PARM)) {
-	switch (vis) {
-	case 2:
-	    code = NCURSES_PUTP2_FLUSH("cursor_visible", cursor_visible);
-	    break;
-	case 1:
-	    code = NCURSES_PUTP2_FLUSH("cursor_normal", cursor_normal);
-	    break;
-	case 0:
-	    code = NCURSES_PUTP2_FLUSH("cursor_invisible", cursor_invisible);
-	    break;
-	}
-    } else {
-	code = ERR;
-    }
-    returnCode(code);
-}
-
 
 NCURSES_EXPORT_VAR (TERM_DRIVER) _nc_TINFO_DRIVER = {
     TRUE,
@@ -771,17 +622,12 @@ NCURSES_EXPORT_VAR (TERM_DRIVER) _nc_TINFO_DRIVER = {
 	drv_init,		/* init */
 	drv_release,		/* release */
 	drv_mvcur,		/* hwcur */
-	drv_rescolors,		/* rescolors */
-	drv_initcolor,		/* initcolor */
-	drv_do_color,		/* docolor */
 	drv_testmouse,		/* testmouse */
 	drv_setfilter,		/* setfilter */
 	drv_doupdate,		/* update */
 	drv_defaultcolors,	/* defaultcolors */
-	drv_setsize,		/* setsize */
 	drv_twait,		/* twait  */
 	drv_read,		/* read */
-	drv_cursorSet		/* cursorSet */
 };
 
 #if USE_TERM_DRIVER

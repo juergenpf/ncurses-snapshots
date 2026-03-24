@@ -230,44 +230,7 @@ wcon_defaultcolors(TERMINAL_CONTROL_BLOCK *TCB,
 	return (code);
 }
 
-static bool
-wcon_rescolors(TERMINAL_CONTROL_BLOCK *TCB)
-{
-	int result = FALSE;
-	SCREEN *sp;
 
-	AssertTCB();
-	SetSP();
-
-	return result;
-}
-
-static void
-wcon_do_color(TERMINAL_CONTROL_BLOCK *TCB,
-			  int old_pair GCC_UNUSED,
-			  int pair GCC_UNUSED,
-			  int reverse GCC_UNUSED,
-			  int (*outc)(SCREEN *, int) GCC_UNUSED)
-{
-	SCREEN *sp;
-
-	AssertTCB();
-	SetSP();
-}
-
-
-static void
-wcon_initcolor(TERMINAL_CONTROL_BLOCK *TCB,
-			   int color GCC_UNUSED,
-			   int r GCC_UNUSED,
-			   int g GCC_UNUSED,
-			   int b GCC_UNUSED)
-{
-	SCREEN *sp;
-
-	AssertTCB();
-	SetSP();
-}
 
 // ------------------------------ Meta-Data related definitions and functions ---------------------------------
 
@@ -301,15 +264,6 @@ get_SBI(void)
 	return rc;
 }
 
-
-static int
-wcon_setsize(TERMINAL_CONTROL_BLOCK *TCB GCC_UNUSED,
-			 int l GCC_UNUSED,
-			 int c GCC_UNUSED)
-{
-	AssertTCB();
-	return ERR;
-}
 
 // ------------------------------ Update related  definitions and functions ---------------------------------
 
@@ -838,28 +792,6 @@ wcon_read(TERMINAL_CONTROL_BLOCK *TCB, int *buf)
 }
 
 
-static int
-wcon_cursorSet(TERMINAL_CONTROL_BLOCK *TCB GCC_UNUSED, int mode)
-{
-	int res = -1;
-	CONSOLE_CURSOR_INFO this_CI = LEGACYCONSOLE.save_CI;
-
-	T((T_CALLED("win32_driver::wcon_cursorSet(%d)"), mode));
-	switch (mode)
-	{
-	case 0:
-		this_CI.bVisible = FALSE;
-		break;
-	case 1:
-		break;
-	case 2:
-		this_CI.dwSize = 100;
-		break;
-	}
-	SetConsoleCursorInfo(LEGACYCONSOLE.core.ConsoleHandleOut, &this_CI);
-	returnCode(res);
-}
-
 #define BUTTON_MASK (FROM_LEFT_1ST_BUTTON_PRESSED | \
 					 FROM_LEFT_2ND_BUTTON_PRESSED | \
 					 FROM_LEFT_3RD_BUTTON_PRESSED | \
@@ -1301,16 +1233,11 @@ _nc_WIN_DRIVER = {
 	wcon_init,			/* init          */
 	wcon_release,		/* release       */
 	wcon_mvcur,			/* hwcur         */
-	wcon_rescolors,		/* rescolors     */
-	wcon_initcolor,		/* initcolor     */
-	wcon_do_color,		/* docolor       */
 	wcon_testmouse,		/* testmouse     */
 	wcon_setfilter,		/* setfilter     */
 	wcon_doupdate,		/* update        */
 	wcon_defaultcolors, /* defaultcolors */
-	wcon_setsize,		/* setsize       */
 	wcon_twait,			/* twait         */
 	wcon_read,			/* read          */
-	wcon_cursorSet		/* cursorSet     */
 };
 #endif /* USE_LEGACY_CONSOLE */

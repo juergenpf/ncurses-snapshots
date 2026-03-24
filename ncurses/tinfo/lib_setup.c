@@ -634,6 +634,7 @@ _nc_update_screensize(SCREEN *sp)
 	old_lines = CORECONSOLE.sbi_lines;
 	old_cols = CORECONSOLE.sbi_cols;
 	LEGACYCONSOLE.AdjustSize();
+	// JPF TODO FIXME : Not sure we can let run that through for legacy console... need to check.
     } else {
 #endif
        old_lines = lines;

@@ -351,15 +351,15 @@ NCURSES_SP_NAME(_nc_reset_colors) (NCURSES_SP_DCL0)
 	SP_PARM->_color_defs = -(SP_PARM->_color_defs);
     if (reset_color_pair(NCURSES_SP_ARG))
 	result = TRUE;
-
-#if USE_TERM_DRIVER
-    result = CallDriver(SP_PARM, td_rescolors);
-#else
+#if USE_LEGACY_CONSOLE
+    if (IsLegacyConsole()) {
+	returnBool(FALSE);
+    }
+#endif
     if (orig_colors != NULL) {
 	NCURSES_PUTP2("orig_colors", orig_colors);
 	result = TRUE;
     }
-#endif
     returnBool(result);
 }
 
@@ -758,12 +758,8 @@ _nc_init_color(SCREEN *sp, int color, int r, int g, int b)
 	    sp->_color_table[color].blue = b;
 	}
 
-#if USE_TERM_DRIVER
-	CallDriver_4(sp, td_initcolor, color, r, g, b);
-#else
 	NCURSES_PUTP2("initialize_color",
 		      TIPARM_4(initialize_color, color, r, g, b));
-#endif
 	sp->_color_defs = Max(color + 1, sp->_color_defs);
 
 	result = OK;
@@ -1010,9 +1006,6 @@ NCURSES_SP_NAME(_nc_do_color) (NCURSES_SP_DCLx
 			       int reverse,
 			       NCURSES_SP_OUTC outc)
 {
-#if USE_TERM_DRIVER
-    CallDriver_4(SP_PARM, td_docolor, old_pair, pair, reverse, outc);
-#else
     int fg = COLOR_DEFAULT;
     int bg = COLOR_DEFAULT;
     int old_fg = -1;
@@ -1084,7 +1077,6 @@ NCURSES_SP_NAME(_nc_do_color) (NCURSES_SP_DCLx
     if (!isDefaultColor(bg)) {
 	set_background_color(NCURSES_SP_ARGx bg, outc);
     }
-#endif
 }
 
 #if NCURSES_SP_FUNCS

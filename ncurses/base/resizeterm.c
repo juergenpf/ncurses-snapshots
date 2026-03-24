@@ -357,7 +357,10 @@ NCURSES_SP_NAME(resize_term) (NCURSES_SP_DCLx int ToLines, int ToCols)
        (void *) SP_PARM, ToLines, ToCols,
        (SP_PARM == NULL) ? -1 : screen_lines(SP_PARM),
        (SP_PARM == NULL) ? -1 : screen_columns(SP_PARM)));
-
+#if USE_LEGACY_CONSOLE
+    if (IsLegacyConsole()) 
+	returnCode(ERR);   
+#endif
     if (SP_PARM == NULL || ToLines <= 0 || ToCols <= 0) {
 	returnCode(ERR);
     }
@@ -407,12 +410,8 @@ NCURSES_SP_NAME(resize_term) (NCURSES_SP_DCLx int ToLines, int ToCols)
 	    screen_lines(SP_PARM) = (NCURSES_SIZE_T) ToLines;
 	    screen_columns(SP_PARM) = (NCURSES_SIZE_T) ToCols;
 
-#if USE_TERM_DRIVER
-	    CallDriver_2(SP_PARM, td_setsize, ToLines, ToCols);
-#else
 	    lines = (NCURSES_INT2) ToLines;
 	    columns = (NCURSES_INT2) ToCols;
-#endif
 
 	    SP_PARM->_lines_avail = (NCURSES_SIZE_T) (ToLines - was_stolen);
 

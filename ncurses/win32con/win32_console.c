@@ -56,6 +56,7 @@ METHOD(init_acs, void)(chtype *acs);
 METHOD(reset_color_pair, BOOL)(void);
 METHOD(init_pair, int)(int pair, int fg, int bg);
 METHOD(setcolor, void)(BOOL fg, int color);
+METHOD(curs_set, int)(int visibility);
 
 static LegacyConsoleInterface legacyCONSOLE =
 	{
@@ -88,7 +89,8 @@ static LegacyConsoleInterface legacyCONSOLE =
 		Dispatch(init_acs),
 		Dispatch(reset_color_pair),
 		Dispatch(init_pair),
-		Dispatch(setcolor)
+		Dispatch(setcolor),
+		Dispatch(curs_set)
 	};
 NCURSES_EXPORT_VAR(LegacyConsoleInterface *)
 _nc_LEGACYCONSOLE = &legacyCONSOLE;
@@ -522,6 +524,27 @@ METHOD(setcolor, void)(BOOL fore, int color)
 	a |= (WORD)((LEGACYCONSOLE.SBI.wAttributes) & ((BOOL)fore ? 0xfff8 : 0xff8f));
 	SetConsoleTextAttribute(LEGACYCONSOLE.core.ConsoleHandleOut, a);
 	get_SBI();
+}
+
+METHOD(curs_set, int)(int visibility)
+{
+	int res = ERR;
+	CONSOLE_CURSOR_INFO this_CI = LEGACYCONSOLE.save_CI;
+
+	T((T_CALLED("win32_console::legacy_curs_set(%d)"), visibility));
+	switch (visibility)
+	{
+	case 0:
+		this_CI.bVisible = FALSE;
+		break;
+	case 1:
+		break;
+	case 2:
+		this_CI.dwSize = 100;
+		break;
+	}
+	SetConsoleCursorInfo(LEGACYCONSOLE.core.ConsoleHandleOut, &this_CI);
+	returnCode(res);
 }
 
 /* This function sets the console mode for the input and output handles. It is called by the main thread
