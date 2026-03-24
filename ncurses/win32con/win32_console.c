@@ -32,7 +32,7 @@
 
 #include <curses.priv.h>
 
-#if USE_LEGACY_CONSOLE
+#if USE_LEGACY_CONSOLE || !JPF
 
 #define DispatchMethod(name) legacy_##name
 #define Dispatch(name) .name = DispatchMethod(name)
@@ -50,6 +50,8 @@ METHOD(napms, int)(int ms);
 METHOD(termattrs, chtype)(void);
 METHOD(keypad, int)(BOOL flag);
 METHOD(beeporflash, int)(BOOL beep);
+METHOD(keyok, int)(int keycode,int flag);
+METHOD(has_key, int)(int keycode);
 
 static LegacyConsoleInterface legacyCONSOLE =
 	{
@@ -76,8 +78,9 @@ static LegacyConsoleInterface legacyCONSOLE =
 		Dispatch(napms),
 		Dispatch(termattrs),
 		Dispatch(keypad),
-		Dispatch(beeporflash)
-
+		Dispatch(beeporflash),
+		Dispatch(keyok),
+		Dispatch(has_key)
 	};
 NCURSES_EXPORT_VAR(LegacyConsoleInterface *)
 _nc_LEGACYCONSOLE = &legacyCONSOLE;
@@ -85,6 +88,176 @@ _nc_LEGACYCONSOLE = &legacyCONSOLE;
 #define RevAttr(attr) (WORD)(((attr) & 0xff00) |       \
 							 ((((attr) & 0x07) << 4) | \
 							  (((attr) & 0x70) >> 4)))
+
+#define GenMap(vKey, key) MAKELONG(key, vKey)
+
+static const LONG keylist[] =
+	{
+		GenMap(VK_PRIOR, KEY_PPAGE),
+		GenMap(VK_NEXT, KEY_NPAGE),
+		GenMap(VK_END, KEY_END),
+		GenMap(VK_HOME, KEY_HOME),
+		GenMap(VK_LEFT, KEY_LEFT),
+		GenMap(VK_UP, KEY_UP),
+		GenMap(VK_RIGHT, KEY_RIGHT),
+		GenMap(VK_DOWN, KEY_DOWN),
+		GenMap(VK_DELETE, KEY_DC),
+		GenMap(VK_INSERT, KEY_IC)};
+
+static const LONG ansi_keys[] =
+	{
+		GenMap(VK_PRIOR, 'I'),
+		GenMap(VK_NEXT, 'Q'),
+		GenMap(VK_END, 'O'),
+		GenMap(VK_HOME, 'H'),
+		GenMap(VK_LEFT, 'K'),
+		GenMap(VK_UP, 'H'),
+		GenMap(VK_RIGHT, 'M'),
+		GenMap(VK_DOWN, 'P'),
+		GenMap(VK_DELETE, 'S'),
+		GenMap(VK_INSERT, 'R')};
+
+/* *INDENT-ON* */
+#define array_length(a) (sizeof(a) / sizeof(a[0]))
+#define N_INI ((int)array_length(keylist))
+#define FKEYS 24
+#define MAPSIZE (FKEYS + N_INI)
+
+static WORD
+console_MapColor(BOOL fore, int color)
+{
+	static const int _cmap[] =
+		{0, 4, 2, 6, 1, 5, 3, 7};
+	int a;
+	if (color < 0 || color > 7)
+		a = fore ? 7 : 0;
+	else
+		a = _cmap[color];
+	if (!fore)
+		a = a << 4;
+	return (WORD)a;
+}
+
+static int
+rkeycompare(const void *el1, const void *el2)
+{
+	WORD key1 = (LOWORD((*((const LONG *)el1)))) & 0x7fff;
+	WORD key2 = (LOWORD((*((const LONG *)el2)))) & 0x7fff;
+
+	return ((key1 < key2) ? -1 : ((key1 == key2) ? 0 : 1));
+}
+
+static int
+keycompare(const void *el1, const void *el2)
+{
+	WORD key1 = HIWORD((*((const LONG *)el1)));
+	WORD key2 = HIWORD((*((const LONG *)el2)));
+
+	return ((key1 < key2) ? -1 : ((key1 == key2) ? 0 : 1));
+}
+
+static BOOL
+get_SBI(void)
+{
+	bool rc = FALSE;
+	if (CORECONSOLE.getSBI(&(LEGACYCONSOLE.SBI)))
+	{
+		T(("GetConsoleScreenBufferInfo"));
+		T(("... buffer(X:%d Y:%d)",
+		   LEGACYCONSOLE.SBI.dwSize.X,
+		   LEGACYCONSOLE.SBI.dwSize.Y));
+		T(("... window(X:%d Y:%d)",
+		   LEGACYCONSOLE.SBI.dwMaximumWindowSize.X,
+		   LEGACYCONSOLE.SBI.dwMaximumWindowSize.Y));
+		T(("... cursor(X:%d Y:%d)",
+		   LEGACYCONSOLE.SBI.dwCursorPosition.X,
+		   LEGACYCONSOLE.SBI.dwCursorPosition.Y));
+		T(("... display(Top:%d Bottom:%d Left:%d Right:%d)",
+		   LEGACYCONSOLE.SBI.srWindow.Top,
+		   LEGACYCONSOLE.SBI.srWindow.Bottom,
+		   LEGACYCONSOLE.SBI.srWindow.Left,
+		   LEGACYCONSOLE.SBI.srWindow.Right));
+		rc = TRUE;
+	}
+	else
+	{
+		T(("GetConsoleScreenBufferInfo ERR"));
+	}
+	return rc;
+}
+
+NCURSES_EXPORT(void)
+_nc_legacy_console_init(void)
+{
+	WORD a;
+	int i;
+	DWORD num_buttons;
+
+	LEGACYCONSOLE.map = (LPDWORD)malloc(sizeof(DWORD) * MAPSIZE);
+	LEGACYCONSOLE.rmap = (LPDWORD)malloc(sizeof(DWORD) * MAPSIZE);
+	LEGACYCONSOLE.ansi_map = (LPDWORD)malloc(sizeof(DWORD) * MAPSIZE);
+
+	for (i = 0; i < (N_INI + FKEYS); i++)
+	{
+		if (i < N_INI)
+		{
+			LEGACYCONSOLE.rmap[i] = LEGACYCONSOLE.map[i] =
+			    (DWORD)keylist[i];
+			LEGACYCONSOLE.ansi_map[i] = (DWORD)ansi_keys[i];
+		}
+		else
+		{
+			LEGACYCONSOLE.rmap[i] = LEGACYCONSOLE.map[i] =
+			    (DWORD)GenMap((VK_F1 + (i - N_INI)),
+					  (KEY_F(1) + (i - N_INI)));
+			LEGACYCONSOLE.ansi_map[i] =
+			    (DWORD)GenMap((VK_F1 + (i - N_INI)),
+					  (';' + (i - N_INI)));
+		}
+	}
+	qsort(LEGACYCONSOLE.ansi_map,
+	      (size_t)(MAPSIZE),
+	      sizeof(keylist[0]),
+	      keycompare);
+	qsort(LEGACYCONSOLE.map,
+	      (size_t)(MAPSIZE),
+	      sizeof(keylist[0]),
+	      keycompare);
+	qsort(LEGACYCONSOLE.rmap,
+	      (size_t)(MAPSIZE),
+	      sizeof(keylist[0]),
+	      rkeycompare);
+
+	if (GetNumberOfConsoleMouseButtons(&num_buttons))
+		LEGACYCONSOLE.numButtons = (int)num_buttons;
+	else
+		LEGACYCONSOLE.numButtons = 1;
+
+	a = console_MapColor(TRUE, COLOR_WHITE) |
+	    console_MapColor(FALSE, COLOR_BLACK);
+	for (i = 0; i < CON_NUMPAIRS; i++)
+		LEGACYCONSOLE.pairs[i] = a;
+
+	get_SBI();
+	GetConsoleCursorInfo(LEGACYCONSOLE.core.ConsoleHandleOut, &LEGACYCONSOLE.save_CI);
+	T(("... initial cursor is %svisible, %d%%",
+	   (LEGACYCONSOLE.save_CI.bVisible ? "" : "not-"),
+	   (int)LEGACYCONSOLE.save_CI.dwSize));
+       
+	LEGACYCONSOLE.info.initcolor = TRUE;
+	LEGACYCONSOLE.info.canchange = FALSE;
+	LEGACYCONSOLE.info.hascolor = TRUE;
+	LEGACYCONSOLE.info.caninit = TRUE;
+	LEGACYCONSOLE.info.maxpairs = CON_NUMPAIRS;
+	LEGACYCONSOLE.info.maxcolors = 8;
+	LEGACYCONSOLE.info.numlabels = 0;
+	LEGACYCONSOLE.info.labelwidth = 0;
+	LEGACYCONSOLE.info.labelheight = 0;
+	LEGACYCONSOLE.info.nocolorvideo = 1;
+	LEGACYCONSOLE.info.tabsize = 8;
+	LEGACYCONSOLE.info.numbuttons = LEGACYCONSOLE.numButtons;
+}
+
 
 METHOD(AdjustSize, BOOL)(void)
 {
@@ -212,6 +385,57 @@ METHOD(beeporflash, int)(BOOL beepFlag)
 	res = OK;
 	return res;
 }
+
+METHOD(keyok, int)(int keycode, int flag)
+{
+	int code = ERR;
+	WORD nKey;
+	WORD vKey;
+	void *res;
+	LONG key = GenMap(0, (WORD)keycode);
+
+	T((T_CALLED("win32_console::legacy_keyok(%d, %d)"), keycode, flag));
+
+	res = bsearch(&key,
+				  LEGACYCONSOLE.rmap,
+				  (size_t)(N_INI + FKEYS),
+				  sizeof(keylist[0]),
+				  rkeycompare);
+	if (res)
+	{
+		key = *((LONG *)res);
+		vKey = HIWORD(key);
+		nKey = (LOWORD(key)) & 0x7fff;
+		if (!flag)
+			nKey |= 0x8000;
+		*(LONG *)res = GenMap(vKey, nKey);
+	}
+	returnCode(code);
+}
+
+METHOD(has_key, int)(int keycode)
+{
+	WORD nKey;
+	void *res;
+	bool found = FALSE;
+	LONG key = GenMap(0, (WORD)keycode);
+
+	T((T_CALLED("win32_console::legacy_has_key(%d)"), keycode));
+	res = bsearch(&key,
+				  LEGACYCONSOLE.rmap,
+				  (size_t)(N_INI + FKEYS),
+				  sizeof(keylist[0]),
+				  rkeycompare);
+	if (res)
+	{
+		key = *((LONG *)res);
+		nKey = LOWORD(key);
+		if (!(nKey & 0x8000))
+			found = TRUE;
+	}
+	returnCode(found ? OK : ERR);
+}
+
 
 /* This function sets the console mode for the input and output handles. It is called by the main thread
  * when it wants to change the console mode. The function takes a TTY structure that contains the desired

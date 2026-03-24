@@ -2453,8 +2453,7 @@ extern NCURSES_EXPORT(int) _nc_get_tty_mode(TTY *);
     }\
     sp->jump = outc
 
-#if USE_TERM_DRIVER
-
+#if USE_TERM_DRIVER || USE_LEGACY_CONSOLE
 typedef struct _termInfo
 {
     bool caninit;
@@ -2476,7 +2475,9 @@ typedef struct _termInfo
 
     const color_t* defaultPalette;
 } TerminalInfo;
+#endif /* USE_TERM_DRIVER || USE_LEGACY_CONSOLE */
 
+#if USE_TERM_DRIVER
 typedef struct term_driver {
     bool   isTerminfo;
     const char* (*td_name)(struct DriverTCB*);
@@ -2495,13 +2496,10 @@ typedef struct term_driver {
     void   (*td_setfilter)(struct DriverTCB*);
     int    (*td_update)(struct DriverTCB*);
     int    (*td_defaultcolors)(struct DriverTCB*, int, int);
-    int    (*td_print)(struct DriverTCB*, char*, int);
     int    (*td_setsize)(struct DriverTCB*, int, int);
     void   (*td_initacs)(struct DriverTCB*, chtype*, chtype*);
     int    (*td_twait)(struct DriverTCB*, int, int, int* EVENTLIST_2nd(_nc_eventlist*));
     int    (*td_read)(struct DriverTCB*, int*);
-    int    (*td_kyOk)(struct DriverTCB*, int, int);
-    bool   (*td_kyExist)(struct DriverTCB*, int);
     int    (*td_cursorSet)(struct DriverTCB*, int);
 } TERM_DRIVER;
 
@@ -2539,14 +2537,11 @@ extern NCURSES_EXPORT(void)     _nc_get_screensize_ex(SCREEN *, TERMINAL *, int 
  * be an sp-name otherwise.
  */
 #if USE_TERM_DRIVER
-#define TINFO_HAS_KEY           _nc_tinfo_has_key
 #define TINFO_DOUPDATE          _nc_tinfo_doupdate
 #define TINFO_MVCUR             _nc_tinfo_mvcur
-extern NCURSES_EXPORT(int)      TINFO_HAS_KEY(SCREEN*, int);
 extern NCURSES_EXPORT(int)      TINFO_DOUPDATE(SCREEN *);
 extern NCURSES_EXPORT(int)      TINFO_MVCUR(SCREEN*, int, int, int, int);
 #else
-#define TINFO_HAS_KEY           NCURSES_SP_NAME(has_key)
 #define TINFO_DOUPDATE          NCURSES_SP_NAME(doupdate)
 #define TINFO_MVCUR             NCURSES_SP_NAME(_nc_mvcur)
 #endif /* USE_TERM_DRIVER */
@@ -2718,11 +2713,15 @@ typedef struct {
     CONSOLE_SCREEN_BUFFER_INFO SBI;
     CONSOLE_CURSOR_INFO save_CI;
 
+    TerminalInfo info;			      // Core capabilities.
+
     BOOL (*AdjustSize)(void);                 // Adjust the console buffer size.
     int (*napms)(int ms);                     // Pointer to the napms function used by the legacy console.
     chtype (*termattrs)(void);                // Pointer to the termattrs function used by the legacy console.
     int (*keypad)(BOOL);                      // Pointer to the keypad function used by the legacy console.
     int (*beeporflash)(BOOL);                 // Pointer to the beep or flash function used by the legacy console.
+    int (*keyok)(int keycode,int flag);       // Pointer to the keyok function used by the legacy console.
+    int (*has_key)(int keycode);              // Pointer to the has_key function used by the legacy console.
 } LegacyConsoleInterface;
 extern NCURSES_EXPORT_VAR(LegacyConsoleInterface *) _nc_LEGACYCONSOLE;
 #define LEGACYCONSOLE (*_nc_LEGACYCONSOLE)
@@ -2807,7 +2806,6 @@ extern NCURSES_EXPORT(bool)     NCURSES_SP_NAME(_nc_reset_colors)(SCREEN*);
 extern NCURSES_EXPORT(char *)   NCURSES_SP_NAME(_nc_printf_string)(SCREEN*, const char *, va_list);
 extern NCURSES_EXPORT(chtype)   NCURSES_SP_NAME(_nc_acs_char)(SCREEN*,int);
 extern NCURSES_EXPORT(int)      NCURSES_SP_NAME(_nc_get_tty_mode)(SCREEN*,TTY*);
-extern NCURSES_EXPORT(int)      NCURSES_SP_NAME(_nc_mcprint)(SCREEN*,char*, int);
 extern NCURSES_EXPORT(int)      NCURSES_SP_NAME(_nc_msec_cost)(SCREEN*, const char *, int);
 extern NCURSES_EXPORT(int)      NCURSES_SP_NAME(_nc_mvcur)(SCREEN*, int, int, int, int);
 extern NCURSES_EXPORT(int)      NCURSES_SP_NAME(_nc_outch)(SCREEN*, int);

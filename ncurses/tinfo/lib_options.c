@@ -266,7 +266,7 @@ typeahead(int fd)
 */
 
 #if NCURSES_EXT_FUNCS
-static int
+static BOOL
 has_key_internal(int keycode, TRIES * tp)
 {
     if (tp == NULL)
@@ -278,14 +278,6 @@ has_key_internal(int keycode, TRIES * tp)
 		|| has_key_internal(keycode, tp->sibling));
 }
 
-#if USE_TERM_DRIVER
-NCURSES_EXPORT(int)
-TINFO_HAS_KEY(SCREEN *sp, int keycode)
-{
-    return IsValidTIScreen(sp) ?
-	has_key_internal(keycode, sp->_keytry) : 0;
-}
-#else
 NCURSES_EXPORT(int)
 NCURSES_SP_NAME(has_key) (NCURSES_SP_DCLx int keycode)
 {
@@ -299,7 +291,6 @@ has_key(int keycode)
 {
     return NCURSES_SP_NAME(has_key) (CURRENT_SCREEN, keycode);
 }
-#endif
 #endif
 #endif /* NCURSES_EXT_FUNCS */
 

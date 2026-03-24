@@ -66,8 +66,6 @@ MODULE_ID("$Id: win32_driver.c,v 1.20 2025/12/30 19:34:50 tom Exp $")
 
 
 static BOOL get_SBI(void);
-static int console_keyok(int keycode, int flag);
-static BOOL console_keyExist(int keycode);
 static WORD console_MapColor(BOOL fore, int color);
 static int console_twait(
 	const SCREEN *sp,
@@ -134,33 +132,11 @@ static const LONG keylist[] =
 		GenMap(VK_DELETE, KEY_DC),
 		GenMap(VK_INSERT, KEY_IC)};
 
-static const LONG ansi_keys[] =
-	{
-		GenMap(VK_PRIOR, 'I'),
-		GenMap(VK_NEXT, 'Q'),
-		GenMap(VK_END, 'O'),
-		GenMap(VK_HOME, 'H'),
-		GenMap(VK_LEFT, 'K'),
-		GenMap(VK_UP, 'H'),
-		GenMap(VK_RIGHT, 'M'),
-		GenMap(VK_DOWN, 'P'),
-		GenMap(VK_DELETE, 'S'),
-		GenMap(VK_INSERT, 'R')};
-
 /* *INDENT-ON* */
 #define array_length(a) (sizeof(a) / sizeof(a[0]))
 #define N_INI ((int)array_length(keylist))
 #define FKEYS 24
 #define MAPSIZE (FKEYS + N_INI)
-
-static int
-rkeycompare(const void *el1, const void *el2)
-{
-	WORD key1 = (LOWORD((*((const LONG *)el1)))) & 0x7fff;
-	WORD key2 = (LOWORD((*((const LONG *)el2)))) & 0x7fff;
-
-	return ((key1 < key2) ? -1 : ((key1 == key2) ? 0 : 1));
-}
 
 static int
 keycompare(const void *el1, const void *el2)
@@ -221,86 +197,6 @@ AnsiKey(WORD vKey)
 	return code;
 }
 
-static int
-console_keyok(int keycode, int flag)
-{
-	int code = ERR;
-	WORD nKey;
-	WORD vKey;
-	void *res;
-	LONG key = GenMap(0, (WORD)keycode);
-
-	T((T_CALLED("win32_driver::console_keyok(%d, %d)"), keycode, flag));
-
-	res = bsearch(&key,
-				  LEGACYCONSOLE.rmap,
-				  (size_t)(N_INI + FKEYS),
-				  sizeof(keylist[0]),
-				  rkeycompare);
-	if (res)
-	{
-		key = *((LONG *)res);
-		vKey = HIWORD(key);
-		nKey = (LOWORD(key)) & 0x7fff;
-		if (!flag)
-			nKey |= 0x8000;
-		*(LONG *)res = GenMap(vKey, nKey);
-	}
-	returnCode(code);
-}
-
-static BOOL
-console_keyExist(int keycode)
-{
-	WORD nKey;
-	void *res;
-	bool found = FALSE;
-	LONG key = GenMap(0, (WORD)keycode);
-
-	T((T_CALLED("win32_driver::console_keyExist(%d)"), keycode));
-	res = bsearch(&key,
-				  LEGACYCONSOLE.rmap,
-				  (size_t)(N_INI + FKEYS),
-				  sizeof(keylist[0]),
-				  rkeycompare);
-	if (res)
-	{
-		key = *((LONG *)res);
-		nKey = LOWORD(key);
-		if (!(nKey & 0x8000))
-			found = TRUE;
-	}
-	returnCode(found);
-}
-
-static bool
-wcon_kyExist(TERMINAL_CONTROL_BLOCK *TCB GCC_UNUSED, int keycode)
-{
-	bool found = FALSE;
-
-	T((T_CALLED("win32_driver::wcon_kyExist(%d)"), keycode));
-	found = console_keyExist(keycode);
-	returnBool(found);
-}
-
-
-static int
-wcon_keyok(TERMINAL_CONTROL_BLOCK *TCB,
-		   int keycode,
-		   int flag)
-{
-	int code = ERR;
-	SCREEN *sp;
-
-	T((T_CALLED("win32_driver::wcon_keyok(%p, %d, %d)"), TCB, keycode, flag));
-
-	SetSP();
-	if (sp)
-	{
-		code = console_keyok(keycode, flag);
-	}
-	returnCode(code);
-}
 
 // ------------------------------- Color related definitions and functions -----------------------------------
 
@@ -875,19 +771,6 @@ wcon_CanHandle(TERMINAL_CONTROL_BLOCK *TCB,
 	returnBool(code);
 }
 
-static int
-wcon_print(TERMINAL_CONTROL_BLOCK *TCB,
-		   char *data GCC_UNUSED,
-		   int len GCC_UNUSED)
-{
-	SCREEN *sp;
-
-	AssertTCB();
-	SetSP();
-
-	return ERR;
-}
-
 static bool
 wcon_rescol(TERMINAL_CONTROL_BLOCK *TCB)
 {
@@ -914,65 +797,6 @@ wcon_release(TERMINAL_CONTROL_BLOCK *TCB)
 	returnVoid;
 }
 
-NCURSES_EXPORT(void)
-_nc_legacy_console_init(void)
-{
-	WORD a;
-	int i;
-	DWORD num_buttons;
-
-	LEGACYCONSOLE.map = (LPDWORD)malloc(sizeof(DWORD) * MAPSIZE);
-	LEGACYCONSOLE.rmap = (LPDWORD)malloc(sizeof(DWORD) * MAPSIZE);
-	LEGACYCONSOLE.ansi_map = (LPDWORD)malloc(sizeof(DWORD) * MAPSIZE);
-
-	for (i = 0; i < (N_INI + FKEYS); i++)
-	{
-		if (i < N_INI)
-		{
-			LEGACYCONSOLE.rmap[i] = LEGACYCONSOLE.map[i] =
-			    (DWORD)keylist[i];
-			LEGACYCONSOLE.ansi_map[i] = (DWORD)ansi_keys[i];
-		}
-		else
-		{
-			LEGACYCONSOLE.rmap[i] = LEGACYCONSOLE.map[i] =
-			    (DWORD)GenMap((VK_F1 + (i - N_INI)),
-					  (KEY_F(1) + (i - N_INI)));
-			LEGACYCONSOLE.ansi_map[i] =
-			    (DWORD)GenMap((VK_F1 + (i - N_INI)),
-					  (';' + (i - N_INI)));
-		}
-	}
-	qsort(LEGACYCONSOLE.ansi_map,
-	      (size_t)(MAPSIZE),
-	      sizeof(keylist[0]),
-	      keycompare);
-	qsort(LEGACYCONSOLE.map,
-	      (size_t)(MAPSIZE),
-	      sizeof(keylist[0]),
-	      keycompare);
-	qsort(LEGACYCONSOLE.rmap,
-	      (size_t)(MAPSIZE),
-	      sizeof(keylist[0]),
-	      rkeycompare);
-
-	if (GetNumberOfConsoleMouseButtons(&num_buttons))
-		LEGACYCONSOLE.numButtons = (int)num_buttons;
-	else
-		LEGACYCONSOLE.numButtons = 1;
-
-	a = console_MapColor(TRUE, COLOR_WHITE) |
-	    console_MapColor(FALSE, COLOR_BLACK);
-	for (i = 0; i < CON_NUMPAIRS; i++)
-		LEGACYCONSOLE.pairs[i] = a;
-
-	get_SBI();
-	GetConsoleCursorInfo(LEGACYCONSOLE.core.ConsoleHandleOut, &LEGACYCONSOLE.save_CI);
-	T(("... initial cursor is %svisible, %d%%",
-	   (LEGACYCONSOLE.save_CI.bVisible ? "" : "not-"),
-	   (int)LEGACYCONSOLE.save_CI.dwSize));
-}
-
 
 static void
 wcon_init(TERMINAL_CONTROL_BLOCK *TCB)
@@ -980,30 +804,6 @@ wcon_init(TERMINAL_CONTROL_BLOCK *TCB)
 	T((T_CALLED("win32_driver::wcon_init(%p)"), TCB));
 
 	AssertTCB();
-	if (!console_initialized)
-	{
-		T(("... Console not initialized, cannot initialize TCB"));
-		returnVoid;
-	}
-	if (TCB)
-	{
-		T(("... initializing TCB info"));
-		TCB->info.initcolor = TRUE;
-		TCB->info.canchange = FALSE;
-		TCB->info.hascolor = TRUE;
-		TCB->info.caninit = TRUE;
-
-		TCB->info.maxpairs = CON_NUMPAIRS;
-		TCB->info.maxcolors = 8;
-		TCB->info.numlabels = 0;
-		TCB->info.labelwidth = 0;
-		TCB->info.labelheight = 0;
-		TCB->info.nocolorvideo = 1;
-		TCB->info.tabsize = 8;
-
-		TCB->info.numbuttons = LEGACYCONSOLE.numButtons;
-		TCB->info.defaultPalette = _nc_cga_palette;
-	}
 	returnVoid;
 }
 
@@ -1620,13 +1420,10 @@ _nc_WIN_DRIVER = {
 	wcon_setfilter,		/* setfilter     */
 	wcon_doupdate,		/* update        */
 	wcon_defaultcolors, /* defaultcolors */
-	wcon_print,			/* print         */
 	wcon_setsize,		/* setsize       */
 	wcon_initacs,		/* initacs       */
 	wcon_twait,			/* twait         */
 	wcon_read,			/* read          */
-	wcon_keyok,			/* kyOk          */
-	wcon_kyExist,		/* kyExist       */
 	wcon_cursorSet		/* cursorSet     */
 };
 #endif /* USE_LEGACY_CONSOLE */

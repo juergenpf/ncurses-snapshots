@@ -272,20 +272,6 @@ toggled_colors(int c)
 }
 
 static int
-drv_print(TERMINAL_CONTROL_BLOCK * TCB, char *data, int len)
-{
-    SCREEN *sp;
-
-    AssertTCB();
-    SetSP();
-#if NCURSES_EXT_FUNCS
-    return NCURSES_SP_NAME(mcprint) (TCB->csp, data, len);
-#else
-    return ERR;
-#endif
-}
-
-static int
 drv_defaultcolors(TERMINAL_CONTROL_BLOCK * TCB, int fg, int bg)
 {
     SCREEN *sp;
@@ -987,50 +973,6 @@ drv_read(TERMINAL_CONTROL_BLOCK * TCB, int *buf)
 }
 
 static int
-drv_keyok(TERMINAL_CONTROL_BLOCK * TCB, int c, int flag)
-{
-    SCREEN *sp;
-    int code = ERR;
-    int count = 0;
-    char *s;
-
-    AssertTCB();
-    SetSP();
-
-    if (c >= 0) {
-	unsigned ch = (unsigned) c;
-	if (flag) {
-	    while ((s = _nc_expand_try(sp->_key_ok,
-				       ch, &count, (size_t) 0)) != NULL) {
-		if (_nc_remove_key(&(sp->_key_ok), ch)) {
-		    code = _nc_add_to_try(&(sp->_keytry), s, ch);
-		    free(s);
-		    count = 0;
-		    if (code != OK)
-			break;
-		} else {
-		    free(s);
-		}
-	    }
-	} else {
-	    while ((s = _nc_expand_try(sp->_keytry,
-				       ch, &count, (size_t) 0)) != NULL) {
-		if (_nc_remove_key(&(sp->_keytry), ch)) {
-		    code = _nc_add_to_try(&(sp->_key_ok), s, ch);
-		    free(s);
-		    count = 0;
-		    if (code != OK)
-			break;
-		} else {
-		    free(s);
-		}
-	    }
-	}
-    }
-    return (code);
-}
-
-static int
 drv_cursorSet(TERMINAL_CONTROL_BLOCK * TCB, int vis)
 {
     SCREEN *sp;
@@ -1059,17 +1001,6 @@ drv_cursorSet(TERMINAL_CONTROL_BLOCK * TCB, int vis)
     returnCode(code);
 }
 
-static bool
-drv_kyExist(TERMINAL_CONTROL_BLOCK * TCB, int key)
-{
-    bool res = FALSE;
-
-    AssertTCB();
-    if (TCB->csp)
-	res = TINFO_HAS_KEY(TCB->csp, key) == 0 ? FALSE : TRUE;
-
-    return res;
-}
 
 NCURSES_EXPORT_VAR (TERM_DRIVER) _nc_TINFO_DRIVER = {
     TRUE,
@@ -1089,13 +1020,10 @@ NCURSES_EXPORT_VAR (TERM_DRIVER) _nc_TINFO_DRIVER = {
 	drv_setfilter,		/* setfilter */
 	drv_doupdate,		/* update */
 	drv_defaultcolors,	/* defaultcolors */
-	drv_print,		/* print */
 	drv_setsize,		/* setsize */
 	drv_initacs,		/* initacs */
 	drv_twait,		/* twait  */
 	drv_read,		/* read */
-	drv_keyok,		/* kyOk */
-	drv_kyExist,		/* kyExist */
 	drv_cursorSet		/* cursorSet */
 };
 

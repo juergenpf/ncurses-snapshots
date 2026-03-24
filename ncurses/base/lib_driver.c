@@ -37,35 +37,6 @@
 MODULE_ID("$Id: lib_driver.c,v 1.12 2025/10/18 19:20:33 tom Exp $")
 
 NCURSES_EXPORT(int)
-NCURSES_SP_NAME(has_key) (SCREEN *sp, int keycode)
-{
-    T((T_CALLED("has_key(%p, %d)"), (void *) sp, keycode));
-    returnCode(IsValidTIScreen(sp) ? CallDriver_1(sp, td_kyExist, keycode) : FALSE);
-}
-
-NCURSES_EXPORT(int)
-has_key(int keycode)
-{
-    return NCURSES_SP_NAME(has_key) (CURRENT_SCREEN, keycode);
-}
-
-NCURSES_EXPORT(int)
-NCURSES_SP_NAME(_nc_mcprint) (SCREEN *sp, char *data, int len)
-{
-    int code = ERR;
-
-    if (NULL != TerminalOf(sp))
-	code = CallDriver_2(sp, td_print, data, len);
-    return (code);
-}
-
-NCURSES_EXPORT(int)
-mcprint(char *data, int len)
-{
-    return NCURSES_SP_NAME(_nc_mcprint) (CURRENT_SCREEN, data, len);
-}
-
-NCURSES_EXPORT(int)
 NCURSES_SP_NAME(doupdate) (SCREEN *sp)
 {
     int code = ERR;
