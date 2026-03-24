@@ -2484,7 +2484,6 @@ typedef struct term_driver {
     bool   (*td_CanHandle)(struct DriverTCB*, const char*, int*);
     void   (*td_init)(struct DriverTCB*);
     void   (*td_release)(struct DriverTCB*);
-    int    (*td_size)(struct DriverTCB*, int* Line, int *Cols);
     int    (*td_hwcur)(struct DriverTCB*, int yold, int xold, int y, int x);
     bool   (*td_rescol)(struct DriverTCB*);
     bool   (*td_rescolors)(struct DriverTCB*);
@@ -2528,7 +2527,6 @@ extern NCURSES_EXPORT_VAR(const color_t*) _nc_cga_palette;
 extern NCURSES_EXPORT_VAR(const color_t*) _nc_hls_palette;
 
 extern NCURSES_EXPORT(int)      _nc_get_driver(TERMINAL_CONTROL_BLOCK*, const char*, int*);
-extern NCURSES_EXPORT(void)     _nc_get_screensize_ex(SCREEN *, TERMINAL *, int *, int *);
 #endif /* USE_TERM_DRIVER */
 
 /*
@@ -2561,19 +2559,14 @@ extern NCURSES_EXPORT(int)      TINFO_MVCUR(SCREEN*, int, int, int, int);
 /*
  * Entrypoints using an extra parameter with the terminal driver.
  */
+
 #if USE_TERM_DRIVER
-extern NCURSES_EXPORT(void)   _nc_get_screensize(SCREEN *, TERMINAL *, int *, int *);
 extern NCURSES_EXPORT(int)    _nc_setupterm_ex(TERMINAL **, const char *, int , int *, int);
-#define TINFO_GET_SIZE(sp, tp, lp, cp) \
-	_nc_get_screensize(sp, tp, lp, cp)
 #define TINFO_SET_CURTERM(sp, tp) \
 	NCURSES_SP_NAME(set_curterm)(sp, tp)
 #define TINFO_SETUP_TERM(tpp, name, fd, err, reuse) \
 	_nc_setupterm_ex(tpp, name, fd, err, reuse)
 #else /* !USE_TERM_DRIVER */
-extern NCURSES_EXPORT(void)   _nc_get_screensize(SCREEN *, int *, int *);
-#define TINFO_GET_SIZE(sp, tp, lp, cp) \
-	_nc_get_screensize(sp, lp, cp)
 #define TINFO_SET_CURTERM(sp, tp) \
 	set_curterm(tp)
 #define TINFO_SETUP_TERM(tpp, name, fd, err, reuse) \
@@ -2585,7 +2578,11 @@ extern NCURSES_EXPORT_VAR(TERM_DRIVER) _nc_WIN_DRIVER;
 extern NCURSES_EXPORT_VAR(TERM_DRIVER) _nc_TINFO_DRIVER;
 #endif /* USE_TERM_DRIVER */
 
-#if  USE_CONSOLE_API
+extern NCURSES_EXPORT(void)   _nc_get_screensize(SCREEN *, int *, int *);
+#define TINFO_GET_SIZE(sp, tp, lp, cp) \
+	_nc_get_screensize(sp, lp, cp)
+
+	#if  USE_CONSOLE_API
 extern NCURSES_EXPORT(BOOL) _nc_console_setup(void);
 #endif
 

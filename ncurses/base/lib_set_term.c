@@ -386,12 +386,7 @@ NCURSES_SP_NAME(_nc_setupscreen) (
      */
     _nc_set_screen(sp);
     sp->_term = cur_term;
-#if USE_TERM_DRIVER
-    TCBOf(sp)->csp = sp;
-    _nc_get_screensize(sp, sp->_term, &slines, &scolumns);
-#else
     _nc_get_screensize(sp, &slines, &scolumns);
-#endif
     if (scolumns < 0)
 	scolumns = 0;
     if (slines < 0)

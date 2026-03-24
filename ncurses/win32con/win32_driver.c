@@ -333,21 +333,6 @@ get_SBI(void)
 
 
 static int
-wcon_size(TERMINAL_CONTROL_BLOCK *TCB, int *Lines, int *Cols)
-{
-	int result = ERR;
-
-	T((T_CALLED("win32_driver::wcon_size(%p)"), TCB));
-
-	if ((Lines != NULL) && (Cols != NULL))
-	{
-		LEGACYCONSOLE.core.size(Lines, Cols);
-		result = OK;
-	}
-	returnCode(result);
-}
-
-static int
 wcon_setsize(TERMINAL_CONTROL_BLOCK *TCB GCC_UNUSED,
 			 int l GCC_UNUSED,
 			 int c GCC_UNUSED)
@@ -1358,7 +1343,6 @@ _nc_WIN_DRIVER = {
 	wcon_CanHandle,		/* CanHandle     */
 	wcon_init,			/* init          */
 	wcon_release,		/* release       */
-	wcon_size,			/* size          */
 	wcon_mvcur,			/* hwcur         */
 	wcon_rescol,		/* rescol        */
 	wcon_rescolors,		/* rescolors     */

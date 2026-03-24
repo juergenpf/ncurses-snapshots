@@ -465,39 +465,35 @@ _nc_check_screensize(SCREEN *sp, TERMINAL *termp, int *linep, int *colp)
 
 NCURSES_EXPORT(void)
 _nc_get_screensize(SCREEN *sp,
-#if USE_TERM_DRIVER
-		   TERMINAL *termp,
-#endif
 		   int *linep, int *colp)
 /* Obtain lines/columns values from the environment and/or terminfo entry */
 {
-#if USE_TERM_DRIVER
-    TERMINAL_CONTROL_BLOCK *TCB;
     int my_tabsize;
 
-    assert(termp != NULL && linep != NULL && colp != NULL);
-    TCB = (TERMINAL_CONTROL_BLOCK *) termp;
-
-    my_tabsize = TCB->info.tabsize;
-    TCB->drv->td_size(TCB, linep, colp);
-
+#if USE_LEGACY_CONSOLE
+    assert(linep != NULL && colp != NULL);
+    if (IsLegacyConsole()) {
+	my_tabsize = LEGACYCONSOLE.info.tabsize;
+	LEGACYCONSOLE.core.size(linep, colp);
 #if USE_REENTRANT
-    if (sp != NULL) {
-	sp->_TABSIZE = my_tabsize;
-    }
+        if (sp != NULL) {
+	    sp->_TABSIZE = my_tabsize;
+        }
 #else
-    (void) sp;
-    TABSIZE = my_tabsize;
+        (void) sp;
+        TABSIZE = my_tabsize;
 #endif
     T(("TABSIZE = %d", my_tabsize));
-#else /* !USE_TERM_DRIVER */
+    }
+    returnVoid
+#endif /* !USE_LEGACY_CONSOLE */
+
     TERMINAL *termp = cur_term;
-    int my_tabsize;
     bool useEnv = _nc_prescreen.use_env;
     bool useTioctl = _nc_prescreen.use_tioctl;
 
     T((T_CALLED("_nc_get_screensize (%p)"), (void *) sp));
-#if USE_CONSOLE_API
+#if USE_MODERN_CONSOLE
     /* If we are here, then Windows console is used in terminfo mode.
        We need to figure out the size using the console API
      */
@@ -620,7 +616,6 @@ _nc_get_screensize(SCREEN *sp,
 #endif
     T(("TABSIZE = %d", TABSIZE));
     returnVoid;
-#endif /* USE_TERM_DRIVER */
 }
 
 #if USE_SIZECHANGE
