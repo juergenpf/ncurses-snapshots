@@ -431,31 +431,6 @@ drv_init(TERMINAL_CONTROL_BLOCK * TCB)
 #define MAX_PALETTE	8
 #define InPalette(n)	((n) >= 0 && (n) < MAX_PALETTE)
 
-static void
-drv_initpair(TERMINAL_CONTROL_BLOCK * TCB, int pair, int f, int b)
-{
-    SCREEN *sp;
-
-    AssertTCB();
-    SetSP();
-
-    if ((initialize_pair != NULL) && InPalette(f) && InPalette(b)) {
-	const color_t *tp = InfoOf(sp).defaultPalette;
-
-	TR(TRACE_ATTRS,
-	   ("initializing pair: pair = %d, fg=(%d,%d,%d), bg=(%d,%d,%d)",
-	    pair,
-	    tp[f].red, tp[f].green, tp[f].blue,
-	    tp[b].red, tp[b].green, tp[b].blue));
-
-	NCURSES_PUTP2("initialize_pair",
-		      TIPARM_7(initialize_pair,
-			       pair,
-			       tp[f].red, tp[f].green, tp[f].blue,
-			       tp[b].red, tp[b].green, tp[b].blue));
-    }
-}
-
 static int
 default_fg(SCREEN *sp)
 {
@@ -796,10 +771,7 @@ NCURSES_EXPORT_VAR (TERM_DRIVER) _nc_TINFO_DRIVER = {
 	drv_init,		/* init */
 	drv_release,		/* release */
 	drv_mvcur,		/* hwcur */
-	drv_rescol,		/* rescol */
 	drv_rescolors,		/* rescolors */
-	drv_setcolor,		/* color */
-	drv_initpair,		/* initpair */
 	drv_initcolor,		/* initcolor */
 	drv_do_color,		/* docolor */
 	drv_testmouse,		/* testmouse */

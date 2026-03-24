@@ -52,6 +52,15 @@
 MODULE_ID("$Id: lib_color.c,v 1.157 2025/12/27 12:31:03 tom Exp $")
 
 #if USE_TERM_DRIVER
+#if USE_LEGACY_CONSOLE
+#define CanChange      LEGACYCONSOLE.info.canchange
+#define DefaultPalette LEGACYCONSOLE.info.defaultPalette
+#define HasColor       LEGACYCONSOLE.info.hascolor
+#define InitColor      LEGACYCONSOLE.info.initcolor
+#define MaxColors      LEGACYCONSOLE.info.maxcolors
+#define MaxPairs       LEGACYCONSOLE.info.maxpairs
+#define UseHlsPalette  (DefaultPalette == _nc_hls_palette)
+#else
 #define CanChange      InfoOf(SP_PARM).canchange
 #define DefaultPalette InfoOf(SP_PARM).defaultPalette
 #define HasColor       InfoOf(SP_PARM).hascolor
@@ -59,6 +68,7 @@ MODULE_ID("$Id: lib_color.c,v 1.157 2025/12/27 12:31:03 tom Exp $")
 #define MaxColors      InfoOf(SP_PARM).maxcolors
 #define MaxPairs       InfoOf(SP_PARM).maxpairs
 #define UseHlsPalette  (DefaultPalette == _nc_hls_palette)
+#endif
 #else
 #define CanChange      can_change
 #define DefaultPalette (hue_lightness_saturation ? hls_palette : cga_palette)
@@ -68,6 +78,7 @@ MODULE_ID("$Id: lib_color.c,v 1.157 2025/12/27 12:31:03 tom Exp $")
 #define MaxPairs       max_pairs
 #define UseHlsPalette  (hue_lightness_saturation)
 #endif
+
 
 #if !USE_TERM_DRIVER
 /*
@@ -159,7 +170,7 @@ default_bg(NCURSES_SP_DCL0)
 #define default_bg(sp) COLOR_BLACK
 #endif
 
-#if !USE_TERM_DRIVER
+#if !USE_TERM_DRIVER || USE_LEGACY_CONSOLE
 /*
  * SVr4 curses is known to interchange color codes (1,4) and (3,6), possibly
  * to maintain compatibility with a pre-ANSI scheme.  The same scheme is
@@ -181,9 +192,12 @@ toggled_colors(int c)
 static void
 set_background_color(NCURSES_SP_DCLx int bg, NCURSES_SP_OUTC outc)
 {
-#if USE_TERM_DRIVER
-    CallDriver_3(SP_PARM, td_color, FALSE, bg, outc);
-#else
+#if USE_LEGACY_CONSOLE
+    if (IsLegacyConsole()) {
+	LEGACYCONSOLE.setcolor(FALSE, bg);
+	return;
+    }
+#endif
     if (set_a_background) {
 	TPUTS_TRACE("set_a_background");
 	NCURSES_SP_NAME(tputs) (NCURSES_SP_ARGx
@@ -195,15 +209,17 @@ set_background_color(NCURSES_SP_DCLx int bg, NCURSES_SP_OUTC outc)
 				TIPARM_1(set_background, toggled_colors(bg)),
 				1, outc);
     }
-#endif
 }
 
 static void
 set_foreground_color(NCURSES_SP_DCLx int fg, NCURSES_SP_OUTC outc)
 {
-#if USE_TERM_DRIVER
-    CallDriver_3(SP_PARM, td_color, TRUE, fg, outc);
-#else
+#if USE_LEGACY_CONSOLE
+    if (IsLegacyConsole()) {
+	LEGACYCONSOLE.setcolor(TRUE, fg);
+	return;
+    }
+#endif
     if (set_a_foreground) {
 	TPUTS_TRACE("set_a_foreground");
 	NCURSES_SP_NAME(tputs) (NCURSES_SP_ARGx
@@ -215,7 +231,6 @@ set_foreground_color(NCURSES_SP_DCLx int fg, NCURSES_SP_OUTC outc)
 				TIPARM_1(set_foreground, toggled_colors(fg)),
 				1, outc);
     }
-#endif
 }
 
 static void
@@ -303,13 +318,15 @@ init_direct_colors(NCURSES_SP_DCL0)
 /*
  * Reset the color pair, e.g., to whatever color pair 0 is.
  */
-static bool
+static BOOL
 reset_color_pair(NCURSES_SP_DCL0)
 {
-#if USE_TERM_DRIVER
-    return CallDriver(SP_PARM, td_rescol);
-#else
-    bool result = FALSE;
+    BOOL result = FALSE;
+#if USE_LEGACY_CONSOLE
+    if (IsLegacyConsole()) {
+	return LEGACYCONSOLE.reset_color_pair();
+    }
+#endif
 
     (void) SP_PARM;
     if (orig_pair != NULL) {
@@ -317,7 +334,6 @@ reset_color_pair(NCURSES_SP_DCL0)
 	result = TRUE;
     }
     return result;
-#endif
 }
 
 /*
@@ -658,9 +674,11 @@ _nc_init_pair(SCREEN *sp, int pair, int f, int b)
     if (GET_SCREEN_PAIR(sp) == pair)
 	SET_SCREEN_PAIR(sp, (int) (~0));	/* force attribute update */
 
-#if USE_TERM_DRIVER
-    CallDriver_3(sp, td_initpair, pair, f, b);
-#else
+#if USE_LEGACY_CONSOLE
+    if (IsLegacyConsole()) {
+	returnCode(LEGACYCONSOLE.init_pair(pair, f, b));
+    }
+#endif
     if (initialize_pair && InPalette(f) && InPalette(b)) {
 	const color_t *tp = DefaultPalette;
 
@@ -680,7 +698,6 @@ _nc_init_pair(SCREEN *sp, int pair, int f, int b)
 			       (int) tp[b].green,
 			       (int) tp[b].blue));
     }
-#endif
 
     returnCode(OK);
 }

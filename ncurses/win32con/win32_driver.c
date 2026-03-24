@@ -215,18 +215,6 @@ console_MapColor(BOOL fore, int color)
 	return (WORD)a;
 }
 
-static void
-wcon_setcolor(TERMINAL_CONTROL_BLOCK *TCB,
-			  int fore,
-			  int color,
-			  int (*outc)(SCREEN *, int) GCC_UNUSED)
-{
-	WORD a = console_MapColor((BOOL)fore, color);
-	(void)TCB;
-	a |= (WORD)((LEGACYCONSOLE.SBI.wAttributes) & ((BOOL)fore ? 0xfff8 : 0xff8f));
-	SetConsoleTextAttribute(LEGACYCONSOLE.core.ConsoleHandleOut, a);
-	get_SBI();
-}
 
 static int
 wcon_defaultcolors(TERMINAL_CONTROL_BLOCK *TCB,
@@ -267,24 +255,6 @@ wcon_do_color(TERMINAL_CONTROL_BLOCK *TCB,
 	SetSP();
 }
 
-static void
-wcon_initpair(TERMINAL_CONTROL_BLOCK *TCB,
-			  int pair,
-			  int f,
-			  int b)
-{
-	SCREEN *sp;
-
-	SetSP();
-
-	if ((pair > 0) && (pair < CON_NUMPAIRS) && (f >= 0) && (f < 8) && (b >= 0) && (b < 8))
-	{
-		LEGACYCONSOLE.pairs[pair] =
-			console_MapColor(TRUE, f) |
-			console_MapColor(FALSE, b);
-		T(("... wcon_initpair: pair %d: fg=%d, bg=%d", pair, f, b));
-	}
-}
 
 static void
 wcon_initcolor(TERMINAL_CONTROL_BLOCK *TCB,
@@ -756,19 +726,6 @@ wcon_CanHandle(TERMINAL_CONTROL_BLOCK *TCB,
 #endif
 	}
 	returnBool(code);
-}
-
-static bool
-wcon_rescol(TERMINAL_CONTROL_BLOCK *TCB)
-{
-	bool res = FALSE;
-
-	WORD a = FOREGROUND_BLUE | FOREGROUND_RED | FOREGROUND_GREEN;
-	(void)TCB;
-	SetConsoleTextAttribute(LEGACYCONSOLE.core.ConsoleHandleOut, a);
-	get_SBI();
-	res = TRUE;
-	return res;
 }
 
 
@@ -1344,10 +1301,7 @@ _nc_WIN_DRIVER = {
 	wcon_init,			/* init          */
 	wcon_release,		/* release       */
 	wcon_mvcur,			/* hwcur         */
-	wcon_rescol,		/* rescol        */
 	wcon_rescolors,		/* rescolors     */
-	wcon_setcolor,		/* color         */
-	wcon_initpair,		/* initpair      */
 	wcon_initcolor,		/* initcolor     */
 	wcon_do_color,		/* docolor       */
 	wcon_testmouse,		/* testmouse     */

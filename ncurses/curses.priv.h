@@ -2485,10 +2485,7 @@ typedef struct term_driver {
     void   (*td_init)(struct DriverTCB*);
     void   (*td_release)(struct DriverTCB*);
     int    (*td_hwcur)(struct DriverTCB*, int yold, int xold, int y, int x);
-    bool   (*td_rescol)(struct DriverTCB*);
     bool   (*td_rescolors)(struct DriverTCB*);
-    void   (*td_color)(struct DriverTCB*, int fore, int color, int(*)(SCREEN*, int));
-    void   (*td_initpair)(struct DriverTCB*, int, int, int);
     void   (*td_initcolor)(struct DriverTCB*, int, int, int, int);
     void   (*td_docolor)(struct DriverTCB*, int, int, int, int(*)(SCREEN*, int));
     int    (*td_testmouse)(struct DriverTCB*, int EVENTLIST_2nd(_nc_eventlist*));
@@ -2719,6 +2716,9 @@ typedef struct {
     int (*keyok)(int keycode,int flag);       // Pointer to the keyok function used by the legacy console.
     int (*has_key)(int keycode);              // Pointer to the has_key function used by the legacy console.
     void (*init_acs)(chtype *acs);            // Pointer to the init_acs function used by the legacy console.
+    BOOL (*reset_color_pair)(void);           // Pointer to the reset_color_pair function used by the legacy console.
+    int (*init_pair)(int pair, int fg, int bg);       // Pointer to the init_pair function used by the legacy console.')
+    void (*setcolor)(BOOL fg, int color);	   // Pointer to the setcolor function used by the legacy console.)
 } LegacyConsoleInterface;
 extern NCURSES_EXPORT_VAR(LegacyConsoleInterface *) _nc_LEGACYCONSOLE;
 #define LEGACYCONSOLE (*_nc_LEGACYCONSOLE)

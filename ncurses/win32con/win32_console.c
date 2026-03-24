@@ -53,6 +53,9 @@ METHOD(beeporflash, int)(BOOL beep);
 METHOD(keyok, int)(int keycode,int flag);
 METHOD(has_key, int)(int keycode);
 METHOD(init_acs, void)(chtype *acs);
+METHOD(reset_color_pair, BOOL)(void);
+METHOD(init_pair, int)(int pair, int fg, int bg);
+METHOD(setcolor, void)(BOOL fg, int color);
 
 static LegacyConsoleInterface legacyCONSOLE =
 	{
@@ -82,8 +85,10 @@ static LegacyConsoleInterface legacyCONSOLE =
 		Dispatch(beeporflash),
 		Dispatch(keyok),
 		Dispatch(has_key),
-		Dispatch(init_acs)
-
+		Dispatch(init_acs),
+		Dispatch(reset_color_pair),
+		Dispatch(init_pair),
+		Dispatch(setcolor)
 	};
 NCURSES_EXPORT_VAR(LegacyConsoleInterface *)
 _nc_LEGACYCONSOLE = &legacyCONSOLE;
@@ -259,8 +264,8 @@ _nc_legacy_console_init(void)
 	LEGACYCONSOLE.info.nocolorvideo = 1;
 	LEGACYCONSOLE.info.tabsize = 8;
 	LEGACYCONSOLE.info.numbuttons = LEGACYCONSOLE.numButtons;
+	LEGACYCONSOLE.info.defaultPalette = _nc_cga_palette;
 }
-
 
 METHOD(AdjustSize, BOOL)(void)
 {
@@ -486,6 +491,38 @@ METHOD(init_acs, void)(chtype *real_map)
 	}
 }
 
+METHOD(reset_color_pair, BOOL)(void)
+{
+	BOOL res = FALSE;
+	WORD a = FOREGROUND_BLUE | FOREGROUND_RED | FOREGROUND_GREEN;
+	SetConsoleTextAttribute(LEGACYCONSOLE.core.ConsoleHandleOut, a);
+	get_SBI();
+	res = TRUE;
+	return res;
+}
+
+METHOD(init_pair, int)(int pair, int f, int b)
+{
+	int code = ERR;
+	int num_colors = LEGACYCONSOLE.info.maxcolors;
+	if ((pair > 0) && (pair < CON_NUMPAIRS) && (f >= 0) && (f < num_colors) && (b >= 0) && (b < num_colors))
+	{
+		LEGACYCONSOLE.pairs[pair] =
+			console_MapColor(TRUE, f) |
+			console_MapColor(FALSE, b);
+		T(("... legacy_init_pair: pair %d: fg=%d, bg=%d", pair, f, b));
+		code = OK;
+	}
+	return code;
+}
+
+METHOD(setcolor, void)(BOOL fore, int color)
+{
+	WORD a = console_MapColor(fore, color);
+	a |= (WORD)((LEGACYCONSOLE.SBI.wAttributes) & ((BOOL)fore ? 0xfff8 : 0xff8f));
+	SetConsoleTextAttribute(LEGACYCONSOLE.core.ConsoleHandleOut, a);
+	get_SBI();
+}
 
 /* This function sets the console mode for the input and output handles. It is called by the main thread
  * when it wants to change the console mode. The function takes a TTY structure that contains the desired
