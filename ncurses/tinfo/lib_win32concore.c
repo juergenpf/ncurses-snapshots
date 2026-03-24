@@ -233,11 +233,13 @@ _nc_console_setup(void) {
 
 NCURSES_EXPORT(int)
 _nc_console_gettty(int fd, ConsoleMode *buf) {
+	assert(_nc_CORECONSOLE);
 	return CORECONSOLE.getmode(fd, buf);
 }
 
 NCURSES_EXPORT(int)
 _nc_console_settty(int fd, ConsoleMode *buf) {
+	assert(_nc_CORECONSOLE);
 	return CORECONSOLE.setmode(fd, buf);
 }
 #endif // _NC_WINDOWS_NATIVE

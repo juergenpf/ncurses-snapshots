@@ -361,6 +361,7 @@ NCURSES_SP_NAME(newterm) (NCURSES_SP_DCLx
 	    result = SP_PARM;
 #if USE_CONSOLE_API
 	    CORECONSOLE.sp = (intptr_t) SP_PARM;
+	    assert(CORECONSOLE.sp != 0);
 	}
 #endif
 	}
