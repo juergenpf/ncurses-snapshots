@@ -87,6 +87,15 @@ METHOD(AdjustSize, BOOL)(void)
     COORD newSize;
     CONSOLE_SCREEN_BUFFER_INFO csbi;
     
+	if (HasConsoleResizeLimitations()) {
+		return res;
+	}
+
+	/*
+	* This piece is just for Windows 10 before the introduction of the new console:.
+	* In older Versions of Windows (before Windows 10), the conhost behaves differently 
+	* when resizing the console window. 
+	*/
     if (!GetConsoleScreenBufferInfo(LEGACYCONSOLE.core.ConsoleHandleOut, &csbi)) {
         return res;
     }
@@ -357,39 +366,6 @@ METHOD(size_changed, BOOL)(void)
 		resized = TRUE;
 		LEGACYCONSOLE.reSizeEventPending = FALSE;
 		_nc_globals.have_sigwinch = 1;
-	}
-	else
-	{
-		if (LEGACYCONSOLE.core.status & CONSOLE_FLAG_LIMITED_RESIZE)
-		{
-			static ULONGLONG lastCheck = 0;
-			int current_lines, current_cols;
-			ULONGLONG now = GetTickCount64();
-			CONSOLE_SCREEN_BUFFER_INFO csbi;
-
-			if (now - lastCheck < RESIZE_CHECK_THROTTLING_MS)
-				returnBool(FALSE);
-
-			if (CORECONSOLE.getSBI(&csbi))
-			{
-				current_lines = (int)(csbi.srWindow.Bottom + 1 - csbi.srWindow.Top);
-				current_cols = (int)(csbi.srWindow.Right + 1 - csbi.srWindow.Left);
-			}
-			else
-			{
-				returnBool(FALSE);
-			}
-
-			if (CORECONSOLE.sbi_lines != -1 && CORECONSOLE.sbi_cols != -1)
-			{
-				if (current_lines != CORECONSOLE.sbi_lines || current_cols != CORECONSOLE.sbi_cols)
-				{
-					_nc_globals.have_sigwinch = 1;
-					resized = TRUE;
-				}
-			}
-			lastCheck = GetTickCount64();
-		}
 	}
 	returnBool(resized);
 }
