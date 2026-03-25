@@ -292,14 +292,6 @@ METHOD(init, BOOL) (int fdOut, int fdIn)
     }
 }
 
-static int64_t 
-get_diff_in_ms(struct timeval start, struct timeval end) 
-{
-    int64_t diff_sec = (int64_t)end.tv_sec - (int64_t)start.tv_sec;
-    int64_t diff_usec = (int64_t)end.tv_usec - (int64_t)start.tv_usec;
-    return (diff_sec * 1000) + (diff_usec / 1000);
-}
-
 /* Check if the Windows Console has been resized. Returns TRUE if a resize was detected.
  * We implement a simple throttling to ensure that we don't call GetConsoleScreenBufferInfo
  * too often, which could become expensive in a pseudo-console context because it involves
@@ -321,7 +313,7 @@ METHOD(size_changed, BOOL) (void)
 
     gettimeofday(&now, NULL);
 
-    if (get_diff_in_ms(lastCheck, now) < RESIZE_CHECK_THROTTLING_MS)
+    if (_nc_timeval_diff_in_ms(lastCheck, now) < RESIZE_CHECK_THROTTLING_MS)
 	returnBool(FALSE);
 
     DispatchMethod(size) (&current_lines, &current_cols);

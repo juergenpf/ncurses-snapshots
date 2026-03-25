@@ -34,7 +34,7 @@
 
 MODULE_ID("$Id$")
 
-#if USE_LEGACY_CONSOLE || !JPF
+#if USE_LEGACY_CONSOLE
 #include <stdint.h>
 #include <sys/time.h>
 
@@ -862,14 +862,6 @@ METHOD(read, int)(int *buf)
 	returnCode(rc);
 }
 
-static int64_t 
-get_diff_in_ms(struct timeval start, struct timeval end) 
-{
-    int64_t diff_sec = (int64_t)end.tv_sec - (int64_t)start.tv_sec;
-    int64_t diff_usec = (int64_t)end.tv_usec - (int64_t)start.tv_usec;
-    return (diff_sec * 1000) + (diff_usec / 1000);
-}
-
 static int
 Adjust(int milliseconds, int diff)
 {
@@ -947,7 +939,7 @@ METHOD(twait,int)(int mode, int milliseconds, int *timeleft EVENTLIST_2nd(_nc_ev
 			gettimeofday(&fstart, NULL);
 			rc = WaitForSingleObject(hdl, (DWORD)milliseconds);
 			gettimeofday(&fend, NULL);
-			diff = (int)get_diff_in_ms(fstart, fend);
+			diff = _nc_timeval_diff_in_ms(fstart, fend);
 			milliseconds = Adjust(milliseconds, diff);
 
 			T(("twait: WaitForSingleObject returned %d, fstart=%llu, fend=%llu, diff=%d msec, remaining=%d msec",

@@ -99,7 +99,7 @@
 #include <stdint.h>		/* for uint32_t */
 
 #if defined(USE_WIN32CON_DRIVER) && defined(_UCRT)
-# error Legacy Console support and UCRT are incomptible
+# warning Using the legacy console code in UCRT environments may lead to unexpected behaviour. Most legacy sysems need special updates to even support UCRT.
 #endif
 /*
  * Allow for build-override, e.g., MinGW used "cygwin".

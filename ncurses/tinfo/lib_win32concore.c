@@ -325,4 +325,16 @@ _nc_console_settty(int fd, ConsoleMode *buf) {
 	assert(_nc_CORECONSOLE);
 	return CORECONSOLE.setmode(fd, buf);
 }
+
+NCURSES_EXPORT(int)
+_nc_timeval_diff_in_ms(struct timeval start, struct timeval end) 
+{
+    /* We simply assume that the time difference is not large enough to 
+     * cause an overflow of the int64_t type, which should be safe for 
+     * differences of up to several years. */
+    int64_t diff_sec = (int64_t)end.tv_sec - (int64_t)start.tv_sec;
+    int64_t diff_usec = (int64_t)end.tv_usec - (int64_t)start.tv_usec;
+    return (int)((diff_sec * 1000) + (diff_usec / 1000));
+}
+
 #endif // _NC_WINDOWS_NATIVE

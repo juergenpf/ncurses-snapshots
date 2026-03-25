@@ -2620,6 +2620,7 @@ extern NCURSES_EXPORT(void) _nc_legacy_console_init(void);
 * unresponsive when resizing the console window.
 */
 #define RESIZE_CHECK_THROTTLING_MS 100
+extern NCURSES_EXPORT(int) _nc_timeval_diff_in_ms(struct timeval start, struct timeval end);
 
 // Flags describing certain capabilities of the console.
 #define CONSOLE_STATUS_INITIALIZED      0x0001
