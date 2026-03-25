@@ -142,9 +142,11 @@ check_mouse_activity(SCREEN *sp, int delay EVENTLIST_2nd(_nc_eventlist * evl))
 {
     int rc;
 
-#if USE_TERM_DRIVER
-    rc = TCBOf(sp)->drv->td_testmouse(TCBOf(sp), delay EVENTLIST_2nd(evl));
-#else /* !USE_TERM_DRIVER */
+#if USE_LEGACY_CONSOLE
+    if (IsLegacyConsole()) {
+	return LEGACYCONSOLE.testmouse(delay EVENTLIST_2nd(evl));
+    }
+#endif /* !USE_LEGACY_CONSOLE */
 # if USE_SYSMOUSE
     if ((sp->_mouse_type == M_SYSMOUSE)
 	&& (sp->_sysmouse_head < sp->_sysmouse_tail)) {
@@ -166,7 +168,6 @@ check_mouse_activity(SCREEN *sp, int delay EVENTLIST_2nd(_nc_eventlist * evl))
 	}
 # endif
     }
-#endif /* USE_TERM_DRIVER */
     return rc;
 }
 

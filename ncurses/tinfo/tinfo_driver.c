@@ -302,37 +302,6 @@ drv_init(TERMINAL_CONTROL_BLOCK * TCB)
 
 
 static int
-drv_testmouse(TERMINAL_CONTROL_BLOCK * TCB,
-	      int delay
-	      EVENTLIST_2nd(_nc_eventlist * evl))
-{
-    int rc = 0;
-    SCREEN *sp;
-
-    AssertTCB();
-    SetSP();
-
-#if USE_SYSMOUSE
-    if ((sp->_mouse_type == M_SYSMOUSE)
-	&& (sp->_sysmouse_head < sp->_sysmouse_tail)) {
-	rc = TW_MOUSE;
-    } else
-#endif
-    {
-	rc = _nc_timed_wait(sp, TWAIT_MASK, delay, (int *) 0 EVENTLIST_2nd(evl));
-#if USE_SYSMOUSE
-	if ((sp->_mouse_type == M_SYSMOUSE)
-	    && (sp->_sysmouse_head < sp->_sysmouse_tail)
-	    && (rc == 0)
-	    && (errno == EINTR)) {
-	    rc |= TW_MOUSE;
-	}
-#endif
-    }
-    return rc;
-}
-
-static int
 drv_mvcur(TERMINAL_CONTROL_BLOCK * TCB, int yold, int xold, int ynew, int xnew)
 {
     SCREEN *sp = TCB->csp;
@@ -460,7 +429,6 @@ NCURSES_EXPORT_VAR (TERM_DRIVER) _nc_TINFO_DRIVER = {
 	drv_CanHandle,		/* CanHandle */
 	drv_init,		/* init */
 	drv_mvcur,		/* hwcur */
-	drv_testmouse,		/* testmouse */
 	drv_setfilter,		/* setfilter */
 	drv_doupdate		/* update */
 };

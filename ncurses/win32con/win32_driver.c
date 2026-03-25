@@ -529,27 +529,6 @@ wcon_init(TERMINAL_CONTROL_BLOCK *TCB)
 	returnVoid;
 }
 
-static int
-wcon_testmouse(TERMINAL_CONTROL_BLOCK *TCB,
-			   int delay
-				   EVENTLIST_2nd(_nc_eventlist *evl)) 
-{
-	int rc = 0;
-	SCREEN *sp;
-
-	T((T_CALLED("win32_driver::wcon_testmouse(%p)"), TCB));
-	SetSP();
-
-	if (sp->_drv_mouse_head < sp->_drv_mouse_tail)
-	{
-		rc = TW_MOUSE;
-	}
-	else
-		rc = LEGACYCONSOLE.twait(TWAIT_MASK, delay, (int *)0 EVENTLIST_2nd(evl));	{
-	}
-
-	returnCode(rc);
-}
 
 static int
 wcon_mvcur(TERMINAL_CONTROL_BLOCK *TCB,
@@ -584,7 +563,6 @@ _nc_WIN_DRIVER = {
 	wcon_CanHandle,		/* CanHandle     */
 	wcon_init,			/* init          */
 	wcon_mvcur,			/* hwcur         */
-	wcon_testmouse,		/* testmouse     */
 	wcon_setfilter,		/* setfilter     */
 	wcon_doupdate		/* update        */
 };

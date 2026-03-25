@@ -41,6 +41,8 @@ MODULE_ID("$Id$")
 #include <io.h>
 #include <fcntl.h>
 #include <process.h>
+#include <sys/time.h>
+#include <stdint.h>
 #if USE_WIDEC_SUPPORT
 #include <wchar.h>
 #endif
@@ -162,6 +164,8 @@ METHOD(init, BOOL) (int fdOut, int fdIn)
 
     T((T_CALLED("lib_win32conpty::pty_init(fdOut=%d, fdIn=%d)"), fdOut, fdIn));
 
+    assert(IsConPTY());
+
     /* initialize once, or not at all */
     if (!IsConsoleInitialized()) {
 	/*
@@ -271,6 +275,8 @@ METHOD(init, BOOL) (int fdOut, int fdIn)
 {
     T((T_CALLED("lib_win32conoty::pty_size(lines=%p, cols=%p)"), Lines, Cols));
 
+    assert(IsConPTY());
+
     if (Lines != NULL && Cols != NULL) {
 	CONSOLE_SCREEN_BUFFER_INFO csbi;
 	if (CORECONSOLE.getSBI(&csbi)) {
@@ -286,6 +292,14 @@ METHOD(init, BOOL) (int fdOut, int fdIn)
     }
 }
 
+static int64_t 
+get_diff_in_ms(struct timeval start, struct timeval end) 
+{
+    int64_t diff_sec = (int64_t)end.tv_sec - (int64_t)start.tv_sec;
+    int64_t diff_usec = (int64_t)end.tv_usec - (int64_t)start.tv_usec;
+    return (diff_sec * 1000) + (diff_usec / 1000);
+}
+
 /* Check if the Windows Console has been resized. Returns TRUE if a resize was detected.
  * We implement a simple throttling to ensure that we don't call GetConsoleScreenBufferInfo
  * too often, which could become expensive in a pseudo-console context because it involves
@@ -296,14 +310,18 @@ METHOD(init, BOOL) (int fdOut, int fdIn)
  * they occur. */
 METHOD(size_changed, BOOL) (void)
 {
-    static ULONGLONG lastCheck = 0;
+    static struct timeval lastCheck = {0, 0};
+    struct timeval now;
     int current_lines, current_cols;
-    ULONGLONG now = GetTickCount64();
     bool resized = FALSE;
 
     T((T_CALLED("lib_win32conpty::pty_size_changed()")));
 
-    if (now - lastCheck < RESIZE_CHECK_THROTTLING_MS)
+    assert(IsConPTY());
+
+    gettimeofday(&now, NULL);
+
+    if (get_diff_in_ms(lastCheck, now) < RESIZE_CHECK_THROTTLING_MS)
 	returnBool(FALSE);
 
     DispatchMethod(size) (&current_lines, &current_cols);
@@ -321,7 +339,7 @@ METHOD(size_changed, BOOL) (void)
 	    resized = TRUE;
 	}
     }
-    lastCheck = GetTickCount64();
+    gettimeofday(&lastCheck, NULL);
     returnBool(resized);
 }
 
@@ -334,6 +352,8 @@ METHOD(size_changed, BOOL) (void)
 METHOD(start_input_subsystem, int) (void)
 {
     T((T_CALLED("lib_win32conpty::start_input_subsystem()")));
+
+    assert(IsConPTY());
 
     if (g_input_thread != NULL)
 	returnCode(OK);		// Already running
@@ -382,6 +402,8 @@ METHOD(start_input_subsystem, int) (void)
 METHOD(stop_input_subsystem, int) (void)
 {
     T((T_CALLED("lib_win32conpty::stop_input_subsystem()")));
+
+    assert(IsConPTY());
 
     if (g_input_thread == NULL)
 	returnCode(OK); // not running, nothing to do
@@ -615,6 +637,9 @@ METHOD(poll, int) (struct pty_pollfd * fds, nfds_t nfds, int timeout_ms)
 
     T((T_CALLED("lib_win32conpty::pty_poll(fds=%p, nfds=%u, timeout_ms=%d)"),
        fds, (unsigned) nfds, timeout_ms));
+
+    assert(IsConPTY());
+
     if (nfds==0) {
 	// pure wait, o we don't actually poll and don't need to assert the input system is up.
 	Sleep((DWORD) timeout_ms);
@@ -651,6 +676,8 @@ METHOD(read, int) (int fd GCC_UNUSED, void *result, size_t count)
     size_t i;
 
     T((T_CALLED("lib_win32conpty::pty_read(fd=%d, result=%p)"), fd, result));
+
+    assert(IsConPTY());
     assert(g_input_thread != NULL && g_stdin_handle != INVALID_HANDLE_VALUE);
 
     if (!result || g_input_thread == NULL || g_stdin_handle == INVALID_HANDLE_VALUE)
@@ -685,6 +712,8 @@ METHOD(write, int) (int fd GCC_UNUSED, const void *buf, size_t count)
     T((T_CALLED("lib_win32conpty::pty_write(fd=%d, buf=%p, count=%u)"), fd,
        buf, (unsigned) count));
 
+    assert(IsConPTY());
+
     if (hOut == INVALID_HANDLE_VALUE)
 	return -1;
 
@@ -712,6 +741,8 @@ METHOD(setmode, int) (int fd GCC_UNUSED, const TTY * arg)
     BOOL output_ok = FALSE;
 
     T((T_CALLED("lib_win32conpty::pty_setmode(fd=%d, TTY*=%p)"), fd, arg));
+
+    assert(IsConPTY());
 
     if (!arg)
 	returnCode(ERR);
@@ -813,6 +844,8 @@ METHOD(defmode, int) (TTY * arg, short kind)
 
     T((T_CALLED("lib_win32conpty::pty_defmode(TTY*=%p, kind=%d)"), arg, kind));
 
+    assert(IsConPTY());
+
     if (NULL == arg)
 	returnCode(ERR);
 
@@ -846,6 +879,8 @@ METHOD(getmode, int) (int fd GCC_UNUSED, TTY * arg)
 
     if (NULL == arg)
 	returnCode(ERR);
+
+    assert(IsConPTY());
 
     *arg = defaultCONPTY.core.ttyflags;
     arg->kind = TTY_MODE_UNSPECIFIED;

@@ -58,9 +58,17 @@ NCURSES_EXPORT_VAR(char) PC = 0;              /* used by termcap library */
 NCURSES_EXPORT_VAR(NCURSES_OSPEED) ospeed = 0;        /* used by termcap library */
 
 NCURSES_EXPORT_VAR(int) _nc_nulls_sent = 0;
-#if USE_MODERN_CONSOLE
-#define write(fd,buf,len) WINCONPTY.write(fd, buf, len)
-#endif
+
+#if USE_CONSOLE_API
+static int 
+console_write(int fd, const char *buf, size_t len) {
+    if (IsConPTY())
+        return WINCONPTY.write(fd,buf, len);
+    else
+        return write(fd, buf, len);
+}
+#define write(fd,buf,len) console_write(fd, buf, len)
+#endif /* USE_CONSOLE_API */
 
 #if NCURSES_NO_PADDING
 NCURSES_EXPORT(void)

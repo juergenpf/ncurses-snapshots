@@ -32,7 +32,14 @@
 
 #include <curses.priv.h>
 
+MODULE_ID("$Id$")
+
 #if USE_LEGACY_CONSOLE || !JPF
+#include <stdint.h>
+#include <sys/time.h>
+
+// FIXME JPF - For now, we disable mouse support as we need to debug why it not works
+#define NO_MOUSE_SUPPORT
 
 #define DispatchMethod(name) legacy_##name
 #define Dispatch(name) .name = DispatchMethod(name)
@@ -45,12 +52,12 @@ METHOD(size_changed, BOOL)(void);
 METHOD(getmode, int)(int fd GCC_UNUSED, TTY *arg);
 METHOD(setmode, int)(int fd GCC_UNUSED, const TTY *arg);
 METHOD(defmode, int)(TTY *arg, short kind);
-METHOD(AdjustSize,BOOL)(void);
+METHOD(AdjustSize, BOOL)(void);
 METHOD(napms, int)(int ms);
 METHOD(termattrs, chtype)(void);
 METHOD(keypad, int)(BOOL flag);
 METHOD(beeporflash, int)(BOOL beep);
-METHOD(keyok, int)(int keycode,int flag);
+METHOD(keyok, int)(int keycode, int flag);
 METHOD(has_key, int)(int keycode);
 METHOD(init_acs, void)(chtype *acs);
 METHOD(reset_color_pair, BOOL)(void);
@@ -58,13 +65,8 @@ METHOD(init_pair, int)(int pair, int fg, int bg);
 METHOD(setcolor, void)(BOOL fg, int color);
 METHOD(curs_set, int)(int visibility);
 METHOD(read, int)(int *buf);
-
-static int legacy_twait(
-	int mode,
-	int milliseconds,
-	int *timeleft
-	EVENTLIST_2nd(_nc_eventlist *evl));
-
+METHOD(twait,int)(int mode,int milliseconds,int *timeleft EVENTLIST_2nd(_nc_eventlist *evl));
+METHOD(testmouse,int)(int delay EVENTLIST_2nd(_nc_eventlist *));
 
 static LegacyConsoleInterface legacyCONSOLE =
 	{
@@ -75,8 +77,7 @@ static LegacyConsoleInterface legacyCONSOLE =
 				Dispatch(size_changed),
 				Dispatch(setmode),
 				Dispatch(getmode),
-				Dispatch(defmode)
-			},
+				Dispatch(defmode)},
 		.hShellMode = INVALID_HANDLE_VALUE,
 		.hProgMode = INVALID_HANDLE_VALUE,
 		.numButtons = 0,
@@ -100,8 +101,8 @@ static LegacyConsoleInterface legacyCONSOLE =
 		Dispatch(setcolor),
 		Dispatch(curs_set),
 		Dispatch(read),
-		Dispatch(twait)
-	};
+		Dispatch(twait),
+		Dispatch(testmouse)};
 NCURSES_EXPORT_VAR(LegacyConsoleInterface *)
 _nc_LEGACYCONSOLE = &legacyCONSOLE;
 
@@ -274,31 +275,31 @@ _nc_legacy_console_init(void)
 		if (i < N_INI)
 		{
 			LEGACYCONSOLE.rmap[i] = LEGACYCONSOLE.map[i] =
-			    (DWORD)keylist[i];
+				(DWORD)keylist[i];
 			LEGACYCONSOLE.ansi_map[i] = (DWORD)ansi_keys[i];
 		}
 		else
 		{
 			LEGACYCONSOLE.rmap[i] = LEGACYCONSOLE.map[i] =
-			    (DWORD)GenMap((VK_F1 + (i - N_INI)),
-					  (KEY_F(1) + (i - N_INI)));
+				(DWORD)GenMap((VK_F1 + (i - N_INI)),
+							  (KEY_F(1) + (i - N_INI)));
 			LEGACYCONSOLE.ansi_map[i] =
-			    (DWORD)GenMap((VK_F1 + (i - N_INI)),
-					  (';' + (i - N_INI)));
+				(DWORD)GenMap((VK_F1 + (i - N_INI)),
+							  (';' + (i - N_INI)));
 		}
 	}
 	qsort(LEGACYCONSOLE.ansi_map,
-	      (size_t)(MAPSIZE),
-	      sizeof(keylist[0]),
-	      keycompare);
+		  (size_t)(MAPSIZE),
+		  sizeof(keylist[0]),
+		  keycompare);
 	qsort(LEGACYCONSOLE.map,
-	      (size_t)(MAPSIZE),
-	      sizeof(keylist[0]),
-	      keycompare);
+		  (size_t)(MAPSIZE),
+		  sizeof(keylist[0]),
+		  keycompare);
 	qsort(LEGACYCONSOLE.rmap,
-	      (size_t)(MAPSIZE),
-	      sizeof(keylist[0]),
-	      rkeycompare);
+		  (size_t)(MAPSIZE),
+		  sizeof(keylist[0]),
+		  rkeycompare);
 
 	if (GetNumberOfConsoleMouseButtons(&num_buttons))
 		LEGACYCONSOLE.numButtons = (int)num_buttons;
@@ -306,7 +307,7 @@ _nc_legacy_console_init(void)
 		LEGACYCONSOLE.numButtons = 1;
 
 	a = console_MapColor(TRUE, COLOR_WHITE) |
-	    console_MapColor(FALSE, COLOR_BLACK);
+		console_MapColor(FALSE, COLOR_BLACK);
 	for (i = 0; i < CON_NUMPAIRS; i++)
 		LEGACYCONSOLE.pairs[i] = a;
 
@@ -315,7 +316,7 @@ _nc_legacy_console_init(void)
 	T(("... initial cursor is %svisible, %d%%",
 	   (LEGACYCONSOLE.save_CI.bVisible ? "" : "not-"),
 	   (int)LEGACYCONSOLE.save_CI.dwSize));
-       
+
 	LEGACYCONSOLE.info.initcolor = TRUE;
 	LEGACYCONSOLE.info.canchange = FALSE;
 	LEGACYCONSOLE.info.hascolor = TRUE;
@@ -333,44 +334,51 @@ _nc_legacy_console_init(void)
 
 METHOD(AdjustSize, BOOL)(void)
 {
-    BOOL res = FALSE;
-    COORD newSize;
-    CONSOLE_SCREEN_BUFFER_INFO csbi;
-    
-    T((T_CALLED("win32_console::legacy_AdjustSize()")));
+	BOOL res = FALSE;
+	COORD newSize;
+	CONSOLE_SCREEN_BUFFER_INFO csbi;
 
-    if (HasConsoleResizeLimitations()) {
-	T(("Console has resize limitations, skipping AdjustSize"));
+	T((T_CALLED("win32_console::legacy_AdjustSize()")));
+
+	assert(IsLegacyConsole());
+
+	if (HasConsoleResizeLimitations())
+	{
+		T(("Console has resize limitations, skipping AdjustSize"));
+		returnBool(res);
+	}
+
+	/*
+	 * This piece is just for Windows 10 before the introduction of the new console:.
+	 * In older Versions of Windows (before Windows 10), the conhost behaves differently
+	 * when resizing the console window.
+	 */
+	if (!GetConsoleScreenBufferInfo(LEGACYCONSOLE.core.ConsoleHandleOut, &csbi))
+	{
+		T(("GetConsoleScreenBufferInfo failed"));
+		returnBool(res);
+	}
+
+	newSize.X = (short)(csbi.srWindow.Right - csbi.srWindow.Left + 1);
+	newSize.Y = (short)(csbi.srWindow.Bottom - csbi.srWindow.Top + 1);
+
+	T(("New console size: %d x %d", newSize.X, newSize.Y));
+	SetConsoleScreenBufferSize(LEGACYCONSOLE.core.ConsoleHandleOut, newSize);
+
+	LEGACYCONSOLE.core.getSBI(&(LEGACYCONSOLE.SBI));
+	LEGACYCONSOLE.core.sbi_lines = newSize.Y;
+	LEGACYCONSOLE.core.sbi_cols = newSize.X;
+	res = TRUE;
+
 	returnBool(res);
-    }
-
-    /*
-     * This piece is just for Windows 10 before the introduction of the new console:.
-     * In older Versions of Windows (before Windows 10), the conhost behaves differently 
-     * when resizing the console window. 
-     */
-    if (!GetConsoleScreenBufferInfo(LEGACYCONSOLE.core.ConsoleHandleOut, &csbi)) {
-        T(("GetConsoleScreenBufferInfo failed"));
-        returnBool(res);
-    }
-
-    newSize.X = (short)(csbi.srWindow.Right - csbi.srWindow.Left + 1);
-    newSize.Y = (short)(csbi.srWindow.Bottom - csbi.srWindow.Top + 1);
-
-    T(("New console size: %d x %d", newSize.X, newSize.Y));
-    SetConsoleScreenBufferSize(LEGACYCONSOLE.core.ConsoleHandleOut, newSize);
-
-    LEGACYCONSOLE.core.getSBI(&(LEGACYCONSOLE.SBI));
-    LEGACYCONSOLE.core.sbi_lines = newSize.Y;
-    LEGACYCONSOLE.core.sbi_cols = newSize.X;
-    res = TRUE;
-
-    returnBool(res);
 }
 
-METHOD(napms,int)(int ms)
+METHOD(napms, int)(int ms)
 {
 	T((T_CALLED("win32_console::legacy_napms(%d)"), ms));
+
+	assert(IsLegacyConsole());
+
 	Sleep((DWORD)ms);
 	returnCode(OK);
 }
@@ -378,18 +386,23 @@ METHOD(napms,int)(int ms)
 METHOD(termattrs, chtype)(void)
 {
 	chtype res = A_NORMAL;
+
+	assert(IsLegacyConsole());
+
 	res |= (A_BOLD | A_DIM | A_REVERSE | A_STANDOUT | A_COLOR);
 	return res;
 }
 
-
 METHOD(keypad, int)(BOOL flag)
 {
 	int code = ERR;
-	SCREEN *sp = ConsoleScreen();
+	SCREEN *sp;
 
 	T((T_CALLED("win32_console::legacy_keypad(%d)"), flag));
 
+	assert(IsLegacyConsole());
+
+	sp = ConsoleScreen();
 	if (sp)
 	{
 		sp->_keypad_on = flag;
@@ -402,12 +415,16 @@ METHOD(beeporflash, int)(BOOL beepFlag)
 {
 	int res = ERR;
 
-	int high = (LEGACYCONSOLE.SBI.srWindow.Bottom -
-				LEGACYCONSOLE.SBI.srWindow.Top + 1);
-	int wide = (LEGACYCONSOLE.SBI.srWindow.Right -
-				LEGACYCONSOLE.SBI.srWindow.Left + 1);
-	int max_cells = (high * wide);
+	int high, wide, max_cells;
 	int i;
+
+	assert(IsLegacyConsole());
+
+	high = (LEGACYCONSOLE.SBI.srWindow.Bottom -
+				LEGACYCONSOLE.SBI.srWindow.Top + 1);
+	wide = (LEGACYCONSOLE.SBI.srWindow.Right -
+				LEGACYCONSOLE.SBI.srWindow.Left + 1);
+	max_cells = (high * wide);
 
 	MakeArray(this_screen, CHAR_INFO, max_cells);
 	MakeArray(that_screen, CHAR_INFO, max_cells);
@@ -468,6 +485,8 @@ METHOD(keyok, int)(int keycode, int flag)
 
 	T((T_CALLED("win32_console::legacy_keyok(%d, %d)"), keycode, flag));
 
+	assert(IsLegacyConsole());
+
 	res = bsearch(&key,
 				  LEGACYCONSOLE.rmap,
 				  (size_t)(N_INI + FKEYS),
@@ -493,6 +512,9 @@ METHOD(has_key, int)(int keycode)
 	LONG key = GenMap(0, (WORD)keycode);
 
 	T((T_CALLED("win32_console::legacy_has_key(%d)"), keycode));
+
+	assert(IsLegacyConsole());
+
 	res = bsearch(&key,
 				  LEGACYCONSOLE.rmap,
 				  (size_t)(N_INI + FKEYS),
@@ -544,8 +566,11 @@ METHOD(init_acs, void)(chtype *real_map)
 	};
 #undef DATA
 	unsigned n;
-	SCREEN *sp = ConsoleScreen();
+	SCREEN *sp;
 
+	assert(IsLegacyConsole());
+
+	sp = ConsoleScreen();
 	for (n = 0; n < SIZEOF(table); ++n)
 	{
 		real_map[table[n].acs_code] =
@@ -559,6 +584,9 @@ METHOD(reset_color_pair, BOOL)(void)
 {
 	BOOL res = FALSE;
 	WORD a = FOREGROUND_BLUE | FOREGROUND_RED | FOREGROUND_GREEN;
+
+	assert(IsLegacyConsole());
+
 	SetConsoleTextAttribute(LEGACYCONSOLE.core.ConsoleHandleOut, a);
 	get_SBI();
 	res = TRUE;
@@ -568,7 +596,11 @@ METHOD(reset_color_pair, BOOL)(void)
 METHOD(init_pair, int)(int pair, int f, int b)
 {
 	int code = ERR;
-	int num_colors = LEGACYCONSOLE.info.maxcolors;
+	int num_colors;
+
+	assert(IsLegacyConsole());
+
+	num_colors = LEGACYCONSOLE.info.maxcolors;
 	if ((pair > 0) && (pair < CON_NUMPAIRS) && (f >= 0) && (f < num_colors) && (b >= 0) && (b < num_colors))
 	{
 		LEGACYCONSOLE.pairs[pair] =
@@ -583,6 +615,9 @@ METHOD(init_pair, int)(int pair, int f, int b)
 METHOD(setcolor, void)(BOOL fore, int color)
 {
 	WORD a = console_MapColor(fore, color);
+
+	assert(IsLegacyConsole());
+
 	a |= (WORD)((LEGACYCONSOLE.SBI.wAttributes) & ((BOOL)fore ? 0xfff8 : 0xff8f));
 	SetConsoleTextAttribute(LEGACYCONSOLE.core.ConsoleHandleOut, a);
 	get_SBI();
@@ -591,9 +626,13 @@ METHOD(setcolor, void)(BOOL fore, int color)
 METHOD(curs_set, int)(int visibility)
 {
 	int res = ERR;
-	CONSOLE_CURSOR_INFO this_CI = LEGACYCONSOLE.save_CI;
+	CONSOLE_CURSOR_INFO this_CI;
 
 	T((T_CALLED("win32_console::legacy_curs_set(%d)"), visibility));
+
+	assert(IsLegacyConsole());
+
+	this_CI = LEGACYCONSOLE.save_CI;
 	switch (visibility)
 	{
 	case 0:
@@ -615,16 +654,18 @@ METHOD(curs_set, int)(int visibility)
 					 FROM_LEFT_3RD_BUTTON_PRESSED | \
 					 FROM_LEFT_4TH_BUTTON_PRESSED | \
 					 RIGHTMOST_BUTTON_PRESSED)
+#define NO_BUTTONS (mmask_t)0
+#define IsMouseActive(sp) (sp->_mouse_active == TRUE)
 
 static mmask_t
-decode_mouse(const SCREEN *sp, int mask)
+filter_button_events(const SCREEN *sp, int mask)
 {
-	mmask_t result = 0;
+	mmask_t result = NO_BUTTONS;
 
 	(void)sp;
 	assert(sp && console_initialized);
 
-	T((T_CALLED("decode_mouse(%p, %08x)"), sp, mask));
+	T((T_CALLED("legacy_console::filter_button_events(%p, %08x)"), sp, mask));
 
 	if (mask & FROM_LEFT_1ST_BUTTON_PRESSED)
 		result |= BUTTON1_PRESSED;
@@ -665,8 +706,18 @@ handle_mouse(SCREEN *sp, MOUSE_EVENT_RECORD mer)
 
 	assert(sp);
 
-	T((T_CALLED("handle_mouse(%p, {pos=(%d,%d) mask=%08x})"),
+	T((T_CALLED("legacy_console::handle_mouse(%p, {pos=(%d,%d) mask=%08x})"),
 	   sp, mer.dwMousePosition.X, mer.dwMousePosition.Y, mer.dwButtonState));
+
+	if (!IsMouseActive(sp))
+	{
+		T(("... mouse is not active, ignoring event"));
+		returnBool(FALSE);
+	}
+#ifdef NO_MOUSE_SUPPORT
+	T(("... mouse support is disabled, ignoring event"));
+	returnBool(FALSE);
+#endif
 
 	sp->_drv_mouse_old_buttons = sp->_drv_mouse_new_buttons;
 	sp->_drv_mouse_new_buttons = mer.dwButtonState & BUTTON_MASK;
@@ -684,19 +735,27 @@ handle_mouse(SCREEN *sp, MOUSE_EVENT_RECORD mer)
 
 		if (sp->_drv_mouse_new_buttons)
 		{
-			work.bstate |= decode_mouse(sp, sp->_drv_mouse_new_buttons);
+			work.bstate |= filter_button_events(sp, sp->_drv_mouse_new_buttons);
 		}
 		else
 		{
 			T(("... button state cleared, reporting release"));
 			/* cf: BUTTON_PRESSED, BUTTON_RELEASED */
-			work.bstate |= (decode_mouse(sp, sp->_drv_mouse_old_buttons) >> 1);
+			work.bstate |= (filter_button_events(sp, sp->_drv_mouse_old_buttons) >> 1);
 			result = TRUE;
 		}
 
 		work.x = mer.dwMousePosition.X;
 		work.y = mer.dwMousePosition.Y - AdjustY();
+		T(("... event at (%d, %d), bstate=%08x", work.x, work.y, work.bstate));
 
+		if (sp->_drv_mouse_tail < 0 || sp->_drv_mouse_tail >= FIFO_SIZE)
+		{
+			T(("... mouse FIFO overflow, dropping event"));
+			returnBool(FALSE);
+		}
+		assert(sp->_drv_mouse_tail >= 0);
+		assert(sp->_drv_mouse_tail < FIFO_SIZE);
 		sp->_drv_mouse_fifo[sp->_drv_mouse_tail] = work;
 		sp->_drv_mouse_tail += 1;
 	}
@@ -710,12 +769,16 @@ METHOD(read, int)(int *buf)
 	BOOL b;
 	DWORD nRead;
 	WORD vk;
-	HANDLE hdl = LEGACYCONSOLE.core.ConsoleHandleIn;
-	SCREEN *sp = ConsoleScreen();
+	HANDLE hdl = INVALID_HANDLE_VALUE;
+	SCREEN *sp;
 
+	assert(IsLegacyConsole());
+
+	sp = ConsoleScreen();
 	assert(buf);
 	assert(sp);
 
+	hdl = LEGACYCONSOLE.core.ConsoleHandleIn;
 	memset(&inp_rec, 0, sizeof(inp_rec));
 
 	T((T_CALLED("win32_console::legacy_read(%p)"), buf));
@@ -779,12 +842,15 @@ METHOD(read, int)(int *buf)
 			}
 			else if (inp_rec.EventType == MOUSE_EVENT)
 			{
-				if (handle_mouse(sp,
-								 inp_rec.Event.MouseEvent))
-				{
-					*buf = KEY_MOUSE;
-					break;
-				}
+				handle_mouse(sp, inp_rec.Event.MouseEvent);
+#ifdef NO_MOUSE_SUPPORT
+					/* Mouse support is disabled, so we ignore the event. */
+					continue;
+				#else
+					/* We report mouse events as KEY_MOUSE, and the actual event data is stored in the mouse FIFO. */
+				*buf = KEY_MOUSE;
+				break;
+#endif
 			}
 			else if (inp_rec.EventType == WINDOW_BUFFER_SIZE_EVENT)
 			{
@@ -796,20 +862,12 @@ METHOD(read, int)(int *buf)
 	returnCode(rc);
 }
 
-static ULONGLONG
-tdiff(FILETIME fstart, FILETIME fend)
+static int64_t 
+get_diff_in_ms(struct timeval start, struct timeval end) 
 {
-	ULARGE_INTEGER ustart;
-	ULARGE_INTEGER uend;
-	ULONGLONG diff;
-
-	ustart.LowPart = fstart.dwLowDateTime;
-	ustart.HighPart = fstart.dwHighDateTime;
-	uend.LowPart = fend.dwLowDateTime;
-	uend.HighPart = fend.dwHighDateTime;
-
-	diff = (uend.QuadPart - ustart.QuadPart) / 10000;
-	return diff;
+    int64_t diff_sec = (int64_t)end.tv_sec - (int64_t)start.tv_sec;
+    int64_t diff_usec = (int64_t)end.tv_usec - (int64_t)start.tv_usec;
+    return (diff_sec * 1000) + (diff_usec / 1000);
 }
 
 static int
@@ -824,205 +882,245 @@ Adjust(int milliseconds, int diff)
 	return milliseconds;
 }
 
-static int 
-legacy_twait(
-	int mode,
-	int milliseconds,
-	int *timeleft
-	EVENTLIST_2nd(_nc_eventlist *evl))
+METHOD(twait,int)(int mode, int milliseconds, int *timeleft EVENTLIST_2nd(_nc_eventlist *evl))
 {
-	SCREEN *sp = ConsoleScreen();
-	HANDLE hdl = LEGACYCONSOLE.core.ConsoleHandleIn;
+	SCREEN *sp;
+	HANDLE hdl = INVALID_HANDLE_VALUE;
 	INPUT_RECORD inp_rec;
 	BOOL b;
 	DWORD nRead = 0, rc = WAIT_FAILED;
 	int code = 0;
-	FILETIME fstart;
-	FILETIME fend;
+	struct timeval fstart;
+	struct timeval fend;
 	int diff;
 	bool isNoDelay = (milliseconds == 0);
+
+	assert(IsLegacyConsole());
+
+	sp = ConsoleScreen();
+	hdl = LEGACYCONSOLE.core.ConsoleHandleIn;
 
 #ifdef NCURSES_WGETCH_EVENTS
 	(void)evl; /* TODO: implement wgetch-events */
 #endif
 
-#define IGNORE_CTRL_KEYS (SHIFT_PRESSED |                        \
-						  LEFT_ALT_PRESSED | RIGHT_ALT_PRESSED | \
-						  LEFT_CTRL_PRESSED | RIGHT_CTRL_PRESSED)
+/* Virtual-key codes that represent standalone modifier-key presses.
+	 * These produce KEY_EVENTs of their own but carry no actual character
+	 * or application key; skip them so they do not trigger TW_INPUT. */
+#define IS_MODIFIER_VK(vk) ((vk) == VK_SHIFT   || (vk) == VK_LSHIFT  || \
+						 (vk) == VK_RSHIFT  || \
+						 (vk) == VK_CONTROL || (vk) == VK_LCONTROL || \
+						 (vk) == VK_RCONTROL || \
+						 (vk) == VK_MENU    || (vk) == VK_LMENU   || \
+						 (vk) == VK_RMENU   || \
+						 (vk) == VK_CAPITAL || (vk) == VK_NUMLOCK  || \
+						 (vk) == VK_SCROLL)
 #define CONSUME() read_keycode(hdl, &inp_rec, 1, &nRead)
 
 	assert(sp);
 
 	TR(TRACE_IEVENT, ("start twait: hdl=%p, %d milliseconds, mode: %d",
-					  hdl, milliseconds, mode));
+				  hdl, milliseconds, mode));
 
 	if (milliseconds < 0)
 		milliseconds = NC_INFINITY;
 
 	memset(&inp_rec, 0, sizeof(inp_rec));
 
+	/*
+	 * TW_NONE: pure delay, no event checking.
+	 * Use Sleep() directly so that events in the input queue do not
+	 * keep the console handle signaled and cause a busy-loop.
+	 */
+	if (mode==TW_NONE) {
+		if (!isNoDelay && milliseconds != NC_INFINITY)
+			Sleep((DWORD)milliseconds);
+		milliseconds = 0;
+		code = TW_NONE;
+		goto end;
+	}
+
 	while (true)
 	{
 		if (!isNoDelay)
 		{
-			GetSystemTimeAsFileTime(&fstart);
+			gettimeofday(&fstart, NULL);
 			rc = WaitForSingleObject(hdl, (DWORD)milliseconds);
-			GetSystemTimeAsFileTime(&fend);
-			diff = (int)tdiff(fstart, fend);
+			gettimeofday(&fend, NULL);
+			diff = (int)get_diff_in_ms(fstart, fend);
 			milliseconds = Adjust(milliseconds, diff);
-			if (milliseconds < 0)
+
+			T(("twait: WaitForSingleObject returned %d, fstart=%llu, fend=%llu, diff=%d msec, remaining=%d msec",
+			   (int)rc, fstart, fend, diff, milliseconds));
+
+			if (rc == WAIT_TIMEOUT) {
+				code = TW_NONE;
 				break;
-		}
-
-		if (isNoDelay || (rc == WAIT_OBJECT_0))
-		{
-			if (mode)
-			{
-				nRead = 0;
-				b = GetNumberOfConsoleInputEvents(hdl, &nRead);
-				if (!b)
-				{
-					T(("twait:err GetNumberOfConsoleInputEvents"));
-				}
-				if (isNoDelay && b)
-				{
-					T(("twait: Events Available: %lu", (unsigned long)nRead));
-					if (nRead == 0)
-					{
-						code = 0;
-						goto end;
-					}
-					else
-					{
-						DWORD n = 0;
-						MakeArray(pInpRec, INPUT_RECORD, nRead);
-						if (pInpRec != NULL)
-						{
-							DWORD i;
-							BOOL f;
-							memset(pInpRec, 0, sizeof(INPUT_RECORD) * nRead);
-							f = PeekConsoleInput(hdl, pInpRec, nRead, &n);
-							if (f)
-							{
-								for (i = 0; i < n; i++)
-								{
-									if (pInpRec[i].EventType == KEY_EVENT)
-									{
-										if (pInpRec[i].Event.KeyEvent.bKeyDown)
-										{
-											DWORD ctrlMask =
-												(pInpRec[i].Event.KeyEvent.dwControlKeyState &
-												 IGNORE_CTRL_KEYS);
-											if (!ctrlMask)
-											{
-												code = TW_INPUT;
-												goto end;
-											}
-										}
-									}
-								}
-							}
-							else
-							{
-								T(("twait:err PeekConsoleInput"));
-							}
-							code = 0;
-							goto end;
-						}
-						else
-						{
-							T(("twait:err could not alloca input records"));
-						}
-					}
-				}
-				if (b && nRead > 0)
-				{
-					b = PeekConsoleInput(hdl, &inp_rec, 1, &nRead);
-					if (!b)
-					{
-						T(("twait:err PeekConsoleInput"));
-					}
-					if (b && nRead > 0)
-					{
-						switch (inp_rec.EventType)
-						{
-						case KEY_EVENT:
-							if (mode & TW_INPUT)
-							{
-								WORD vk = inp_rec.Event.KeyEvent.wVirtualKeyCode;
-								WORD ch = inp_rec.Event.KeyEventChar;
-
-								T(("twait:event KEY_EVENT"));
-								T(("twait vk=%d, ch=%d, keydown=%d",
-								   vk, ch, inp_rec.Event.KeyEvent.bKeyDown));
-
-								if (inp_rec.Event.KeyEvent.bKeyDown)
-								{
-									T(("twait:event KeyDown"));
-									if ((0 == ch))
-									{
-										int nKey = MapKey(vk);
-										if (nKey < 0)
-										{
-											CONSUME();
-											continue;
-										}
-									}
-									code = TW_INPUT;
-									goto end;
-								}
-								else
-								{
-									CONSUME();
-								}
-							}
-							continue;
-						case MOUSE_EVENT:
-							T(("twait:event MOUSE_EVENT"));
-							if (decode_mouse(sp,
-											 (inp_rec.Event.MouseEvent.dwButtonState & BUTTON_MASK)) == 0)
-							{
-								CONSUME();
-							}
-							else if (mode & TW_MOUSE)
-							{
-								code = TW_MOUSE;
-								goto end;
-							}
-							continue;
-							/* e.g., FOCUS_EVENT */
-						case WINDOW_BUFFER_SIZE_EVENT:
-							T(("twait:event WINDOW_BUFFER_SIZE_EVENT"));
-							CONSUME();
-							SetConsolePendingResize();
-							continue;
-						default:
-							T(("twait:event Type %d", inp_rec.EventType));
-							CONSUME();
-							// selectActiveHandle();
-							continue;
-						}
-					}
-				}
 			}
-			continue;
-		}
-		else
-		{
-			if (rc != WAIT_TIMEOUT)
-			{
+			if (rc != WAIT_OBJECT_0) {
 				code = -1;
 				break;
 			}
-			else
+		}
+
+		/*
+		 * rc == WAIT_OBJECT_0 or isNoDelay: inspect the event queue.
+		 *
+		 * Strategy: scan events from the front of the queue.
+		 *   - Relevant event found  -> leave it in queue (for legacy_read),
+		 *                              set code and return.
+		 *   - Definitely irrelevant -> consume it (ReadConsoleInput) so the
+		 *                              handle does not stay permanently
+		 *                              signaled and cause a busy-loop.
+		 *   - Belongs to a mode we  -> stop scanning; leave it for a future
+		 *     are not checking        call that uses a matching mode.
+		 *
+		 * "Definitely irrelevant" events (always consumed):
+		 *   KEY_EVENT  with bKeyDown==FALSE  (key-up)
+		 *   KEY_EVENT  with bKeyDown==TRUE but only modifier keys held
+		 *   MOUSE_EVENT with no relevant button state (mouse move etc.)
+		 *   WINDOW_BUFFER_SIZE_EVENT  (consumed + resize flag set)
+		 *   all other event types    (FOCUS_EVENT, MENU_EVENT, ...)
+		 */
+		{
+			DWORD n = 0;
+			DWORD i;
+			BOOL stop_scan;
+
+			b = GetNumberOfConsoleInputEvents(hdl, &n);
+			if (!b)
 			{
-				code = 0;
-				break;
+				T(("twait:err GetNumberOfConsoleInputEvents"));
+				code = TW_NONE;
+				goto end;
 			}
+			T(("twait: %lu events in queue", (unsigned long)n));
+
+			if (n == 0)
+			{
+				if (isNoDelay) {
+					code = TW_NONE;
+					goto end;
+				}
+				if (milliseconds <= 0)
+					break;
+				continue;
+			}
+
+			/* n > 0: peek all events and scan from the front.
+			 * MakeArray must be the first declaration in this block. */
+			{
+				MakeArray(pInpRec, INPUT_RECORD, n);
+
+				if (pInpRec == NULL) {
+					T(("twait:err could not alloca input records"));
+					code = TW_NONE;
+					goto end;
+				}
+				memset(pInpRec, 0, sizeof(INPUT_RECORD) * n);
+				b = PeekConsoleInput(hdl, pInpRec, n, &n);
+				if (!b) {
+					T(("twait:err PeekConsoleInput"));
+					code = TW_NONE;
+					goto end;
+				}
+
+				stop_scan = FALSE;
+				for (i = 0; i < n && !stop_scan; i++)
+				{
+					switch (pInpRec[i].EventType)
+					{
+					case KEY_EVENT:
+						if (pInpRec[i].Event.KeyEvent.bKeyDown)
+						{
+							if (mode & TW_INPUT)
+							{
+								WORD vk = pInpRec[i].Event.KeyEvent.wVirtualKeyCode;
+								if (!IS_MODIFIER_VK(vk))
+								{
+									/* Relevant key-down (incl. Ctrl+X etc.): leave for reader */
+									T(("twait:event KEY_EVENT: vk=%d, char=%d",
+									   vk,
+									   pInpRec[i].Event.KeyEventChar));
+									code |= TW_INPUT;
+									goto end;
+								}
+								/* Standalone modifier key: consume it */
+								T(("twait: consuming standalone modifier KEY_EVENT vk=%d", vk));
+								CONSUME();
+							}
+							else
+							{
+								/* Key-down but TW_INPUT not requested: may be needed
+								 * by a later call -- stop scanning without consuming */
+								T(("twait: KEY_EVENT not in mode, stopping scan"));
+								stop_scan = TRUE;
+							}
+						}
+						else
+						{
+							/* Key-up: always irrelevant, consume it */
+							CONSUME();
+						}
+						break;
+
+					case MOUSE_EVENT:
+						if (mode & TW_MOUSE)
+						{
+#ifdef NO_MOUSE_SUPPORT
+							/* Mouse support is disabled, so we ignore the event. */
+							T(("twait: mouse support disabled, consuming MOUSE_EVENT"));
+							CONSUME();
+							continue;
+#else
+							if (filter_button_events(sp,
+									pInpRec[i].Event.MouseEvent.dwButtonState & BUTTON_MASK) != NO_BUTTONS)
+							{
+								/* Relevant button state: leave at queue head for reader */
+								T(("twait:event MOUSE_EVENT: buttonState=%08lx",
+								   (unsigned long)pInpRec[i].Event.MouseEvent.dwButtonState));
+								code |= TW_MOUSE;
+								goto end;
+							}
+							/* No relevant buttons (mouse move etc.): consume it */
+							T(("twait: consuming irrelevant MOUSE_EVENT"));
+							CONSUME();
+#endif
+						}
+						else
+						{
+							/* Mouse event but TW_MOUSE not requested: may be needed
+							 * by a later call -- stop scanning without consuming */
+							T(("twait: MOUSE_EVENT not in mode, stopping scan"));
+							stop_scan = TRUE;
+						}
+						break;
+
+					case WINDOW_BUFFER_SIZE_EVENT:
+						T(("twait:event WINDOW_BUFFER_SIZE_EVENT"));
+						CONSUME();
+						SetConsolePendingResize();
+						break;
+
+					default:
+						T(("twait:event type %d, consuming", pInpRec[i].EventType));
+						CONSUME();
+						break;
+					}
+				}
+			}     /* end MakeArray block */
+
+			/* No relevant events found in this pass */
+			if (isNoDelay) {
+				code = TW_NONE;
+				goto end;
+			}
+			if (milliseconds <= 0)
+				break;
+			/* Continue waiting */
 		}
 	}
 end:
-
 	TR(TRACE_IEVENT, ("end twait: returned %d (%lu), remaining time %d msec",
 					  code, (unsigned long)GetLastError(), milliseconds));
 
@@ -1032,6 +1130,30 @@ end:
 	return code;
 }
 
+METHOD(testmouse,int)(int delay EVENTLIST_2nd(_nc_eventlist *))
+{
+	int rc = 0;
+	SCREEN *sp;
+
+	T((T_CALLED("legacy_console::legacy__testmouse(%d)"), delay));
+
+	assert(IsLegacyConsole());
+
+	sp = ConsoleScreen();
+	assert(sp);
+
+	if (sp->_drv_mouse_head < sp->_drv_mouse_tail)
+	{
+		rc = TW_MOUSE;
+	}
+	else
+	{
+		rc = DispatchMethod(twait)(TWAIT_MASK, delay, (int *)0 EVENTLIST_2nd(evl));
+	}
+
+	returnCode(rc);
+}
+
 /* This function sets the console mode for the input and output handles. It is called by the main thread
  * when it wants to change the console mode. The function takes a TTY structure that contains the desired
  * mode flags, and it returns OK on success or ERR on failure.
@@ -1039,13 +1161,19 @@ end:
  * stopping the input subsystem accordingly. */
 METHOD(setmode, int)(int fd GCC_UNUSED, const TTY *arg)
 {
-	HANDLE input_target = LEGACYCONSOLE.core.ConsoleHandleIn;
-	HANDLE output_target = LEGACYCONSOLE.core.ConsoleHandleOut;
+	HANDLE input_target = INVALID_HANDLE_VALUE;
+	HANDLE output_target = INVALID_HANDLE_VALUE;
 	BOOL input_ok = FALSE;
 	BOOL output_ok = FALSE;
-	SCREEN *sp = ConsoleScreen();
+	SCREEN *sp = NULL;
 
 	T((T_CALLED("win32_driver::legacy_setmode(fd=%d, TTY*=%p)"), fd, arg));
+
+	assert(IsLegacyConsole());
+
+	input_target = LEGACYCONSOLE.core.ConsoleHandleIn;
+	output_target = LEGACYCONSOLE.core.ConsoleHandleOut;
+	sp = ConsoleScreen();
 
 	if (!arg)
 		returnCode(ERR);
@@ -1061,7 +1189,7 @@ METHOD(setmode, int)(int fd GCC_UNUSED, const TTY *arg)
 			 * what they would expect from a typical command prompt or terminal window, with
 			 * features like line editing and input processing enabled. */
 			mode |= (ENABLE_LINE_INPUT | ENABLE_PROCESSED_INPUT | ENABLE_ECHO_INPUT);
-			//mode &= ~(ENABLE_MOUSE_INPUT | ENABLE_WINDOW_INPUT);
+			// mode &= ~(ENABLE_MOUSE_INPUT | ENABLE_WINDOW_INPUT);
 		}
 		else if (arg->kind == TTY_MODE_PROGRAM)
 		{
@@ -1125,24 +1253,29 @@ METHOD(setmode, int)(int fd GCC_UNUSED, const TTY *arg)
 	if (arg->kind == TTY_MODE_SHELL)
 	{
 		T(("Shell mode set"));
-		if (IsConsoleProgMode()) {
+		if (IsConsoleProgMode())
+		{
 			ClearConsoleProgMode();
 			if (sp)
 			{
 				_nc_keypad(sp, FALSE);
 				NCURSES_SP_NAME(_nc_flush)(sp);
 			}
-		
+
 			if (LEGACYCONSOLE.hShellMode != INVALID_HANDLE_VALUE)
 			{
 				T(("... LEGACYCONSOLE: switching to shell mode buffer"));
 				LEGACYCONSOLE.core.ConsoleHandleOut = LEGACYCONSOLE.hShellMode;
 				SetConsoleActiveScreenBuffer(LEGACYCONSOLE.core.ConsoleHandleOut);
 				SetConsoleCursorInfo(LEGACYCONSOLE.core.ConsoleHandleOut, &LEGACYCONSOLE.save_CI);
-			} else {
+			}
+			else
+			{
 				T(("... LEGACYCONSOLE: no valid shell mode buffer"));
 			}
-		} else {
+		}
+		else
+		{
 			T(("... LEGACYCONSOLE: Already in shell mode"));
 		}
 	}
@@ -1157,17 +1290,21 @@ METHOD(setmode, int)(int fd GCC_UNUSED, const TTY *arg)
 				if (sp->_keypad_on)
 					_nc_keypad(sp, TRUE);
 			}
-				
+
 			if (LEGACYCONSOLE.hProgMode != INVALID_HANDLE_VALUE)
 			{
 				T(("... LEGACYCONSOLE: switching to program mode buffer"));
 				LEGACYCONSOLE.core.ConsoleHandleOut = LEGACYCONSOLE.hProgMode;
 				SetConsoleActiveScreenBuffer(LEGACYCONSOLE.core.ConsoleHandleOut);
 				SetConsoleCursorInfo(LEGACYCONSOLE.core.ConsoleHandleOut, &LEGACYCONSOLE.save_CI);
-			} else {
+			}
+			else
+			{
 				T(("... LEGACYCONSOLE: no valid program mode buffer"));
 			}
-		} else {
+		}
+		else
+		{
 			T(("... LEGACYCONSOLE: Already in program mode"));
 		}
 	}
@@ -1195,6 +1332,8 @@ METHOD(getmode, int)(int fd GCC_UNUSED, TTY *arg)
 {
 	T((T_CALLED("win32_driver::legacy_getmode(fd=%d, TTY*=%p)"), fd, arg));
 
+	assert(IsLegacyConsole());
+
 	if (NULL == arg)
 		returnCode(ERR);
 
@@ -1221,6 +1360,8 @@ METHOD(defmode, int)(TTY *arg, short kind)
 
 	T((T_CALLED("win32_driver::legacy_defmode(TTY*=%p, kind=%d)"), arg, kind));
 
+	assert(IsLegacyConsole());
+
 	if (NULL == arg)
 		returnCode(ERR);
 
@@ -1235,6 +1376,9 @@ METHOD(defmode, int)(TTY *arg, short kind)
 
 METHOD(size, void)(int *Lines, int *Cols)
 {
+
+	assert(IsLegacyConsole());
+
 	if (Lines != NULL && Cols != NULL)
 	{
 		*Lines = (int)(LEGACYCONSOLE.SBI.srWindow.Bottom + 1 -
@@ -1249,6 +1393,8 @@ METHOD(size_changed, BOOL)(void)
 {
 	BOOL resized = FALSE;
 	T((T_CALLED("win32_console::legacy_size_changed()")));
+
+	assert(IsLegacyConsole());
 
 	if (HasConsolePendingResize())
 	{
@@ -1280,6 +1426,8 @@ METHOD(init, BOOL)(int fdOut, int fdIn)
 
 	T((T_CALLED("win32_driver::legacy_init(fdOut=%d, fdIn=%d)"), fdOut, fdIn));
 
+	assert(IsLegacyConsole());
+
 	/* initialize once, or not at all */
 	if (!IsConsoleInitialized())
 	{
@@ -1290,7 +1438,7 @@ METHOD(init, BOOL)(int fdOut, int fdIn)
 		DWORD dwFlagOut = (ENABLE_PROCESSED_OUTPUT | DISABLE_NEWLINE_AUTO_RETURN | ENABLE_WRAP_AT_EOL_OUTPUT);
 		DWORD dwFlag;
 
-		HANDLE stdin_handle  = INVALID_HANDLE_VALUE;
+		HANDLE stdin_handle = INVALID_HANDLE_VALUE;
 		HANDLE stdout_handle = INVALID_HANDLE_VALUE;
 
 		if (fdIn != -1)
@@ -1300,15 +1448,15 @@ METHOD(init, BOOL)(int fdOut, int fdIn)
 		}
 
 		stdin_handle = CreateFileA(
-			"CONIN$", 
-			GENERIC_READ | GENERIC_WRITE, 
-			FILE_SHARE_READ, 
+			"CONIN$",
+			GENERIC_READ | GENERIC_WRITE,
+			FILE_SHARE_READ,
 			NULL, OPEN_EXISTING, 0, NULL);
 
 		stdout_handle = CreateFileA(
-			"CONOUT$", 
-			GENERIC_READ | GENERIC_WRITE, 
-			FILE_SHARE_WRITE, 
+			"CONOUT$",
+			GENERIC_READ | GENERIC_WRITE,
+			FILE_SHARE_WRITE,
 			NULL, OPEN_EXISTING, 0, NULL);
 
 		LEGACYCONSOLE.hShellMode = stdout_handle;
@@ -1374,18 +1522,19 @@ METHOD(init, BOOL)(int fdOut, int fdIn)
 		 * update the defaultCONPTY structure to use the new handles. */
 		DWORD dwFlagOut;
 
-		if (LEGACYCONSOLE.hProgMode == INVALID_HANDLE_VALUE) {
+		if (LEGACYCONSOLE.hProgMode == INVALID_HANDLE_VALUE)
+		{
 			T(("... creating console buffer"));
 			/* Save the original active screen buffer handle so we can switch
 			 * back to it when endwin() / reset_shell_mode is called. */
 			LEGACYCONSOLE.hProgMode =
 				CreateConsoleScreenBuffer(GENERIC_READ | GENERIC_WRITE,
-									  FILE_SHARE_READ | FILE_SHARE_WRITE,
-									  NULL,
-									  CONSOLE_TEXTMODE_BUFFER,
-									  NULL);
-		}		
-		if (LEGACYCONSOLE.hProgMode==INVALID_HANDLE_VALUE || GetConsoleMode(LEGACYCONSOLE.hProgMode, &dwFlagOut) == 0)
+										  FILE_SHARE_READ | FILE_SHARE_WRITE,
+										  NULL,
+										  CONSOLE_TEXTMODE_BUFFER,
+										  NULL);
+		}
+		if (LEGACYCONSOLE.hProgMode == INVALID_HANDLE_VALUE || GetConsoleMode(LEGACYCONSOLE.hProgMode, &dwFlagOut) == 0)
 		{
 			T(("Output handle is not a console"));
 			returnBool(FALSE);

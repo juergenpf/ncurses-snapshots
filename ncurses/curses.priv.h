@@ -2484,7 +2484,6 @@ typedef struct term_driver {
     bool   (*td_CanHandle)(struct DriverTCB*, const char*, int*);
     void   (*td_init)(struct DriverTCB*);
     int    (*td_hwcur)(struct DriverTCB*, int yold, int xold, int y, int x);
-    int    (*td_testmouse)(struct DriverTCB*, int EVENTLIST_2nd(_nc_eventlist*));
     void   (*td_setfilter)(struct DriverTCB*);
     int    (*td_update)(struct DriverTCB*);
 } TERM_DRIVER;
@@ -2711,7 +2710,9 @@ typedef struct {
     void (*setcolor)(BOOL fg, int color);	   // Pointer to the setcolor function used by the legacy console.)
     int (*curs_set)(int visibility);                // Pointer to the curs_set function used by the legacy console.
     int (*read)(int *buf); 		    // Pointer to the read function used by the legacy console.
-     int (*twait)(int, int, int* EVENTLIST_2nd(_nc_eventlist*));  
+     int (*twait)(int, int, int* EVENTLIST_2nd(_nc_eventlist*)); 
+     int (*testmouse)(int EVENTLIST_2nd(_nc_eventlist*));
+ 
 } LegacyConsoleInterface;
 extern NCURSES_EXPORT_VAR(LegacyConsoleInterface *) _nc_LEGACYCONSOLE;
 #define LEGACYCONSOLE (*_nc_LEGACYCONSOLE)
