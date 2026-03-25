@@ -254,112 +254,6 @@ drv_CanHandle(TERMINAL_CONTROL_BLOCK * TCB, const char *tname, int *errret)
     returnBool(result);
 }
 
-/*
- * SVr4 curses is known to interchange color codes (1,4) and (3,6), possibly
- * to maintain compatibility with a pre-ANSI scheme.  The same scheme is
- * also used in the FreeBSD syscons.
- */
-static int
-toggled_colors(int c)
-{
-    if (c < 16) {
-	static const int table[] =
-	{0, 4, 2, 6, 1, 5, 3, 7,
-	 8, 12, 10, 14, 9, 13, 11, 15};
-	c = table[c];
-    }
-    return c;
-}
-
-static int
-drv_defaultcolors(TERMINAL_CONTROL_BLOCK * TCB, int fg, int bg)
-{
-    SCREEN *sp;
-    int code = ERR;
-
-    AssertTCB();
-    SetSP();
-
-    if (sp != NULL && orig_pair && orig_colors && (initialize_pair != NULL)) {
-#if NCURSES_EXT_FUNCS
-	sp->_default_color = isDefaultColor(fg) || isDefaultColor(bg);
-	sp->_has_sgr_39_49 = (NCURSES_SP_NAME(tigetflag) (NCURSES_SP_ARGx
-							  UserCap(AX))
-			      == TRUE);
-	sp->_default_fg = isDefaultColor(fg) ? COLOR_DEFAULT : fg;
-	sp->_default_bg = isDefaultColor(bg) ? COLOR_DEFAULT : bg;
-	if (sp->_color_pairs != NULL) {
-	    bool save = sp->_default_color;
-	    sp->_default_color = TRUE;
-	    NCURSES_SP_NAME(init_pair) (NCURSES_SP_ARGx
-					0,
-					(short)fg,
-					(short)bg);
-	    sp->_default_color = save;
-	}
-#endif
-	code = OK;
-    }
-    return (code);
-}
-
-static void
-drv_setcolor(TERMINAL_CONTROL_BLOCK * TCB,
-	     int fore,
-	     int color,
-	     NCURSES_SP_OUTC outc)
-{
-    SCREEN *sp;
-
-    AssertTCB();
-    SetSP();
-
-    if (fore) {
-	if (set_a_foreground) {
-	    TPUTS_TRACE("set_a_foreground");
-	    NCURSES_SP_NAME(tputs) (NCURSES_SP_ARGx
-				    TIPARM_1(set_a_foreground, color), 1, outc);
-	} else {
-	    TPUTS_TRACE("set_foreground");
-	    NCURSES_SP_NAME(tputs) (NCURSES_SP_ARGx
-				    TIPARM_1(set_foreground,
-					     toggled_colors(color)), 1, outc);
-	}
-    } else {
-	if (set_a_background) {
-	    TPUTS_TRACE("set_a_background");
-	    NCURSES_SP_NAME(tputs) (NCURSES_SP_ARGx
-				    TIPARM_1(set_a_background, color), 1, outc);
-	} else {
-	    TPUTS_TRACE("set_background");
-	    NCURSES_SP_NAME(tputs) (NCURSES_SP_ARGx
-				    TIPARM_1(set_background,
-					     toggled_colors(color)), 1, outc);
-	}
-    }
-}
-
-static bool
-drv_rescol(TERMINAL_CONTROL_BLOCK * TCB)
-{
-    bool result = FALSE;
-    SCREEN *sp;
-
-    AssertTCB();
-    SetSP();
-
-    if (orig_pair != NULL) {
-	NCURSES_PUTP2("orig_pair", orig_pair);
-	result = TRUE;
-    }
-    return result;
-}
-
-
-static void
-drv_release(TERMINAL_CONTROL_BLOCK * TCB GCC_UNUSED)
-{
-}
 
 static void
 drv_init(TERMINAL_CONTROL_BLOCK * TCB)
@@ -406,25 +300,6 @@ drv_init(TERMINAL_CONTROL_BLOCK * TCB)
 #define MAX_PALETTE	8
 #define InPalette(n)	((n) >= 0 && (n) < MAX_PALETTE)
 
-static int
-default_fg(SCREEN *sp)
-{
-#if NCURSES_EXT_FUNCS
-    return (sp != NULL) ? sp->_default_fg : COLOR_WHITE;
-#else
-    return COLOR_WHITE;
-#endif
-}
-
-static int
-default_bg(SCREEN *sp)
-{
-#if NCURSES_EXT_FUNCS
-    return sp != NULL ? sp->_default_bg : COLOR_BLACK;
-#else
-    return COLOR_BLACK;
-#endif
-}
 
 static int
 drv_testmouse(TERMINAL_CONTROL_BLOCK * TCB,
@@ -444,11 +319,7 @@ drv_testmouse(TERMINAL_CONTROL_BLOCK * TCB,
     } else
 #endif
     {
-	rc = TCBOf(sp)->drv->td_twait(TCBOf(sp),
-				      TWAIT_MASK,
-				      delay,
-				      (int *) 0
-				      EVENTLIST_2nd(evl));
+	rc = _nc_timed_wait(sp, TWAIT_MASK, delay, (int *) 0 EVENTLIST_2nd(evl));
 #if USE_SYSMOUSE
 	if ((sp->_mouse_type == M_SYSMOUSE)
 	    && (sp->_sysmouse_head < sp->_sysmouse_tail)
@@ -582,52 +453,16 @@ _nc_cookie_init(SCREEN *sp)
 #endif
 }
 
-static int
-drv_twait(TERMINAL_CONTROL_BLOCK * TCB,
-	  int mode,
-	  int milliseconds,
-	  int *timeleft
-	  EVENTLIST_2nd(_nc_eventlist * evl))
-{
-    SCREEN *sp;
-
-    AssertTCB();
-    SetSP();
-    return _nc_timed_wait(sp, mode, milliseconds, timeleft EVENTLIST_2nd(evl));
-}
-
-static int
-drv_read(TERMINAL_CONTROL_BLOCK * TCB, int *buf)
-{
-    SCREEN *sp;
-    int n;
-    unsigned char c2 = 0;
-
-    AssertTCB();
-    assert(buf);
-    SetSP();
-
-    _nc_set_read_thread(TRUE);
-    n = (int) NC_READ(sp->_ifd, &c2, (size_t) 1);
-    _nc_set_read_thread(FALSE);
-    *buf = (int) c2;
-    return n;
-}
-
 
 NCURSES_EXPORT_VAR (TERM_DRIVER) _nc_TINFO_DRIVER = {
     TRUE,
 	drv_Name,		/* Name */
 	drv_CanHandle,		/* CanHandle */
 	drv_init,		/* init */
-	drv_release,		/* release */
 	drv_mvcur,		/* hwcur */
 	drv_testmouse,		/* testmouse */
 	drv_setfilter,		/* setfilter */
-	drv_doupdate,		/* update */
-	drv_defaultcolors,	/* defaultcolors */
-	drv_twait,		/* twait  */
-	drv_read,		/* read */
+	drv_doupdate		/* update */
 };
 
 #if USE_TERM_DRIVER

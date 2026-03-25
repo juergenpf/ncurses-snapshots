@@ -57,6 +57,14 @@ METHOD(reset_color_pair, BOOL)(void);
 METHOD(init_pair, int)(int pair, int fg, int bg);
 METHOD(setcolor, void)(BOOL fg, int color);
 METHOD(curs_set, int)(int visibility);
+METHOD(read, int)(int *buf);
+
+static int legacy_twait(
+	int mode,
+	int milliseconds,
+	int *timeleft
+	EVENTLIST_2nd(_nc_eventlist *evl));
+
 
 static LegacyConsoleInterface legacyCONSOLE =
 	{
@@ -90,7 +98,9 @@ static LegacyConsoleInterface legacyCONSOLE =
 		Dispatch(reset_color_pair),
 		Dispatch(init_pair),
 		Dispatch(setcolor),
-		Dispatch(curs_set)
+		Dispatch(curs_set),
+		Dispatch(read),
+		Dispatch(twait)
 	};
 NCURSES_EXPORT_VAR(LegacyConsoleInterface *)
 _nc_LEGACYCONSOLE = &legacyCONSOLE;
@@ -100,6 +110,8 @@ _nc_LEGACYCONSOLE = &legacyCONSOLE;
 							  (((attr) & 0x70) >> 4)))
 
 #define GenMap(vKey, key) MAKELONG(key, vKey)
+#define AdjustY() 0
+#define console_initialized (IsConsoleInitialized())
 
 static const LONG keylist[] =
 	{
@@ -164,6 +176,56 @@ keycompare(const void *el1, const void *el2)
 	WORD key2 = HIWORD((*((const LONG *)el2)));
 
 	return ((key1 < key2) ? -1 : ((key1 == key2) ? 0 : 1));
+}
+
+static int
+MapKey(WORD vKey)
+{
+	int code = -1;
+
+	WORD nKey = 0;
+	void *res;
+	LONG key = GenMap(vKey, 0);
+
+	res = bsearch(&key,
+				  LEGACYCONSOLE.map,
+				  (size_t)(N_INI + FKEYS),
+				  sizeof(keylist[0]),
+				  keycompare);
+	if (res)
+	{
+		key = *((LONG *)res);
+		nKey = LOWORD(key);
+		code = (int)(nKey & 0x7fff);
+		if (nKey & 0x8000)
+			code = -code;
+	}
+	return code;
+}
+
+static int
+AnsiKey(WORD vKey)
+{
+	int code = -1;
+
+	WORD nKey = 0;
+	void *res;
+	LONG key = GenMap(vKey, 0);
+
+	res = bsearch(&key,
+				  LEGACYCONSOLE.ansi_map,
+				  (size_t)(N_INI + FKEYS),
+				  sizeof(keylist[0]),
+				  keycompare);
+	if (res)
+	{
+		key = *((LONG *)res);
+		nKey = LOWORD(key);
+		code = (int)(nKey & 0x7fff);
+		if (nKey & 0x8000)
+			code = -code;
+	}
+	return code;
 }
 
 static BOOL
@@ -545,6 +607,429 @@ METHOD(curs_set, int)(int visibility)
 	}
 	SetConsoleCursorInfo(LEGACYCONSOLE.core.ConsoleHandleOut, &this_CI);
 	returnCode(res);
+}
+
+#define CONTROL_PRESSED (LEFT_CTRL_PRESSED | RIGHT_CTRL_PRESSED)
+#define BUTTON_MASK (FROM_LEFT_1ST_BUTTON_PRESSED | \
+					 FROM_LEFT_2ND_BUTTON_PRESSED | \
+					 FROM_LEFT_3RD_BUTTON_PRESSED | \
+					 FROM_LEFT_4TH_BUTTON_PRESSED | \
+					 RIGHTMOST_BUTTON_PRESSED)
+
+static mmask_t
+decode_mouse(const SCREEN *sp, int mask)
+{
+	mmask_t result = 0;
+
+	(void)sp;
+	assert(sp && console_initialized);
+
+	T((T_CALLED("decode_mouse(%p, %08x)"), sp, mask));
+
+	if (mask & FROM_LEFT_1ST_BUTTON_PRESSED)
+		result |= BUTTON1_PRESSED;
+	if (mask & FROM_LEFT_2ND_BUTTON_PRESSED)
+		result |= BUTTON2_PRESSED;
+	if (mask & FROM_LEFT_3RD_BUTTON_PRESSED)
+		result |= BUTTON3_PRESSED;
+	if (mask & FROM_LEFT_4TH_BUTTON_PRESSED)
+		result |= BUTTON4_PRESSED;
+
+	if (mask & RIGHTMOST_BUTTON_PRESSED)
+	{
+		switch (LEGACYCONSOLE.numButtons)
+		{
+		case 1:
+			result |= BUTTON1_PRESSED;
+			break;
+		case 2:
+			result |= BUTTON2_PRESSED;
+			break;
+		case 3:
+			result |= BUTTON3_PRESSED;
+			break;
+		case 4:
+			result |= BUTTON4_PRESSED;
+			break;
+		}
+	}
+
+	returnCode(result);
+}
+
+static BOOL
+handle_mouse(SCREEN *sp, MOUSE_EVENT_RECORD mer)
+{
+	MEVENT work;
+	BOOL result = FALSE;
+
+	assert(sp);
+
+	T((T_CALLED("handle_mouse(%p, {pos=(%d,%d) mask=%08x})"),
+	   sp, mer.dwMousePosition.X, mer.dwMousePosition.Y, mer.dwButtonState));
+
+	sp->_drv_mouse_old_buttons = sp->_drv_mouse_new_buttons;
+	sp->_drv_mouse_new_buttons = mer.dwButtonState & BUTTON_MASK;
+
+	/*
+	 * We're only interested if the button is pressed or released.
+	 * FIXME: implement continuous event-tracking.
+	 */
+	if (sp->_drv_mouse_new_buttons != sp->_drv_mouse_old_buttons)
+	{
+		T(("... button state changed: old=%08x new=%08x",
+		   sp->_drv_mouse_old_buttons, sp->_drv_mouse_new_buttons));
+
+		memset(&work, 0, sizeof(work));
+
+		if (sp->_drv_mouse_new_buttons)
+		{
+			work.bstate |= decode_mouse(sp, sp->_drv_mouse_new_buttons);
+		}
+		else
+		{
+			T(("... button state cleared, reporting release"));
+			/* cf: BUTTON_PRESSED, BUTTON_RELEASED */
+			work.bstate |= (decode_mouse(sp, sp->_drv_mouse_old_buttons) >> 1);
+			result = TRUE;
+		}
+
+		work.x = mer.dwMousePosition.X;
+		work.y = mer.dwMousePosition.Y - AdjustY();
+
+		sp->_drv_mouse_fifo[sp->_drv_mouse_tail] = work;
+		sp->_drv_mouse_tail += 1;
+	}
+	returnBool(result);
+}
+
+METHOD(read, int)(int *buf)
+{
+	int rc = -1;
+	INPUT_RECORD inp_rec;
+	BOOL b;
+	DWORD nRead;
+	WORD vk;
+	HANDLE hdl = LEGACYCONSOLE.core.ConsoleHandleIn;
+	SCREEN *sp = ConsoleScreen();
+
+	assert(buf);
+	assert(sp);
+
+	memset(&inp_rec, 0, sizeof(inp_rec));
+
+	T((T_CALLED("win32_console::legacy_read(%p)"), buf));
+
+	while ((b = read_keycode(hdl, &inp_rec, 1, &nRead)))
+	{
+		if (b && nRead > 0)
+		{
+			if (rc < 0)
+				rc = 0;
+			rc = rc + (int)nRead;
+			if (inp_rec.EventType == KEY_EVENT)
+			{
+				if (!inp_rec.Event.KeyEvent.bKeyDown)
+					continue;
+				*buf = (int)inp_rec.Event.KeyEventChar;
+				vk = inp_rec.Event.KeyEvent.wVirtualKeyCode;
+				/*
+				 * There are 24 virtual function-keys, and typically
+				 * 12 function-keys on a keyboard.  Use the shift-modifier
+				 * to provide the remaining 12 keys.
+				 */
+				if (vk >= VK_F1 && vk <= VK_F12)
+				{
+					if (inp_rec.Event.KeyEvent.dwControlKeyState &
+						SHIFT_PRESSED)
+					{
+						vk = (WORD)(vk + 12);
+					}
+				}
+				if (*buf == 0)
+				{
+					int key = MapKey(vk);
+					if (key < 0)
+						continue;
+					if (sp->_keypad_on)
+					{
+						*buf = key;
+					}
+					else
+					{
+						ungetch('\0');
+						*buf = AnsiKey(vk);
+					}
+				}
+				else if (vk == VK_BACK)
+				{
+					if (!(inp_rec.Event.KeyEvent.dwControlKeyState & (SHIFT_PRESSED | CONTROL_PRESSED)))
+					{
+						*buf = KEY_BACKSPACE;
+					}
+				}
+				else if (vk == VK_TAB)
+				{
+					if ((inp_rec.Event.KeyEvent.dwControlKeyState & (SHIFT_PRESSED | CONTROL_PRESSED)))
+					{
+						*buf = KEY_BTAB;
+					}
+				}
+				break;
+			}
+			else if (inp_rec.EventType == MOUSE_EVENT)
+			{
+				if (handle_mouse(sp,
+								 inp_rec.Event.MouseEvent))
+				{
+					*buf = KEY_MOUSE;
+					break;
+				}
+			}
+			else if (inp_rec.EventType == WINDOW_BUFFER_SIZE_EVENT)
+			{
+				SetConsolePendingResize();
+			}
+			continue;
+		}
+	}
+	returnCode(rc);
+}
+
+static ULONGLONG
+tdiff(FILETIME fstart, FILETIME fend)
+{
+	ULARGE_INTEGER ustart;
+	ULARGE_INTEGER uend;
+	ULONGLONG diff;
+
+	ustart.LowPart = fstart.dwLowDateTime;
+	ustart.HighPart = fstart.dwHighDateTime;
+	uend.LowPart = fend.dwLowDateTime;
+	uend.HighPart = fend.dwHighDateTime;
+
+	diff = (uend.QuadPart - ustart.QuadPart) / 10000;
+	return diff;
+}
+
+static int
+Adjust(int milliseconds, int diff)
+{
+	if (milliseconds != NC_INFINITY)
+	{
+		milliseconds -= diff;
+		if (milliseconds < 0)
+			milliseconds = 0;
+	}
+	return milliseconds;
+}
+
+static int 
+legacy_twait(
+	int mode,
+	int milliseconds,
+	int *timeleft
+	EVENTLIST_2nd(_nc_eventlist *evl))
+{
+	SCREEN *sp = ConsoleScreen();
+	HANDLE hdl = LEGACYCONSOLE.core.ConsoleHandleIn;
+	INPUT_RECORD inp_rec;
+	BOOL b;
+	DWORD nRead = 0, rc = WAIT_FAILED;
+	int code = 0;
+	FILETIME fstart;
+	FILETIME fend;
+	int diff;
+	bool isNoDelay = (milliseconds == 0);
+
+#ifdef NCURSES_WGETCH_EVENTS
+	(void)evl; /* TODO: implement wgetch-events */
+#endif
+
+#define IGNORE_CTRL_KEYS (SHIFT_PRESSED |                        \
+						  LEFT_ALT_PRESSED | RIGHT_ALT_PRESSED | \
+						  LEFT_CTRL_PRESSED | RIGHT_CTRL_PRESSED)
+#define CONSUME() read_keycode(hdl, &inp_rec, 1, &nRead)
+
+	assert(sp);
+
+	TR(TRACE_IEVENT, ("start twait: hdl=%p, %d milliseconds, mode: %d",
+					  hdl, milliseconds, mode));
+
+	if (milliseconds < 0)
+		milliseconds = NC_INFINITY;
+
+	memset(&inp_rec, 0, sizeof(inp_rec));
+
+	while (true)
+	{
+		if (!isNoDelay)
+		{
+			GetSystemTimeAsFileTime(&fstart);
+			rc = WaitForSingleObject(hdl, (DWORD)milliseconds);
+			GetSystemTimeAsFileTime(&fend);
+			diff = (int)tdiff(fstart, fend);
+			milliseconds = Adjust(milliseconds, diff);
+			if (milliseconds < 0)
+				break;
+		}
+
+		if (isNoDelay || (rc == WAIT_OBJECT_0))
+		{
+			if (mode)
+			{
+				nRead = 0;
+				b = GetNumberOfConsoleInputEvents(hdl, &nRead);
+				if (!b)
+				{
+					T(("twait:err GetNumberOfConsoleInputEvents"));
+				}
+				if (isNoDelay && b)
+				{
+					T(("twait: Events Available: %lu", (unsigned long)nRead));
+					if (nRead == 0)
+					{
+						code = 0;
+						goto end;
+					}
+					else
+					{
+						DWORD n = 0;
+						MakeArray(pInpRec, INPUT_RECORD, nRead);
+						if (pInpRec != NULL)
+						{
+							DWORD i;
+							BOOL f;
+							memset(pInpRec, 0, sizeof(INPUT_RECORD) * nRead);
+							f = PeekConsoleInput(hdl, pInpRec, nRead, &n);
+							if (f)
+							{
+								for (i = 0; i < n; i++)
+								{
+									if (pInpRec[i].EventType == KEY_EVENT)
+									{
+										if (pInpRec[i].Event.KeyEvent.bKeyDown)
+										{
+											DWORD ctrlMask =
+												(pInpRec[i].Event.KeyEvent.dwControlKeyState &
+												 IGNORE_CTRL_KEYS);
+											if (!ctrlMask)
+											{
+												code = TW_INPUT;
+												goto end;
+											}
+										}
+									}
+								}
+							}
+							else
+							{
+								T(("twait:err PeekConsoleInput"));
+							}
+							code = 0;
+							goto end;
+						}
+						else
+						{
+							T(("twait:err could not alloca input records"));
+						}
+					}
+				}
+				if (b && nRead > 0)
+				{
+					b = PeekConsoleInput(hdl, &inp_rec, 1, &nRead);
+					if (!b)
+					{
+						T(("twait:err PeekConsoleInput"));
+					}
+					if (b && nRead > 0)
+					{
+						switch (inp_rec.EventType)
+						{
+						case KEY_EVENT:
+							if (mode & TW_INPUT)
+							{
+								WORD vk = inp_rec.Event.KeyEvent.wVirtualKeyCode;
+								WORD ch = inp_rec.Event.KeyEventChar;
+
+								T(("twait:event KEY_EVENT"));
+								T(("twait vk=%d, ch=%d, keydown=%d",
+								   vk, ch, inp_rec.Event.KeyEvent.bKeyDown));
+
+								if (inp_rec.Event.KeyEvent.bKeyDown)
+								{
+									T(("twait:event KeyDown"));
+									if ((0 == ch))
+									{
+										int nKey = MapKey(vk);
+										if (nKey < 0)
+										{
+											CONSUME();
+											continue;
+										}
+									}
+									code = TW_INPUT;
+									goto end;
+								}
+								else
+								{
+									CONSUME();
+								}
+							}
+							continue;
+						case MOUSE_EVENT:
+							T(("twait:event MOUSE_EVENT"));
+							if (decode_mouse(sp,
+											 (inp_rec.Event.MouseEvent.dwButtonState & BUTTON_MASK)) == 0)
+							{
+								CONSUME();
+							}
+							else if (mode & TW_MOUSE)
+							{
+								code = TW_MOUSE;
+								goto end;
+							}
+							continue;
+							/* e.g., FOCUS_EVENT */
+						case WINDOW_BUFFER_SIZE_EVENT:
+							T(("twait:event WINDOW_BUFFER_SIZE_EVENT"));
+							CONSUME();
+							SetConsolePendingResize();
+							continue;
+						default:
+							T(("twait:event Type %d", inp_rec.EventType));
+							CONSUME();
+							// selectActiveHandle();
+							continue;
+						}
+					}
+				}
+			}
+			continue;
+		}
+		else
+		{
+			if (rc != WAIT_TIMEOUT)
+			{
+				code = -1;
+				break;
+			}
+			else
+			{
+				code = 0;
+				break;
+			}
+		}
+	}
+end:
+
+	TR(TRACE_IEVENT, ("end twait: returned %d (%lu), remaining time %d msec",
+					  code, (unsigned long)GetLastError(), milliseconds));
+
+	if (timeleft)
+		*timeleft = milliseconds;
+
+	return code;
 }
 
 /* This function sets the console mode for the input and output handles. It is called by the main thread

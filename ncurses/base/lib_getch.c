@@ -271,19 +271,23 @@ fifo_push(SCREEN *sp EVENTLIST_2nd(_nc_eventlist * evl))
     } else
 #endif
     {				/* Can block... */
-#if USE_TERM_DRIVER
-	int buf;
-	n = CallDriver_1(sp, td_read, &buf);
-	ch = buf;
-#else /* !USE_TERM_DRIVER */
+#if USE_LEGACY_CONSOLE
+	if (IsLegacyConsole()) {
+	    int buf;
+	    n = LEGACYCONSOLE.read(&buf);	
+	   ch = buf;
+	} else {
+#endif /* USE_LEGACY_CONSOLE */
 	unsigned char c2 = 0;
 
 	_nc_set_read_thread(TRUE);
 	n = (int) NC_READ(sp->_ifd, &c2, (size_t) 1);
 	_nc_set_read_thread(FALSE);
 	ch = c2;
-#endif /* USE_TERM_DRIVER */
     }
+#if USE_LEGACY_CONSOLE
+    }
+#endif /* USE_LEGACY_CONSOLE */
 
     if ((n == -1) || (n == 0)) {
 	TR(TRACE_IEVENT, ("read(%d,&ch,1)=%d, errno=%d", sp->_ifd, n, errno));

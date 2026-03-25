@@ -163,10 +163,6 @@ NCURSES_SP_NAME(del_curterm) (NCURSES_SP_DCLx TERMINAL *termp)
 	    FreeAndNull(_nc_globals.home_terminfo);
 	}
 #endif
-#if USE_TERM_DRIVER
-	if (TCB->drv)
-	    TCB->drv->td_release(TCB);
-#endif
 #if NO_LEAKS
 	/* discard memory used in tgetent's cache for this terminal */
 	_nc_tgetent_leak(termp);

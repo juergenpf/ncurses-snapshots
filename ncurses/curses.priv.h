@@ -2483,14 +2483,10 @@ typedef struct term_driver {
     const char* (*td_name)(struct DriverTCB*);
     bool   (*td_CanHandle)(struct DriverTCB*, const char*, int*);
     void   (*td_init)(struct DriverTCB*);
-    void   (*td_release)(struct DriverTCB*);
     int    (*td_hwcur)(struct DriverTCB*, int yold, int xold, int y, int x);
     int    (*td_testmouse)(struct DriverTCB*, int EVENTLIST_2nd(_nc_eventlist*));
     void   (*td_setfilter)(struct DriverTCB*);
     int    (*td_update)(struct DriverTCB*);
-    int    (*td_defaultcolors)(struct DriverTCB*, int, int);
-    int    (*td_twait)(struct DriverTCB*, int, int, int* EVENTLIST_2nd(_nc_eventlist*));
-    int    (*td_read)(struct DriverTCB*, int*);
 } TERM_DRIVER;
 
 typedef struct DriverTCB
@@ -2499,7 +2495,6 @@ typedef struct DriverTCB
     TERM_DRIVER*  drv;    /* The driver for that Terminal */
     SCREEN*       csp;    /* The screen that owns that Terminal */
     TerminalInfo  info;   /* Driver independent core capabilities of the Terminal */
-    void*         prop;   /* Driver dependent property storage to be used by the Driver */
     long          magic;
 } TERMINAL_CONTROL_BLOCK;
 
@@ -2715,6 +2710,8 @@ typedef struct {
     int (*init_pair)(int pair, int fg, int bg);       // Pointer to the init_pair function used by the legacy console.')
     void (*setcolor)(BOOL fg, int color);	   // Pointer to the setcolor function used by the legacy console.)
     int (*curs_set)(int visibility);                // Pointer to the curs_set function used by the legacy console.
+    int (*read)(int *buf); 		    // Pointer to the read function used by the legacy console.
+     int (*twait)(int, int, int* EVENTLIST_2nd(_nc_eventlist*));  
 } LegacyConsoleInterface;
 extern NCURSES_EXPORT_VAR(LegacyConsoleInterface *) _nc_LEGACYCONSOLE;
 #define LEGACYCONSOLE (*_nc_LEGACYCONSOLE)
