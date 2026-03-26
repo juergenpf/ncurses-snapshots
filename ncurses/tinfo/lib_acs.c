@@ -59,7 +59,7 @@ NCURSES_EXPORT_VAR (chtype) acs_map[ACS_LEN] =
 };
 #endif
 
-#if USE_TERM_DRIVER
+#if USE_TERM_DRIVER || USE_LEGACY_CONSOLE
 NCURSES_EXPORT(chtype)
 NCURSES_SP_NAME(_nc_acs_char) (NCURSES_SP_DCLx int c)
 {

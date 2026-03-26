@@ -1286,7 +1286,7 @@ typedef struct screen {
 	int		_sysmouse_new_buttons;
 #endif
 
-#if USE_TERM_DRIVER
+#if USE_TERM_DRIVER || USE_LEGACY_CONSOLE
 	MEVENT		_drv_mouse_fifo[FIFO_SIZE];
 	int		_drv_mouse_head;
 	int		_drv_mouse_tail;
@@ -2483,7 +2483,6 @@ typedef struct term_driver {
     const char* (*td_name)(struct DriverTCB*);
     bool   (*td_CanHandle)(struct DriverTCB*, const char*, int*);
     void   (*td_init)(struct DriverTCB*);
-    void   (*td_setfilter)(struct DriverTCB*);
 } TERM_DRIVER;
 
 typedef struct DriverTCB

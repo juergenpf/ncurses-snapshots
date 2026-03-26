@@ -136,22 +136,12 @@ wcon_init(TERMINAL_CONTROL_BLOCK *TCB)
 }
 
 
-static void
-wcon_setfilter(TERMINAL_CONTROL_BLOCK *TCB)
-{
-	SCREEN *sp;
-
-	AssertTCB();
-	SetSP();
-}
-
 
 NCURSES_EXPORT_VAR(TERM_DRIVER)
 _nc_WIN_DRIVER = {
 	FALSE,
 	wcon_name,			/* Name          */
 	wcon_CanHandle,		/* CanHandle     */
-	wcon_init,			/* init          */
-	wcon_setfilter		/* setfilter     */
+	wcon_init			/* init          */
 };
 #endif /* USE_LEGACY_CONSOLE */

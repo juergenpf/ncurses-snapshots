@@ -53,12 +53,12 @@ MODULE_ID("$Id: lib_color.c,v 1.157 2025/12/27 12:31:03 tom Exp $")
 
 #if USE_TERM_DRIVER
 #if USE_LEGACY_CONSOLE
-#define CanChange      LEGACYCONSOLE.info.canchange
-#define DefaultPalette LEGACYCONSOLE.info.defaultPalette
-#define HasColor       LEGACYCONSOLE.info.hascolor
-#define InitColor      LEGACYCONSOLE.info.initcolor
-#define MaxColors      LEGACYCONSOLE.info.maxcolors
-#define MaxPairs       LEGACYCONSOLE.info.maxpairs
+#define CanChange      (IsLegacyConsole() ? LEGACYCONSOLE.info.canchange : InfoOf(SP_PARM).canchange)
+#define DefaultPalette (IsLegacyConsole() ? LEGACYCONSOLE.info.defaultPalette : InfoOf(SP_PARM).defaultPalette)
+#define HasColor       (IsLegacyConsole() ? LEGACYCONSOLE.info.hascolor : InfoOf(SP_PARM).hascolor)
+#define InitColor      (IsLegacyConsole() ? LEGACYCONSOLE.info.initcolor : InfoOf(SP_PARM).initcolor)
+#define MaxColors      (IsLegacyConsole() ? LEGACYCONSOLE.info.maxcolors : InfoOf(SP_PARM).maxcolors)
+#define MaxPairs       (IsLegacyConsole() ? LEGACYCONSOLE.info.maxpairs : InfoOf(SP_PARM).maxpairs)
 #define UseHlsPalette  (DefaultPalette == _nc_hls_palette)
 #else
 #define CanChange      InfoOf(SP_PARM).canchange
@@ -143,7 +143,7 @@ static const color_t hls_palette[] =
     DATA(	0,	50,	100),		/* COLOR_WHITE */
 };
 
-#if USE_TERM_DRIVER
+#if USE_TERM_DRIVER || USE_LEGACY_CONSOLE
 NCURSES_EXPORT_VAR(const color_t*) _nc_cga_palette = cga_palette;
 NCURSES_EXPORT_VAR(const color_t*) _nc_hls_palette = hls_palette;
 #endif

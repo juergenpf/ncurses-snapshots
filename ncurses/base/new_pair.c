@@ -44,7 +44,11 @@
 #endif
 
 #if USE_TERM_DRIVER
+#if USE_LEGACY_CONSOLE
+#define MaxColors      (IsLegacyConsole() ? LEGACYCONSOLE.info.maxcolors : InfoOf(SP_PARM).maxcolors)
+#else
 #define MaxColors      InfoOf(SP_PARM).maxcolors
+#endif
 #else
 #define MaxColors      max_colors
 #endif

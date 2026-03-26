@@ -52,7 +52,11 @@
 MODULE_ID("$Id: lib_newterm.c,v 1.110 2025/12/27 12:28:45 tom Exp $")
 
 #if USE_TERM_DRIVER
+#if USE_LEGACY_CONSOLE
+#define NumLabels      (IsLegacyConsole() ? LEGACYCONSOLE.info.numlabels : InfoOf(SP_PARM).numlabels)
+#else
 #define NumLabels      InfoOf(SP_PARM).numlabels
+#endif
 #else
 #define NumLabels      num_labels
 #endif

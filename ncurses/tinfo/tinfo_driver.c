@@ -291,26 +291,6 @@ drv_init(TERMINAL_CONTROL_BLOCK * TCB)
 #define InPalette(n)	((n) >= 0 && (n) < MAX_PALETTE)
 
 
-static void
-drv_setfilter(TERMINAL_CONTROL_BLOCK * TCB)
-{
-    AssertTCB();
-
-    /* *INDENT-EQLS* */
-    clear_screen     = ABSENT_STRING;
-    cursor_address   = ABSENT_STRING;
-    cursor_down      = ABSENT_STRING;
-    cursor_up        = ABSENT_STRING;
-    parm_down_cursor = ABSENT_STRING;
-    parm_up_cursor   = ABSENT_STRING;
-    row_address      = ABSENT_STRING;
-    cursor_home      = carriage_return;
-
-    if (back_color_erase)
-	clr_eos = ABSENT_STRING;
-}
-
-
 #define ENSURE_TINFO(sp) (TCBOf(sp)->drv->isTerminfo)
 
 NCURSES_EXPORT(void)
@@ -408,8 +388,7 @@ NCURSES_EXPORT_VAR (TERM_DRIVER) _nc_TINFO_DRIVER = {
     TRUE,
 	drv_Name,		/* Name */
 	drv_CanHandle,		/* CanHandle */
-	drv_init,		/* init */
-	drv_setfilter		/* setfilter */
+	drv_init		/* init */
 };
 
 #if USE_TERM_DRIVER

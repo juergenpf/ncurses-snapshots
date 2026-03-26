@@ -60,8 +60,13 @@
 MODULE_ID("$Id: lib_set_term.c,v 1.199 2025/12/27 12:28:45 tom Exp $")
 
 #if USE_TERM_DRIVER
+#if USE_LEGACY_CONSOLE
+#define MaxColors      (IsLegacyConsole() ? LEGACYCONSOLE.info.maxcolors : InfoOf(SP_PARM).maxcolors)
+#define NumLabels      (IsLegacyConsole() ? LEGACYCONSOLE.info.numlabels : InfoOf(SP_PARM).numlabels)
+#else
 #define MaxColors      InfoOf(sp).maxcolors
 #define NumLabels      InfoOf(sp).numlabels
+#endif
 #else
 #define MaxColors      max_colors
 #define NumLabels      num_labels
@@ -403,9 +408,6 @@ NCURSES_SP_NAME(_nc_setupscreen) (
     if (filtered) {
 	slines = 1;
 	SET_LINES(slines);
-#if USE_TERM_DRIVER
-	CallDriver(sp, td_setfilter);
-#else
 	/* *INDENT-EQLS* */
 	clear_screen     = ABSENT_STRING;
 	cursor_address   = ABSENT_STRING;
@@ -419,7 +421,6 @@ NCURSES_SP_NAME(_nc_setupscreen) (
 	if (back_color_erase)
 	    clr_eos = ABSENT_STRING;
 
-#endif
 	T(("filter screensize %dx%d", slines, scolumns));
     }
     sp->_lines = (NCURSES_SIZE_T) slines;

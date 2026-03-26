@@ -47,7 +47,11 @@
 MODULE_ID("$Id: lib_slkrefr.c,v 1.35 2025/12/27 12:41:23 tom Exp $")
 
 #if USE_TERM_DRIVER
+#if USE_LEGACY_CONSOLE
+#define NumLabels    (IsLegacyConsole() ? LEGACYCONSOLE.info.numlabels : InfoOf(SP_PARM).numlabels)
+#else
 #define NumLabels    InfoOf(SP_PARM).numlabels
+#endif
 #else
 #define NumLabels    num_labels
 #endif
