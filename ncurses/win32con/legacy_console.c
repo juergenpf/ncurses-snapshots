@@ -48,6 +48,7 @@ MODULE_ID("$Id$")
 #define Dispatch(name) .name = DispatchMethod(name)
 #define NoDispatch(name) .name = NULL
 #define METHOD(name, type) static type DispatchMethod(name)
+#define T_METHOD(name,fmt) "called {legacy_console::legacy_" #name fmt
 
 METHOD(init, BOOL)(int fdOut, int fdIn);
 METHOD(size, void)(int *Lines, int *Cols);
@@ -55,7 +56,8 @@ METHOD(size_changed, BOOL)(void);
 METHOD(getmode, int)(int fd GCC_UNUSED, TTY *arg);
 METHOD(setmode, int)(int fd GCC_UNUSED, const TTY *arg);
 METHOD(defmode, int)(TTY *arg, short kind);
-METHOD(AdjustSize, BOOL)(void);
+METHOD(termname, char *)(BOOL longname);
+METHOD(adjust_size, BOOL)(void);
 METHOD(termattrs, chtype)(void);
 METHOD(keypad, int)(BOOL flag);
 METHOD(beeporflash, int)(BOOL beep);
@@ -92,7 +94,8 @@ static LegacyConsoleInterface legacyCONSOLE =
 		.SBI = {},
 		.save_CI = {0},
 
-		Dispatch(AdjustSize),
+		Dispatch(termname),
+		Dispatch(adjust_size),
 		Dispatch(termattrs),
 		Dispatch(keypad),
 		Dispatch(beeporflash),
@@ -338,13 +341,19 @@ _nc_legacy_console_init(void)
 	LEGACYCONSOLE.info.defaultPalette = _nc_cga_palette;
 }
 
-METHOD(AdjustSize, BOOL)(void)
+METHOD(termname, char *)(BOOL longname)
+{
+	assert(IsLegacyConsole());
+	return longname ? "Windows Legacy Console" : "#win32console";
+}
+
+METHOD(adjust_size, BOOL)(void)
 {
 	BOOL res = FALSE;
 	COORD newSize;
 	CONSOLE_SCREEN_BUFFER_INFO csbi;
 
-	T((T_CALLED("win32_console::legacy_AdjustSize()")));
+	T((T_METHOD(adjust_size," ")));
 
 	assert(IsLegacyConsole());
 
@@ -394,7 +403,7 @@ METHOD(keypad, int)(BOOL flag)
 	int code = ERR;
 	SCREEN *sp;
 
-	T((T_CALLED("win32_console::legacy_keypad(%d)"), flag));
+	T((T_METHOD(keypad,"(%d)"), flag));
 
 	assert(IsLegacyConsole());
 
@@ -479,7 +488,7 @@ METHOD(keyok, int)(int keycode, int flag)
 	void *res;
 	LONG key = GenMap(0, (WORD)keycode);
 
-	T((T_CALLED("win32_console::legacy_keyok(%d, %d)"), keycode, flag));
+	T((T_METHOD(keyok,"(%d, %d)"), keycode, flag));
 
 	assert(IsLegacyConsole());
 
@@ -507,7 +516,7 @@ METHOD(has_key, int)(int keycode)
 	bool found = FALSE;
 	LONG key = GenMap(0, (WORD)keycode);
 
-	T((T_CALLED("win32_console::legacy_has_key(%d)"), keycode));
+	T((T_METHOD(has_key,"(%d)"), keycode));
 
 	assert(IsLegacyConsole());
 
@@ -624,7 +633,7 @@ METHOD(curs_set, int)(int visibility)
 	int res = ERR;
 	CONSOLE_CURSOR_INFO this_CI;
 
-	T((T_CALLED("win32_console::legacy_curs_set(%d)"), visibility));
+	T((T_METHOD(curs_set,"(%d)"), visibility));
 
 	assert(IsLegacyConsole());
 
@@ -777,7 +786,7 @@ METHOD(read, int)(int *buf)
 	hdl = LEGACYCONSOLE.core.ConsoleHandleIn;
 	memset(&inp_rec, 0, sizeof(inp_rec));
 
-	T((T_CALLED("win32_console::legacy_read(%p)"), buf));
+	T((T_METHOD(read,"(%p)"), buf));
 
 	while ((b = read_keycode(hdl, &inp_rec, 1, &nRead)))
 	{
@@ -1122,7 +1131,7 @@ METHOD(testmouse,int)(int delay EVENTLIST_2nd(_nc_eventlist *))
 	int rc = 0;
 	SCREEN *sp;
 
-	T((T_CALLED("legacy_console::legacy__testmouse(%d)"), delay));
+	T((T_METHOD(testmouse,"(delay=%d)"), delay));
 
 	assert(IsLegacyConsole());
 
@@ -1154,7 +1163,7 @@ METHOD(setmode, int)(int fd GCC_UNUSED, const TTY *arg)
 	BOOL output_ok = FALSE;
 	SCREEN *sp = NULL;
 
-	T((T_CALLED("win32_driver::legacy_setmode(fd=%d, TTY*=%p)"), fd, arg));
+	T((T_METHOD(setmode,"(fd=%d, TTY*=%p)"), fd, arg));
 
 	assert(IsLegacyConsole());
 
@@ -1317,7 +1326,7 @@ METHOD(setmode, int)(int fd GCC_UNUSED, const TTY *arg)
  * that TTY. */
 METHOD(getmode, int)(int fd GCC_UNUSED, TTY *arg)
 {
-	T((T_CALLED("win32_driver::legacy_getmode(fd=%d, TTY*=%p)"), fd, arg));
+	T((T_METHOD(getmode,"(fd=%d, TTY*=%p)"), fd, arg));
 
 	assert(IsLegacyConsole());
 
@@ -1345,7 +1354,7 @@ METHOD(defmode, int)(TTY *arg, short kind)
 {
 	short realMode = kind;
 
-	T((T_CALLED("win32_driver::legacy_defmode(TTY*=%p, kind=%d)"), arg, kind));
+	T((T_METHOD(defmode,"(TTY*=%p, kind=%d)"), arg, kind));
 
 	assert(IsLegacyConsole());
 
@@ -1379,7 +1388,7 @@ METHOD(size, void)(int *Lines, int *Cols)
 METHOD(size_changed, BOOL)(void)
 {
 	BOOL resized = FALSE;
-	T((T_CALLED("win32_console::legacy_size_changed()")));
+	T((T_METHOD(size_changed,"()")));
 
 	assert(IsLegacyConsole());
 
@@ -1411,7 +1420,7 @@ METHOD(init, BOOL)(int fdOut, int fdIn)
 {
 	BOOL result = FALSE;
 
-	T((T_CALLED("win32_driver::legacy_init(fdOut=%d, fdIn=%d)"), fdOut, fdIn));
+	T((T_METHOD(init,"(fdOut=%d, fdIn=%d)"), fdOut, fdIn));
 
 	assert(IsLegacyConsole());
 
@@ -1427,12 +1436,6 @@ METHOD(init, BOOL)(int fdOut, int fdIn)
 
 		HANDLE stdin_handle = INVALID_HANDLE_VALUE;
 		HANDLE stdout_handle = INVALID_HANDLE_VALUE;
-
-		if (fdIn != -1)
-		{
-			T(("In the first call fdIn is expected to be -1."));
-			returnBool(FALSE);
-		}
 
 		stdin_handle = CreateFileA(
 			"CONIN$",
@@ -1499,15 +1502,6 @@ METHOD(init, BOOL)(int fdOut, int fdIn)
 
 		LEGACYCONSOLE.core.ConsoleHandleIn = stdin_handle;
 		LEGACYCONSOLE.core.ConsoleHandleOut = stdout_handle;
-		MarkConsoleInitialized();
-		result = TRUE;
-	}
-	else
-	{
-		/* This branch is called from newterm() when fdIn is provided, so we need to validate
-		 * that the provided fdIn and fdOut are valid pseudo-console handles, and if so we
-		 * update the defaultCONPTY structure to use the new handles. */
-		DWORD dwFlagOut;
 
 		if (LEGACYCONSOLE.hProgMode == INVALID_HANDLE_VALUE)
 		{
@@ -1526,6 +1520,12 @@ METHOD(init, BOOL)(int fdOut, int fdIn)
 			T(("Output handle is not a console"));
 			returnBool(FALSE);
 		}
+
+		MarkConsoleInitialized();
+		result = TRUE;
+	} else
+	{
+		T(("Console already initialized"));
 		result = TRUE;
 	}
 	returnBool(result);
@@ -1783,7 +1783,7 @@ METHOD(doupdate,int)(void)
 	int y, nonempty, n, x0, x1, Width, Height;
 	SCREEN *sp;
 
-	T((T_CALLED("legacy_console::legacy_doupdate()")));
+	T((T_METHOD(doupdate,"()")));
 
 	assert(IsLegacyConsole());
 

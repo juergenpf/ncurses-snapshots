@@ -633,7 +633,7 @@ _nc_update_screensize(SCREEN *sp)
     if (IsLegacyConsole()) {
 	old_lines = CORECONSOLE.sbi_lines;
 	old_cols = CORECONSOLE.sbi_cols;
-	LEGACYCONSOLE.AdjustSize();
+	LEGACYCONSOLE.adjust_size();
 	// JPF TODO FIXME : Not sure we can let run that through for legacy console... need to check.
     } else {
 #endif
@@ -864,11 +864,15 @@ TINFO_SETUP_TERM(TERMINAL **tp,
 
     if (tname == NULL) {
 	tname = getenv("TERM");
-#if USE_CONSOLE_API
+#if USE_LEGACY_CONSOLE
+    if (IsLegacyConsole()) {
+	tname = LEGACYCONSOLE.termname(FALSE);
+    } else {
 	if (!VALID_TERM_ENV(tname, NO_TERMINAL)) {
 	    T(("Failure with TERM=%s", NonNull(tname)));
 	    ret_error0(TGETENT_ERR, "TERM environment variable not set.\n");
 	}
+   }
 #elif USE_TERM_DRIVER
 	if (!NonEmpty(tname))
 	    tname = "unknown";

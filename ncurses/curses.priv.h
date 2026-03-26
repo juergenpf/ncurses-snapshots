@@ -2551,9 +2551,6 @@ extern NCURSES_EXPORT(void)   _nc_get_screensize(SCREEN *, int *, int *);
 #define TINFO_GET_SIZE(sp, tp, lp, cp) \
 	_nc_get_screensize(sp, lp, cp)
 
-	#if  USE_CONSOLE_API
-extern NCURSES_EXPORT(BOOL) _nc_console_setup(void);
-#endif
 
 #if USE_MODERN_CONSOLE
 #define NC_READ(fd, buf, count) WINCONPTY.read(fd,buf,count)
@@ -2644,6 +2641,7 @@ typedef struct {
 extern NCURSES_EXPORT_VAR(ConsoleCoreInterface*) _nc_CORECONSOLE;
 #define CORECONSOLE (*_nc_CORECONSOLE)
 #define ConsoleScreen() ((SCREEN*)(intptr_t)CORECONSOLE.sp)
+#define CoreConsoleInitialized() (_nc_CORECONSOLE != NULL)
 
 #define IsConPTY() (CORECONSOLE.status & CONSOLE_STATUS_IS_CONPTY)
 #define IsLegacyConsole() (!(CORECONSOLE.status & CONSOLE_STATUS_IS_CONPTY) )
@@ -2663,6 +2661,15 @@ extern NCURSES_EXPORT_VAR(ConsoleCoreInterface*) _nc_CORECONSOLE;
 #define SetConsoleResizeLimitations() (CORECONSOLE.status |= CONSOLE_STATUS_LIMITED_RESIZE)
 #define ClearConsoleResizeLimitations() (CORECONSOLE.status &= ~CONSOLE_STATUS_LIMITED_RESIZE)
 
+extern NCURSES_EXPORT(BOOL) _nc_console_setup(void);
+#define AssertConsoleSetup() \
+    if (!CoreConsoleInitialized()) { \
+	if (!_nc_console_setup()) { \
+	    fprintf(stderr, "Failed to initialize console interface\n"); \
+	    ExitProgram(EXIT_FAILURE); \
+	} \
+    }
+
 #if USE_LEGACY_CONSOLE
 #define CON_NUMPAIRS 64
 typedef struct {
@@ -2681,18 +2688,19 @@ typedef struct {
 
     TerminalInfo info;			      // Core capabilities.
 
-    BOOL (*AdjustSize)(void);                 // Adjust the console buffer size.
-    chtype (*termattrs)(void);                // Pointer to the termattrs function used by the legacy console.
-    int (*keypad)(BOOL);                      // Pointer to the keypad function used by the legacy console.
-    int (*beeporflash)(BOOL);                 // Pointer to the beep or flash function used by the legacy console.
-    int (*keyok)(int keycode,int flag);       // Pointer to the keyok function used by the legacy console.
-    int (*has_key)(int keycode);              // Pointer to the has_key function used by the legacy console.
-    void (*init_acs)(chtype *acs);            // Pointer to the init_acs function used by the legacy console.
-    BOOL (*reset_color_pair)(void);           // Pointer to the reset_color_pair function used by the legacy console.
-    int (*init_pair)(int pair, int fg, int bg);       // Pointer to the init_pair function used by the legacy console.')
+    char* (*termname)(BOOL longname);	           // Pointer to the name function used by the legacy console.
+    BOOL (*adjust_size)(void);                     // Adjust the console buffer size.
+    chtype (*termattrs)(void);                     // Pointer to the termattrs function used by the legacy console.
+    int (*keypad)(BOOL);                           // Pointer to the keypad function used by the legacy console.
+    int (*beeporflash)(BOOL);                      // Pointer to the beep or flash function used by the legacy console.
+    int (*keyok)(int keycode,int flag);            // Pointer to the keyok function used by the legacy console.
+    int (*has_key)(int keycode);                   // Pointer to the has_key function used by the legacy console.
+    void (*init_acs)(chtype *acs);                 // Pointer to the init_acs function used by the legacy console.
+    BOOL (*reset_color_pair)(void);                // Pointer to the reset_color_pair function used by the legacy console.
+    int (*init_pair)(int pair, int fg, int bg);    // Pointer to the init_pair function used by the legacy console.')
     void (*setcolor)(BOOL fg, int color);	   // Pointer to the setcolor function used by the legacy console.)
-    int (*curs_set)(int visibility);                // Pointer to the curs_set function used by the legacy console.
-    int (*read)(int *buf); 		    // Pointer to the read function used by the legacy console.
+    int (*curs_set)(int visibility);               // Pointer to the curs_set function used by the legacy console.
+    int (*read)(int *buf); 		           // Pointer to the read function used by the legacy console.
      int (*twait)(int, int, int* EVENTLIST_2nd(_nc_eventlist*)); 
      int (*testmouse)(int EVENTLIST_2nd(_nc_eventlist*));
      int (*mvcur)(int yold, int xold, int y, int x);

@@ -68,7 +68,12 @@ initscr(void)
 
 	env = getenv("TERM");
 	(void) VALID_TERM_ENV(env, "unknown");
-
+#if USE_LEGACY_CONSOLE
+	AssertConsoleSetup();
+	if (IsLegacyConsole()) {
+	    env = LEGACYCONSOLE.termname(FALSE);
+	} 
+#endif
 	if ((name = strdup(env)) == NULL) {
 	    fprintf(stderr, "ncurses: cannot allocate %d bytes of"
 		    "memory for $TERM; exiting\n", (int) strlen(env));

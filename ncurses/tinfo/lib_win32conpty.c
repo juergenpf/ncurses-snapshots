@@ -51,6 +51,7 @@ MODULE_ID("$Id$")
 #define Dispatch(name) .name = DispatchMethod(name)
 #define NoDispatch(name) .name = NULL
 #define METHOD(name,type) static type DispatchMethod(name)
+#define T_METHOD(name,fmt) "called {lib_win32conpty::pty_" #name fmt
 
 // Prototypes of static function we want to use in initializers
 METHOD(init, BOOL) (int fdOut, int fdIn);
@@ -162,7 +163,7 @@ METHOD(init, BOOL) (int fdOut, int fdIn)
 {
     BOOL result = FALSE;
 
-    T((T_CALLED("lib_win32conpty::pty_init(fdOut=%d, fdIn=%d)"), fdOut, fdIn));
+    T((T_METHOD(init,"(fdOut=%d, fdIn=%d)"), fdOut, fdIn));
 
     assert(IsConPTY());
 
@@ -240,23 +241,7 @@ METHOD(init, BOOL) (int fdOut, int fdIn)
 	MarkConsoleInitialized();
 	result = TRUE;
     } else {
-	/* This branch is called from newterm() when fdIn is provided, so we need to validate
-	* that the provided fdIn and fdOut are valid pseudo-console handles, and if so we
-	* update the defaultCONPTY structure to use the new handles. */
-	DWORD dwFlagOut;
-	DWORD dwFlagIn;
-
-	if (GetConsoleMode(defaultCONPTY.core.ConsoleHandleOut, &dwFlagOut) == 0) {
-	    T(("Output handle is not a pseudo-console"));
-	    returnBool(FALSE);
-	}
-	if (GetConsoleMode(defaultCONPTY.core.ConsoleHandleIn, &dwFlagIn) == 0) {
-	    T(("Input handle is not a pseudo-console"));
-	    returnBool(FALSE);
-	}
-	defaultCONPTY.core.ttyflags.dwFlagOut = dwFlagOut;
-	defaultCONPTY.core.ttyflags.dwFlagIn = dwFlagIn;
-
+	T(("Console already initialized, skipping initialization"));
 	result = TRUE;
     }
     returnBool(result);
@@ -273,7 +258,7 @@ METHOD(init, BOOL) (int fdOut, int fdIn)
  * because we can fallback to query the standard handles. */
  METHOD(size, void) (int *Lines, int *Cols)
 {
-    T((T_CALLED("lib_win32conoty::pty_size(lines=%p, cols=%p)"), Lines, Cols));
+    T((T_METHOD(size,"(lines=%p, cols=%p)"), Lines, Cols));
 
     assert(IsConPTY());
 
@@ -307,7 +292,7 @@ METHOD(size_changed, BOOL) (void)
     int current_lines, current_cols;
     bool resized = FALSE;
 
-    T((T_CALLED("lib_win32conpty::pty_size_changed()")));
+    T((T_METHOD(size_changed,"()")));
 
     assert(IsConPTY());
 
@@ -343,7 +328,7 @@ METHOD(size_changed, BOOL) (void)
  * which will block on reading from the console input handle. */
 METHOD(start_input_subsystem, int) (void)
 {
-    T((T_CALLED("lib_win32conpty::start_input_subsystem()")));
+    T((T_METHOD(start_input_subsystem,"()")));
 
     assert(IsConPTY());
 
@@ -393,7 +378,7 @@ METHOD(start_input_subsystem, int) (void)
  * global variables to their initial state. */
 METHOD(stop_input_subsystem, int) (void)
 {
-    T((T_CALLED("lib_win32conpty::stop_input_subsystem()")));
+    T((T_METHOD(stop_input_subsystem,"()")));
 
     assert(IsConPTY());
 
@@ -627,7 +612,7 @@ METHOD(poll, int) (struct pty_pollfd * fds, nfds_t nfds, int timeout_ms)
 {
     int code = -1;
 
-    T((T_CALLED("lib_win32conpty::pty_poll(fds=%p, nfds=%u, timeout_ms=%d)"),
+    T((T_METHOD(poll,"(fds=%p, nfds=%u, timeout_ms=%d)"),
        fds, (unsigned) nfds, timeout_ms));
 
     assert(IsConPTY());
@@ -667,7 +652,7 @@ METHOD(read, int) (int fd GCC_UNUSED, void *result, size_t count)
     int byte;
     size_t i;
 
-    T((T_CALLED("lib_win32conpty::pty_read(fd=%d, result=%p)"), fd, result));
+    T((T_METHOD(read,"(fd=%d, result=%p)"), fd, result));
 
     assert(IsConPTY());
     assert(g_input_thread != NULL && g_stdin_handle != INVALID_HANDLE_VALUE);
@@ -701,8 +686,7 @@ METHOD(write, int) (int fd GCC_UNUSED, const void *buf, size_t count)
     HANDLE hOut = defaultCONPTY.core.ConsoleHandleOut;
     DWORD written = 0;
 
-    T((T_CALLED("lib_win32conpty::pty_write(fd=%d, buf=%p, count=%u)"), fd,
-       buf, (unsigned) count));
+    T((T_METHOD(write,"(fd=%d, buf=%p, count=%u)"), fd, buf, (unsigned) count));
 
     assert(IsConPTY());
 
@@ -732,7 +716,7 @@ METHOD(setmode, int) (int fd GCC_UNUSED, const TTY * arg)
     BOOL input_ok = FALSE;
     BOOL output_ok = FALSE;
 
-    T((T_CALLED("lib_win32conpty::pty_setmode(fd=%d, TTY*=%p)"), fd, arg));
+    T((T_METHOD(setmode,"(fd=%d, TTY*=%p)"), fd, arg));
 
     assert(IsConPTY());
 
@@ -834,7 +818,7 @@ METHOD(defmode, int) (TTY * arg, short kind)
 {
     short realMode = kind;
 
-    T((T_CALLED("lib_win32conpty::pty_defmode(TTY*=%p, kind=%d)"), arg, kind));
+    T((T_METHOD(defmode,"(TTY*=%p, kind=%d)"), arg, kind));
 
     assert(IsConPTY());
 
@@ -867,7 +851,7 @@ METHOD(defmode, int) (TTY * arg, short kind)
  * that TTY. */
 METHOD(getmode, int) (int fd GCC_UNUSED, TTY * arg)
 {
-    T((T_CALLED("lib_win32conpty::pty_getmode(fd=%d, TTY*=%p)"), fd, arg));
+    T((T_METHOD(getmode,"(fd=%d, TTY*=%p)"), fd, arg));
 
     if (NULL == arg)
 	returnCode(ERR);
