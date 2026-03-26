@@ -28,6 +28,7 @@
 
 /****************************************************************************
  *  Author: Juergen Pfeifer                                                 *
+ *     and: Thomas E. Dickey                                                *                                     *
  ****************************************************************************/
 
 #include <curses.priv.h>
@@ -40,6 +41,8 @@ MODULE_ID("$Id$")
 
 // FIXME JPF - For now, we disable mouse support as we need to debug why it not works
 #define NO_MOUSE_SUPPORT
+
+#define EXP_OPTIMIZE 0
 
 #define DispatchMethod(name) legacy_##name
 #define Dispatch(name) .name = DispatchMethod(name)
@@ -67,6 +70,8 @@ METHOD(curs_set, int)(int visibility);
 METHOD(read, int)(int *buf);
 METHOD(twait,int)(int mode,int milliseconds,int *timeleft EVENTLIST_2nd(_nc_eventlist *evl));
 METHOD(testmouse,int)(int delay EVENTLIST_2nd(_nc_eventlist *));
+METHOD(mvcur, int)(int yold, int xold, int y, int x);
+METHOD(doupdate, int)(void);
 
 static LegacyConsoleInterface legacyCONSOLE =
 	{
@@ -102,7 +107,10 @@ static LegacyConsoleInterface legacyCONSOLE =
 		Dispatch(curs_set),
 		Dispatch(read),
 		Dispatch(twait),
-		Dispatch(testmouse)};
+		Dispatch(testmouse),
+		Dispatch(mvcur),
+		Dispatch(doupdate)
+};
 NCURSES_EXPORT_VAR(LegacyConsoleInterface *)
 _nc_LEGACYCONSOLE = &legacyCONSOLE;
 
@@ -1534,5 +1542,401 @@ METHOD(init, BOOL)(int fdOut, int fdIn)
 		result = TRUE;
 	}
 	returnBool(result);
+}
+
+METHOD(mvcur,int)(int oldrow GCC_UNUSED, int oldcol GCC_UNUSED, int newrow, int newcol)
+{
+	int result = ERR;
+	COORD pos;
+
+	assert(IsLegacyConsole());
+
+	pos.X = (SHORT)newcol;
+	pos.Y = (SHORT)newrow;
+	if (SetConsoleCursorPosition(LEGACYCONSOLE.core.ConsoleHandleOut, pos))
+	{
+		result = OK;
+	}
+	return(result);
+}
+
+static WORD
+MapAttr(WORD res, attr_t ch)
+{
+	if (ch & A_COLOR)
+	{
+		int p;
+
+		p = PairNumber(ch);
+		if (p >= 0 && p < CON_NUMPAIRS)
+		{
+			WORD a;
+			a = LEGACYCONSOLE.pairs[p];
+			res = (WORD)((res & 0xff00) | a);
+		}
+	}
+
+	if (ch & A_REVERSE)
+	{
+		res = RevAttr(res);
+	}
+
+	if (ch & A_STANDOUT)
+	{
+		res = RevAttr(res) | BACKGROUND_INTENSITY;
+	}
+
+	if (ch & A_BOLD)
+		res |= FOREGROUND_INTENSITY;
+
+	if (ch & A_DIM)
+		res |= BACKGROUND_INTENSITY;
+
+	return res;
+}
+
+#if USE_WIDEC_SUPPORT
+/*
+ * TODO: support surrogate pairs
+ * TODO: support combining characters
+ * TODO: support acsc
+ * TODO: _nc_wacs should be part of sp.
+ */
+static BOOL
+con_write16(int y, int x, cchar_t *str, int limit)
+{
+	int actual = 0;
+	MakeArray(ci, CHAR_INFO, limit);
+	COORD loc, siz;
+	SMALL_RECT rec;
+	int i;
+	cchar_t ch;
+	SCREEN *sp = ConsoleScreen();
+
+
+	for (i = actual = 0; i < limit; i++)
+	{
+		ch = str[i];
+		if (isWidecExt(ch))
+			continue;
+		ci[actual].CharInfoChar = CharOf(ch);
+		ci[actual].Attributes = MapAttr(LEGACYCONSOLE.SBI.wAttributes,
+										AttrOf(ch));
+		if (AttrOf(ch) & A_ALTCHARSET)
+		{
+			if (_nc_wacs)
+			{
+				int which = CharOf(ch);
+				if (which > 0 && which < ACS_LEN && CharOf(_nc_wacs[which]) != 0)
+				{
+					ci[actual].CharInfoChar = CharOf(_nc_wacs[which]);
+				}
+				else
+				{
+					ci[actual].CharInfoChar = ' ';
+				}
+			}
+		}
+		++actual;
+	}
+
+	loc.X = (SHORT)0;
+	loc.Y = (SHORT)0;
+	siz.X = (SHORT)actual;
+	siz.Y = 1;
+
+	rec.Left = (SHORT)x;
+	rec.Top = (SHORT)(y + AdjustY());
+	rec.Right = (SHORT)(x + limit - 1);
+	rec.Bottom = rec.Top;
+
+	return write_screen(LEGACYCONSOLE.core.ConsoleHandleOut, ci, siz, loc, &rec);
+}
+
+
+#define con_write(y, x, str, n) con_write16(y, x, str, n)
+#else
+static BOOL
+con_write8(int y, int x, chtype *str, int n)
+{
+	MakeArray(ci, CHAR_INFO, n);
+	COORD loc, siz;
+	SMALL_RECT rec;
+	int i;
+	chtype ch;
+	SCREEN *sp = ConsoleScreen();
+
+	for (i = 0; i < n; i++)
+	{
+		ch = str[i];
+		ci[i].CharInfoChar = ChCharOf(ch);
+		ci[i].Attributes = MapAttr(LEGACYCONSOLE.SBI.wAttributes,
+								   ChAttrOf(ch));
+		if (ChAttrOf(ch) & A_ALTCHARSET)
+		{
+			if (sp->_acs_map)
+				ci[i].CharInfoChar =
+					ChCharOf(NCURSES_SP_NAME(_nc_acs_char)(sp, ChCharOf(ch)));
+		}
+	}
+
+	loc.X = (short)0;
+	loc.Y = (short)0;
+	siz.X = (short)n;
+	siz.Y = 1;
+
+	rec.Left = (short)x;
+	rec.Top = (short)y;
+	rec.Right = (short)(x + n - 1);
+	rec.Bottom = rec.Top;
+
+	return write_screen(LEGACYCONSOLE.core.ConsoleHandleOut, ci, siz, loc, &rec);
+}
+#define con_write(y, x, str, n) con_write8(y, x, str, n)
+#endif
+
+#if EXP_OPTIMIZE
+/*
+ * Comparing new/current screens, determine the last column-index for a change
+ * beginning on the given row,col position.  Unlike a serial terminal, there is
+ * no cost for "moving" the "cursor" on the line as we update it.
+ */
+static int
+find_end_of_change(SCREEN *sp, int row, int col)
+{
+	int result = col;
+	struct ldat *curdat = CurScreen(sp)->_line + row;
+	struct ldat *newdat = NewScreen(sp)->_line + row;
+
+	while (col <= newdat->lastchar)
+	{
+#if USE_WIDEC_SUPPORT
+		if (isWidecExt(curdat->text[col]) ||
+			isWidecExt(newdat->text[col]))
+		{
+			result = col;
+		}
+		else if (memcmp(&curdat->text[col],
+						&newdat->text[col],
+						sizeof(curdat->text[0])))
+		{
+			result = col;
+		}
+		else
+		{
+			break;
+		}
+#else
+		if (curdat->text[col] != newdat->text[col])
+		{
+			result = col;
+		}
+		else
+		{
+			break;
+		}
+#endif
+		++col;
+	}
+	return result;
+}
+
+/*
+ * Given a row,col position at the end of a change-chunk, look for the
+ * beginning of the next change-chunk.
+ */
+static int
+find_next_change(SCREEN *sp, int row, int col)
+{
+	struct ldat *curdat = CurScreen(sp)->_line + row;
+	struct ldat *newdat = NewScreen(sp)->_line + row;
+	int result = newdat->lastchar + 1;
+
+	while (++col <= newdat->lastchar)
+	{
+#if USE_WIDEC_SUPPORT
+		if (isWidecExt(curdat->text[col]) !=
+			isWidecExt(newdat->text[col]))
+		{
+			result = col;
+			break;
+		}
+		else if (memcmp(&curdat->text[col],
+						&newdat->text[col],
+						sizeof(curdat->text[0])))
+		{
+			result = col;
+			break;
+		}
+#else
+		if (curdat->text[col] != newdat->text[col])
+		{
+			result = col;
+			break;
+		}
+#endif
+	}
+	return result;
+}
+
+#define EndChange(first) \
+	find_end_of_change(sp, y, first)
+#define NextChange(last) \
+	find_next_change(sp, y, last)
+
+#endif /* EXP_OPTIMIZE */
+
+#define MARK_NOCHANGE(win, row)            \
+	win->_line[row].firstchar = _NOCHANGE; \
+	win->_line[row].lastchar = _NOCHANGE
+
+METHOD(doupdate,int)(void)
+{
+	int result = ERR;
+	int y, nonempty, n, x0, x1, Width, Height;
+	SCREEN *sp;
+
+	T((T_CALLED("legacy_console::legacy_doupdate()")));
+
+	assert(IsLegacyConsole());
+
+	sp = ConsoleScreen();
+
+	Width = screen_columns(sp);
+	Height = screen_lines(sp);
+	nonempty = Min(Height, NewScreen(sp)->_maxy + 1);
+
+	T(("... %dx%d clear cur:%d new:%d",
+	   Height, Width,
+	   CurScreen(sp)->_clear,
+	   NewScreen(sp)->_clear));
+
+	if (SP_PARM->_endwin == ewSuspend)
+	{
+
+		T(("coming back from shell mode"));
+		NCURSES_SP_NAME(reset_prog_mode)(NCURSES_SP_ARG);
+
+		NCURSES_SP_NAME(_nc_mvcur_resume)(NCURSES_SP_ARG);
+		NCURSES_SP_NAME(_nc_screen_resume)(NCURSES_SP_ARG);
+		SP_PARM->_mouse_resume(SP_PARM);
+
+		SP_PARM->_endwin = ewRunning;
+	}
+
+	if ((CurScreen(sp)->_clear || NewScreen(sp)->_clear))
+	{
+		int x;
+#if USE_WIDEC_SUPPORT
+		MakeArray(empty, cchar_t, Width);
+		wchar_t blank[2] =
+			{
+				L' ', L'\0'};
+
+		for (x = 0; x < Width; x++)
+			setcchar(&empty[x], blank, 0, 0, NULL);
+#else
+		MakeArray(empty, chtype, Width);
+
+		for (x = 0; x < Width; x++)
+			empty[x] = ' ';
+#endif
+
+		for (y = 0; y < nonempty; y++)
+		{
+			con_write(y, 0, empty, Width);
+			memcpy(empty,
+				   CurScreen(sp)->_line[y].text,
+				   (size_t)Width * sizeof(empty[0]));
+		}
+		CurScreen(sp)->_clear = FALSE;
+		NewScreen(sp)->_clear = FALSE;
+		touchwin(NewScreen(sp));
+		T(("... cleared %dx%d lines @%d of screen", nonempty, Width,
+		   AdjustY()));
+	}
+
+	for (y = 0; y < nonempty; y++)
+	{
+		x0 = NewScreen(sp)->_line[y].firstchar;
+		if (x0 != _NOCHANGE)
+		{
+#if EXP_OPTIMIZE
+			int x2;
+			int limit = NewScreen(sp)->_line[y].lastchar;
+			while ((x1 = EndChange(x0)) <= limit)
+			{
+				while ((x2 = NextChange(x1)) <=
+						   limit &&
+					   x2 <= (x1 + 2))
+				{
+					x1 = x2;
+				}
+				n = x1 - x0 + 1;
+				memcpy(&CurScreen(sp)->_line[y].text[x0],
+					   &NewScreen(sp)->_line[y].text[x0],
+					   n * sizeof(CurScreen(sp)->_line[y].text[x0]));
+				con_write(y,
+						  x0,
+						  &CurScreen(sp)->_line[y].text[x0], n);
+				x0 = NextChange(x1);
+			}
+
+			/* mark line changed successfully */
+			if (y <= NewScreen(sp)->_maxy)
+			{
+				MARK_NOCHANGE(NewScreen(sp), y);
+			}
+			if (y <= CurScreen(sp)->_maxy)
+			{
+				MARK_NOCHANGE(CurScreen(sp), y);
+			}
+#else
+			x1 = NewScreen(sp)->_line[y].lastchar;
+			n = x1 - x0 + 1;
+			if (n > 0)
+			{
+				memcpy(&CurScreen(sp)->_line[y].text[x0],
+					   &NewScreen(sp)->_line[y].text[x0],
+					   (size_t)n *
+						   sizeof(CurScreen(sp)->_line[y].text[x0]));
+				con_write(y,
+						  x0,
+						  &CurScreen(sp)->_line[y].text[x0], n);
+
+				/* mark line changed successfully */
+				if (y <= NewScreen(sp)->_maxy)
+				{
+					MARK_NOCHANGE(NewScreen(sp), y);
+				}
+				if (y <= CurScreen(sp)->_maxy)
+				{
+					MARK_NOCHANGE(CurScreen(sp), y);
+				}
+			}
+#endif
+		}
+	}
+
+	/* put everything back in sync */
+	for (y = nonempty; y <= NewScreen(sp)->_maxy; y++)
+	{
+		MARK_NOCHANGE(NewScreen(sp), y);
+	}
+	for (y = nonempty; y <= CurScreen(sp)->_maxy; y++)
+	{
+		MARK_NOCHANGE(CurScreen(sp), y);
+	}
+
+	if (!NewScreen(sp)->_leaveok)
+	{
+		CurScreen(sp)->_curx = NewScreen(sp)->_curx;
+		CurScreen(sp)->_cury = NewScreen(sp)->_cury;
+		LEGACYCONSOLE.mvcur(0, 0, CurScreen(sp)->_cury, CurScreen(sp)->_curx);
+	}
+	// selectActiveHandle();
+	result = OK;
+
+	returnCode(result);
 }
 #endif /* USE_LEGACY_CONSOLE */

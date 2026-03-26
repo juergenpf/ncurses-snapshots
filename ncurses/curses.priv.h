@@ -2483,9 +2483,7 @@ typedef struct term_driver {
     const char* (*td_name)(struct DriverTCB*);
     bool   (*td_CanHandle)(struct DriverTCB*, const char*, int*);
     void   (*td_init)(struct DriverTCB*);
-    int    (*td_hwcur)(struct DriverTCB*, int yold, int xold, int y, int x);
     void   (*td_setfilter)(struct DriverTCB*);
-    int    (*td_update)(struct DriverTCB*);
 } TERM_DRIVER;
 
 typedef struct DriverTCB
@@ -2513,20 +2511,6 @@ extern NCURSES_EXPORT_VAR(const color_t*) _nc_cga_palette;
 extern NCURSES_EXPORT_VAR(const color_t*) _nc_hls_palette;
 
 extern NCURSES_EXPORT(int)      _nc_get_driver(TERMINAL_CONTROL_BLOCK*, const char*, int*);
-#endif /* USE_TERM_DRIVER */
-
-/*
- * Entrypoints which are actually provided in the terminal driver, which would
- * be an sp-name otherwise.
- */
-#if USE_TERM_DRIVER
-#define TINFO_DOUPDATE          _nc_tinfo_doupdate
-#define TINFO_MVCUR             _nc_tinfo_mvcur
-extern NCURSES_EXPORT(int)      TINFO_DOUPDATE(SCREEN *);
-extern NCURSES_EXPORT(int)      TINFO_MVCUR(SCREEN*, int, int, int, int);
-#else
-#define TINFO_DOUPDATE          NCURSES_SP_NAME(doupdate)
-#define TINFO_MVCUR             NCURSES_SP_NAME(_nc_mvcur)
 #endif /* USE_TERM_DRIVER */
 
 #ifdef _NC_WINDOWS
@@ -2713,7 +2697,8 @@ typedef struct {
     int (*read)(int *buf); 		    // Pointer to the read function used by the legacy console.
      int (*twait)(int, int, int* EVENTLIST_2nd(_nc_eventlist*)); 
      int (*testmouse)(int EVENTLIST_2nd(_nc_eventlist*));
- 
+     int (*mvcur)(int yold, int xold, int y, int x);
+     int (*doupdate)(void);
 } LegacyConsoleInterface;
 extern NCURSES_EXPORT_VAR(LegacyConsoleInterface *) _nc_LEGACYCONSOLE;
 #define LEGACYCONSOLE (*_nc_LEGACYCONSOLE)

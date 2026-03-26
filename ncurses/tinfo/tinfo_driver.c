@@ -97,16 +97,6 @@ NCURSES_EXPORT_VAR(int) COLORS = 0;
 #define AssertTCB() assert(TCB != NULL && TCB->magic == TCBMAGIC)
 #define SetSP() assert(TCB->csp != NULL); sp = TCB->csp; (void) sp
 
-/*
- * This routine needs to do all the work to make curscr look
- * like newscr.
- */
-static int
-drv_doupdate(TERMINAL_CONTROL_BLOCK * TCB)
-{
-    AssertTCB();
-    return TINFO_DOUPDATE(TCB->csp);
-}
 
 static const char *
 drv_Name(TERMINAL_CONTROL_BLOCK * TCB)
@@ -301,15 +291,6 @@ drv_init(TERMINAL_CONTROL_BLOCK * TCB)
 #define InPalette(n)	((n) >= 0 && (n) < MAX_PALETTE)
 
 
-static int
-drv_mvcur(TERMINAL_CONTROL_BLOCK * TCB, int yold, int xold, int ynew, int xnew)
-{
-    SCREEN *sp = TCB->csp;
-    AssertTCB();
-    return NCURSES_SP_NAME(_nc_mvcur) (sp, yold, xold, ynew, xnew);
-}
-
-
 static void
 drv_setfilter(TERMINAL_CONTROL_BLOCK * TCB)
 {
@@ -428,9 +409,7 @@ NCURSES_EXPORT_VAR (TERM_DRIVER) _nc_TINFO_DRIVER = {
 	drv_Name,		/* Name */
 	drv_CanHandle,		/* CanHandle */
 	drv_init,		/* init */
-	drv_mvcur,		/* hwcur */
-	drv_setfilter,		/* setfilter */
-	drv_doupdate		/* update */
+	drv_setfilter		/* setfilter */
 };
 
 #if USE_TERM_DRIVER
