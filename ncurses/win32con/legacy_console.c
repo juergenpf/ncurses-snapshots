@@ -56,7 +56,6 @@ METHOD(getmode, int)(int fd GCC_UNUSED, TTY *arg);
 METHOD(setmode, int)(int fd GCC_UNUSED, const TTY *arg);
 METHOD(defmode, int)(TTY *arg, short kind);
 METHOD(AdjustSize, BOOL)(void);
-METHOD(napms, int)(int ms);
 METHOD(termattrs, chtype)(void);
 METHOD(keypad, int)(BOOL flag);
 METHOD(beeporflash, int)(BOOL beep);
@@ -94,7 +93,6 @@ static LegacyConsoleInterface legacyCONSOLE =
 		.save_CI = {0},
 
 		Dispatch(AdjustSize),
-		Dispatch(napms),
 		Dispatch(termattrs),
 		Dispatch(keypad),
 		Dispatch(beeporflash),
@@ -379,16 +377,6 @@ METHOD(AdjustSize, BOOL)(void)
 	res = TRUE;
 
 	returnBool(res);
-}
-
-METHOD(napms, int)(int ms)
-{
-	T((T_CALLED("win32_console::legacy_napms(%d)"), ms));
-
-	assert(IsLegacyConsole());
-
-	Sleep((DWORD)ms);
-	returnCode(OK);
 }
 
 METHOD(termattrs, chtype)(void)
@@ -895,10 +883,14 @@ METHOD(twait,int)(int mode, int milliseconds, int *timeleft EVENTLIST_2nd(_nc_ev
 	int diff;
 	bool isNoDelay = (milliseconds == 0);
 
+	TR(TRACE_IEVENT, ("start twait: %d milliseconds, mode: %d",
+				  milliseconds, mode));
+
 	assert(IsLegacyConsole());
 
 	sp = ConsoleScreen();
 	hdl = LEGACYCONSOLE.core.ConsoleHandleIn;
+	assert(sp);
 
 #ifdef NCURSES_WGETCH_EVENTS
 	(void)evl; /* TODO: implement wgetch-events */
@@ -916,11 +908,6 @@ METHOD(twait,int)(int mode, int milliseconds, int *timeleft EVENTLIST_2nd(_nc_ev
 						 (vk) == VK_CAPITAL || (vk) == VK_NUMLOCK  || \
 						 (vk) == VK_SCROLL)
 #define CONSUME() read_keycode(hdl, &inp_rec, 1, &nRead)
-
-	assert(sp);
-
-	TR(TRACE_IEVENT, ("start twait: hdl=%p, %d milliseconds, mode: %d",
-				  hdl, milliseconds, mode));
 
 	if (milliseconds < 0)
 		milliseconds = NC_INFINITY;

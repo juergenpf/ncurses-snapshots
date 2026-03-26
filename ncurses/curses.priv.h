@@ -2682,7 +2682,6 @@ typedef struct {
     TerminalInfo info;			      // Core capabilities.
 
     BOOL (*AdjustSize)(void);                 // Adjust the console buffer size.
-    int (*napms)(int ms);                     // Pointer to the napms function used by the legacy console.
     chtype (*termattrs)(void);                // Pointer to the termattrs function used by the legacy console.
     int (*keypad)(BOOL);                      // Pointer to the keypad function used by the legacy console.
     int (*beeporflash)(BOOL);                 // Pointer to the beep or flash function used by the legacy console.
