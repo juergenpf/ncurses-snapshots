@@ -2536,10 +2536,10 @@ typedef struct {
     SCREEN* sp;                      /* Screen pointer */
 
     // Methods
-    BOOL (*init)(int fdOut, int fdIn);                 /* Initialize with I/O file descriptors. fdIn maybe -1 in first call */
-    BOOL (*getSBI)(CONSOLE_SCREEN_BUFFER_INFO *sbi);   /* Get the current console size. Returns FALSE on failure. */
+    bool (*init)(int fdOut, int fdIn);                 /* Initialize with I/O file descriptors. fdIn maybe -1 in first call */
+    bool (*getSBI)(CONSOLE_SCREEN_BUFFER_INFO *sbi);   /* Get the current console size. Returns FALSE on failure. */
     void (*size)(int *Lines, int *Cols);               /* Query console size. Safe to be called before init */ 
-    BOOL (*size_changed)(void);                        /* Return TRUE if the console has been resized */
+    bool (*size_changed)(void);                        /* Return TRUE if the console has been resized */
     int (*setmode)(int fd, const ConsoleMode *arg);    /* Our SET_TTY implementation */
     int (*getmode)(int fd, ConsoleMode *arg);          /* Our GET_TTY implementation */
     int (*defmode )(ConsoleMode *arg, short kind);     /* Used by shell-/prog-mode handling to manage start/stop of the I/O subsystem of ncurses */
@@ -2569,7 +2569,7 @@ extern NCURSES_EXPORT_VAR(ConsoleCoreInterface*) _nc_CORECONSOLE;
 #define SetConsoleResizeLimitations() (CORECONSOLE.status |= CONSOLE_STATUS_LIMITED_RESIZE)
 #define ClearConsoleResizeLimitations() (CORECONSOLE.status &= ~CONSOLE_STATUS_LIMITED_RESIZE)
 
-extern NCURSES_EXPORT(BOOL) _nc_console_setup(void);
+extern NCURSES_EXPORT(bool) _nc_console_setup(void);
 #define AssertConsoleSetup() \
     if (!CoreConsoleInitialized()) { \
 	if (!_nc_console_setup()) { \
@@ -2596,17 +2596,17 @@ typedef struct {
 
     TerminalInfo info;			      // Core capabilities.
 
-    char* (*termname)(BOOL longname);	           // Pointer to the name function used by the legacy console.
-    BOOL (*adjust_size)(void);                     // Adjust the console buffer size.
+    char* (*termname)(bool longname);	           // Pointer to the name function used by the legacy console.
+    bool (*adjust_size)(void);                     // Adjust the console buffer size.
     chtype (*termattrs)(void);                     // Pointer to the termattrs function used by the legacy console.
-    int (*keypad)(BOOL);                           // Pointer to the keypad function used by the legacy console.
-    int (*beeporflash)(BOOL);                      // Pointer to the beep or flash function used by the legacy console.
+    int (*keypad)(bool);                           // Pointer to the keypad function used by the legacy console.
+    int (*beeporflash)(bool);                      // Pointer to the beep or flash function used by the legacy console.
     int (*keyok)(int keycode,int flag);            // Pointer to the keyok function used by the legacy console.
     int (*has_key)(int keycode);                   // Pointer to the has_key function used by the legacy console.
     void (*init_acs)(chtype *acs);                 // Pointer to the init_acs function used by the legacy console.
-    BOOL (*reset_color_pair)(void);                // Pointer to the reset_color_pair function used by the legacy console.
+    bool (*reset_color_pair)(void);                // Pointer to the reset_color_pair function used by the legacy console.
     int (*init_pair)(int pair, int fg, int bg);    // Pointer to the init_pair function used by the legacy console.')
-    void (*setcolor)(BOOL fg, int color);	   // Pointer to the setcolor function used by the legacy console.)
+    void (*setcolor)(bool fg, int color);	   // Pointer to the setcolor function used by the legacy console.)
     int (*curs_set)(int visibility);               // Pointer to the curs_set function used by the legacy console.
     int (*read)(int *buf); 		           // Pointer to the read function used by the legacy console.
     int (*twait)(int, int, int* EVENTLIST_2nd(_nc_eventlist*)); 
@@ -2631,7 +2631,7 @@ extern NCURSES_EXPORT_VAR(LegacyConsoleInterface *) _nc_LEGACYCONSOLE;
 #endif /* USE_WIDEC_SUPPORT */
 
 #define MouseFifoHasEvent(sp) (sp->_drv_mouse_head < sp->_drv_mouse_tail)
-#define IsMouseActive(sp) (sp->_mouse_active == TRUE)
+#define IsMouseActive(sp) (sp->_mouse_active == true)
 
 #endif /* USE_LEGACY_CONSOLE */
 

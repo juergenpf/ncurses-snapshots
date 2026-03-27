@@ -50,23 +50,23 @@ MODULE_ID("$Id$")
 #define METHOD(name, type) static type DispatchMethod(name)
 #define T_METHOD(name,fmt) "called {legacy_console::legacy_" #name fmt
 
-METHOD(init, BOOL)(int fdOut, int fdIn);
+METHOD(init, bool)(int fdOut, int fdIn);
 METHOD(size, void)(int *Lines, int *Cols);
-METHOD(size_changed, BOOL)(void);
+METHOD(size_changed, bool)(void);
 METHOD(getmode, int)(int fd GCC_UNUSED, TTY *arg);
 METHOD(setmode, int)(int fd GCC_UNUSED, const TTY *arg);
 METHOD(defmode, int)(TTY *arg, short kind);
-METHOD(termname, char *)(BOOL longname);
-METHOD(adjust_size, BOOL)(void);
+METHOD(termname, char *)(bool longname);
+METHOD(adjust_size, bool)(void);
 METHOD(termattrs, chtype)(void);
-METHOD(keypad, int)(BOOL flag);
-METHOD(beeporflash, int)(BOOL beep);
+METHOD(keypad, int)(bool flag);
+METHOD(beeporflash, int)(bool beep);
 METHOD(keyok, int)(int keycode, int flag);
 METHOD(has_key, int)(int keycode);
 METHOD(init_acs, void)(chtype *acs);
-METHOD(reset_color_pair, BOOL)(void);
+METHOD(reset_color_pair, bool)(void);
 METHOD(init_pair, int)(int pair, int fg, int bg);
-METHOD(setcolor, void)(BOOL fg, int color);
+METHOD(setcolor, void)(bool fg, int color);
 METHOD(curs_set, int)(int visibility);
 METHOD(read, int)(int *buf);
 METHOD(twait,int)(int mode,int milliseconds,int *timeleft EVENTLIST_2nd(_nc_eventlist *evl));
@@ -154,7 +154,7 @@ static const LONG ansi_keys[] =
 #define MAPSIZE (FKEYS + N_INI)
 
 static WORD
-console_MapColor(BOOL fore, int color)
+console_MapColor(bool fore, int color)
 {
 	static const int _cmap[] =
 		{0, 4, 2, 6, 1, 5, 3, 7};
@@ -236,10 +236,10 @@ AnsiKey(WORD vKey)
 	return code;
 }
 
-static BOOL
+static bool
 get_SBI(void)
 {
-	bool rc = FALSE;
+	bool rc = false;
 	if (CORECONSOLE.getSBI(&(LEGACYCONSOLE.SBI)))
 	{
 		T(("GetConsoleScreenBufferInfo"));
@@ -257,7 +257,7 @@ get_SBI(void)
 		   LEGACYCONSOLE.SBI.srWindow.Bottom,
 		   LEGACYCONSOLE.SBI.srWindow.Left,
 		   LEGACYCONSOLE.SBI.srWindow.Right));
-		rc = TRUE;
+		rc = true;
 	}
 	else
 	{
@@ -344,15 +344,15 @@ _nc_legacy_console_init(void)
 	LEGACYCONSOLE.info.defaultPalette = _nc_cga_palette;
 }
 
-METHOD(termname, char *)(BOOL longname)
+METHOD(termname, char *)(bool longname)
 {
 	assert(IsLegacyConsole());
 	return longname ? "Windows Legacy Console" : "#win32console";
 }
 
-METHOD(adjust_size, BOOL)(void)
+METHOD(adjust_size, bool)(void)
 {
-	BOOL res = FALSE;
+	bool res = false;
 	COORD newSize;
 	CONSOLE_SCREEN_BUFFER_INFO csbi;
 
@@ -401,7 +401,7 @@ METHOD(termattrs, chtype)(void)
 	return res;
 }
 
-METHOD(keypad, int)(BOOL flag)
+METHOD(keypad, int)(bool flag)
 {
 	int code = ERR;
 	SCREEN *sp;
@@ -419,7 +419,7 @@ METHOD(keypad, int)(BOOL flag)
 	returnCode(code);
 }
 
-METHOD(beeporflash, int)(BOOL beepFlag)
+METHOD(beeporflash, int)(bool beepFlag)
 {
 	int res = ERR;
 
@@ -588,16 +588,16 @@ METHOD(init_acs, void)(chtype *real_map)
 	}
 }
 
-METHOD(reset_color_pair, BOOL)(void)
+METHOD(reset_color_pair, bool)(void)
 {
-	BOOL res = FALSE;
+	bool res = false;
 	WORD a = FOREGROUND_BLUE | FOREGROUND_RED | FOREGROUND_GREEN;
 
 	assert(IsLegacyConsole());
 
 	SetConsoleTextAttribute(LEGACYCONSOLE.core.ConsoleHandleOut, a);
 	get_SBI();
-	res = TRUE;
+	res = true;
 	return res;
 }
 
@@ -620,13 +620,13 @@ METHOD(init_pair, int)(int pair, int f, int b)
 	return code;
 }
 
-METHOD(setcolor, void)(BOOL fore, int color)
+METHOD(setcolor, void)(bool fore, int color)
 {
 	WORD a = console_MapColor(fore, color);
 
 	assert(IsLegacyConsole());
 
-	a |= (WORD)((LEGACYCONSOLE.SBI.wAttributes) & ((BOOL)fore ? 0xfff8 : 0xff8f));
+	a |= (WORD)((LEGACYCONSOLE.SBI.wAttributes) & ((fore) ? 0xfff8 : 0xff8f));
 	SetConsoleTextAttribute(LEGACYCONSOLE.core.ConsoleHandleOut, a);
 	get_SBI();
 }
@@ -705,11 +705,11 @@ filter_button_events(const SCREEN *sp, int mask)
 	returnCode(result);
 }
 
-static BOOL
+static bool
 handle_mouse(SCREEN *sp, MOUSE_EVENT_RECORD mer)
 {
 	MEVENT work;
-	BOOL result = FALSE;
+	bool result = false;
 
 	assert(sp);
 
@@ -719,11 +719,11 @@ handle_mouse(SCREEN *sp, MOUSE_EVENT_RECORD mer)
 	if (!IsMouseActive(sp))
 	{
 		T(("... mouse is not active, ignoring event"));
-		returnBool(FALSE);
+		returnBool(false);
 	}
 #ifdef NO_MOUSE_SUPPORT
 	T(("... mouse support is disabled, ignoring event"));
-	returnBool(FALSE);
+	returnBool(false);
 #endif
 
 	sp->_drv_mouse_old_buttons = sp->_drv_mouse_new_buttons;
@@ -749,7 +749,7 @@ handle_mouse(SCREEN *sp, MOUSE_EVENT_RECORD mer)
 			T(("... button state cleared, reporting release"));
 			/* cf: BUTTON_PRESSED, BUTTON_RELEASED */
 			work.bstate |= (filter_button_events(sp, sp->_drv_mouse_old_buttons) >> 1);
-			result = TRUE;
+			result = true;
 		}
 
 		work.x = mer.dwMousePosition.X;
@@ -759,7 +759,7 @@ handle_mouse(SCREEN *sp, MOUSE_EVENT_RECORD mer)
 		if (sp->_drv_mouse_tail < 0 || sp->_drv_mouse_tail >= FIFO_SIZE)
 		{
 			T(("... mouse FIFO overflow, dropping event"));
-			returnBool(FALSE);
+			returnBool(false);
 		}
 		assert(sp->_drv_mouse_tail >= 0);
 		assert(sp->_drv_mouse_tail < FIFO_SIZE);
@@ -773,7 +773,7 @@ METHOD(read, int)(int *buf)
 {
 	int rc = -1;
 	INPUT_RECORD inp_rec;
-	BOOL b;
+	bool b;
 	DWORD nRead;
 	WORD vk;
 	HANDLE hdl = INVALID_HANDLE_VALUE;
@@ -790,7 +790,7 @@ METHOD(read, int)(int *buf)
 	hdl = LEGACYCONSOLE.core.ConsoleHandleIn;
 	memset(&inp_rec, 0, sizeof(inp_rec));
 
-	while ((b = read_keycode(hdl, &inp_rec, 1, &nRead)))
+	while ((b = (bool)read_keycode(hdl, &inp_rec, 1, &nRead)))
 	{
 		if (b && nRead > 0)
 		{
@@ -886,7 +886,7 @@ METHOD(twait,int)(int mode, int milliseconds, int *timeleft EVENTLIST_2nd(_nc_ev
 	SCREEN *sp;
 	HANDLE hdl = INVALID_HANDLE_VALUE;
 	INPUT_RECORD inp_rec;
-	BOOL b;
+	bool b;
 	DWORD nRead = 0, rc = WAIT_FAILED;
 	int code = 0;
 	struct timeval fstart;
@@ -983,9 +983,9 @@ METHOD(twait,int)(int mode, int milliseconds, int *timeleft EVENTLIST_2nd(_nc_ev
 		{
 			DWORD n = 0;
 			DWORD i;
-			BOOL stop_scan;
+			bool stop_scan;
 
-			b = GetNumberOfConsoleInputEvents(hdl, &n);
+			b = (bool)GetNumberOfConsoleInputEvents(hdl, &n);
 			if (!b)
 			{
 				T(("twait:err GetNumberOfConsoleInputEvents"));
@@ -1052,7 +1052,7 @@ METHOD(twait,int)(int mode, int milliseconds, int *timeleft EVENTLIST_2nd(_nc_ev
 								/* Key-down but TW_INPUT not requested: may be needed
 								 * by a later call -- stop scanning without consuming */
 								T(("twait: KEY_EVENT not in mode, stopping scan"));
-								stop_scan = TRUE;
+								stop_scan = true;
 							}
 						}
 						else
@@ -1090,7 +1090,7 @@ METHOD(twait,int)(int mode, int milliseconds, int *timeleft EVENTLIST_2nd(_nc_ev
 							/* Mouse event but TW_MOUSE not requested: may be needed
 							 * by a later call -- stop scanning without consuming */
 							T(("twait: MOUSE_EVENT not in mode, stopping scan"));
-							stop_scan = TRUE;
+							stop_scan = true;
 						}
 						break;
 
@@ -1137,8 +1137,8 @@ METHOD(setmode, int)(int fd GCC_UNUSED, const TTY *arg)
 {
 	HANDLE input_target = INVALID_HANDLE_VALUE;
 	HANDLE output_target = INVALID_HANDLE_VALUE;
-	BOOL input_ok = FALSE;
-	BOOL output_ok = FALSE;
+	 bool input_ok = false;
+	bool output_ok = false;
 	SCREEN *sp = NULL;
 
 	T((T_METHOD(setmode,"(fd=%d, TTY*=%p)"), fd, arg));
@@ -1177,7 +1177,7 @@ METHOD(setmode, int)(int fd GCC_UNUSED, const TTY *arg)
 			mode &= ~ENABLE_ECHO_INPUT;
 		}
 
-		input_ok = SetConsoleMode(input_target, mode);
+		input_ok = (bool)SetConsoleMode(input_target, mode);
 		if (input_ok)
 		{
 			/* Make sure the cached value reflects the real value we set, as the
@@ -1202,7 +1202,7 @@ METHOD(setmode, int)(int fd GCC_UNUSED, const TTY *arg)
 	if (output_target != INVALID_HANDLE_VALUE)
 	{
 		DWORD mode = arg->dwFlagOut;
-		output_ok = SetConsoleMode(output_target, mode);
+		output_ok = (bool)SetConsoleMode(output_target, mode);
 		if (output_ok)
 		{
 			/* Make sure the cached value reflects the real value we set,
@@ -1363,9 +1363,9 @@ METHOD(size, void)(int *Lines, int *Cols)
 	}
 }
 
-METHOD(size_changed, BOOL)(void)
+METHOD(size_changed, bool)(void)
 {
-	BOOL resized = FALSE;
+	bool resized = false;
 	T((T_METHOD(size_changed,"()")));
 
 	assert(IsLegacyConsole());
@@ -1373,7 +1373,7 @@ METHOD(size_changed, BOOL)(void)
 	if (HasConsolePendingResize())
 	{
 		T(("Resize event pending, returning TRUE"));
-		resized = TRUE;
+		resized = true;
 		ClearConsoleResizeLimitations();
 		_nc_globals.have_sigwinch = 1;
 	}
@@ -1391,9 +1391,9 @@ METHOD(size_changed, BOOL)(void)
  * will never be used, the use of ConPTY will be forced, and this init function will never be called. 
  * So the legacy console is basically a fallback for older Windows versions that don't support ConPTY.
  * */
-METHOD(init, BOOL)(int fdOut, int fdIn)
+METHOD(init, bool)(int fdOut, int fdIn)
 {
-	BOOL result = FALSE;
+	bool result = false;
 
 	T((T_METHOD(init,"(fdOut=%d, fdIn=%d)"), fdOut, fdIn));
 
@@ -1433,7 +1433,7 @@ METHOD(init, BOOL)(int fdOut, int fdIn)
 																	&dwFlag) == 0)
 		{
 			T(("Output handle is not a console"));
-			returnBool(FALSE);
+			returnBool(false);
 		}
 		LEGACYCONSOLE.core.ConsoleHandleOut = stdout_handle;
 
@@ -1441,7 +1441,7 @@ METHOD(init, BOOL)(int fdOut, int fdIn)
 																   &dwFlag) == 0)
 		{
 			T(("StdIn handle is not a console"));
-			returnBool(FALSE);
+			returnBool(false);
 		}
 		LEGACYCONSOLE.core.ConsoleHandleIn = stdin_handle;
 
@@ -1452,7 +1452,7 @@ METHOD(init, BOOL)(int fdOut, int fdIn)
 		if (GetConsoleMode(stdout_handle, &dwFlagOut) == 0)
 		{
 			T(("GetConsoleMode() failed for stdout"));
-			returnBool(FALSE);
+			returnBool(false);
 		}
 		LEGACYCONSOLE.core.ttyflags.dwFlagOut = dwFlagOut;
 
@@ -1464,7 +1464,7 @@ METHOD(init, BOOL)(int fdOut, int fdIn)
 		if (GetConsoleMode(stdin_handle, &dwFlagIn) == 0)
 		{
 			T(("GetConsoleMode() failed for stdin"));
-			returnBool(FALSE);
+			returnBool(false);
 		}
 		LEGACYCONSOLE.core.ttyflags.dwFlagIn = dwFlagIn;
 
@@ -1486,15 +1486,15 @@ METHOD(init, BOOL)(int fdOut, int fdIn)
 		if (LEGACYCONSOLE.hProgMode == INVALID_HANDLE_VALUE || GetConsoleMode(LEGACYCONSOLE.hProgMode, &dwFlagOut) == 0)
 		{
 			T(("Output handle is not a console"));
-			returnBool(FALSE);
+			returnBool(false);
 		}
 
 		MarkConsoleInitialized();
-		result = TRUE;
+		result = true;
 	} else
 	{
 		T(("Console already initialized"));
-		result = TRUE;
+		result = true;
 	}
 	returnBool(result);
 }
@@ -1557,7 +1557,7 @@ MapAttr(WORD res, attr_t ch)
  * TODO: support acsc
  * TODO: _nc_wacs should be part of sp.
  */
-static BOOL
+static bool
 con_write16(int y, int x, cchar_t *str, int limit)
 {
 	int actual = 0;
@@ -1605,13 +1605,13 @@ con_write16(int y, int x, cchar_t *str, int limit)
 	rec.Right = (SHORT)(x + limit - 1);
 	rec.Bottom = rec.Top;
 
-	return write_screen(LEGACYCONSOLE.core.ConsoleHandleOut, ci, siz, loc, &rec);
+	return (bool)write_screen(LEGACYCONSOLE.core.ConsoleHandleOut, ci, siz, loc, &rec);
 }
 
 
 #define con_write(y, x, str, n) con_write16(y, x, str, n)
 #else
-static BOOL
+static bool
 con_write8(int y, int x, chtype *str, int n)
 {
 	MakeArray(ci, CHAR_INFO, n);
@@ -1645,7 +1645,7 @@ con_write8(int y, int x, chtype *str, int n)
 	rec.Right = (short)(x + n - 1);
 	rec.Bottom = rec.Top;
 
-	return write_screen(LEGACYCONSOLE.core.ConsoleHandleOut, ci, siz, loc, &rec);
+	return (bool)write_screen(LEGACYCONSOLE.core.ConsoleHandleOut, ci, siz, loc, &rec);
 }
 #define con_write(y, x, str, n) con_write8(y, x, str, n)
 #endif

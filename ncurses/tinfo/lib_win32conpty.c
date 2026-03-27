@@ -54,9 +54,9 @@ MODULE_ID("$Id$")
 #define T_METHOD(name,fmt) "called {lib_win32conpty::pty_" #name fmt
 
 // Prototypes of static function we want to use in initializers
-METHOD(init, BOOL) (int fdOut, int fdIn);
+METHOD(init, bool) (int fdOut, int fdIn);
 METHOD(size, void) (int *Lines, int *Cols);
-METHOD(size_changed, BOOL) (void);
+METHOD(size_changed, bool) (void);
 METHOD(setmode, int) (int fd, const TTY * arg);
 METHOD(getmode, int) (int fd, TTY * arg);
 METHOD(defmode, int) (TTY * arg, short kind);
@@ -156,9 +156,9 @@ static unsigned __stdcall input_thread(LPVOID param);
  * which is a requirement for the Windows Console backend of ncurses. This is because without
  * ConPTY, the Windows Console does not provide the necessary capabilities for ncurses and
  * especially the terminfo layer to function properly. */
-METHOD(init, BOOL) (int fdOut, int fdIn)
+METHOD(init, bool) (int fdOut, int fdIn)
 {
-    BOOL result = FALSE;
+    bool result = false;
 
     T((T_METHOD(init,"(fdOut=%d, fdIn=%d)"), fdOut, fdIn));
 
@@ -199,20 +199,20 @@ METHOD(init, BOOL) (int fdOut, int fdIn)
 
 	if (fdIn != -1) {
 	    T(("In the first call fdIn is expected to be -1."));
-	    returnBool(FALSE);
+	    returnBool(false);
 	}
 
 	if (stdout_hdl == INVALID_HANDLE_VALUE || GetConsoleMode(stdout_hdl,
 								 &dwFlag) == 0) {
 	    T(("Output handle is not a pseudo-console"));
-	    returnBool(FALSE);
+	    returnBool(false);
 	}
 	defaultCONPTY.core.ConsoleHandleOut = stdout_hdl;
 
 	if (stdin_hdl == INVALID_HANDLE_VALUE || GetConsoleMode(stdin_hdl,
 								&dwFlag) == 0) {
 	    T(("StdIn handle is not a pseudo-console"));
-	    returnBool(FALSE);
+	    returnBool(false);
 	}
 	defaultCONPTY.core.ConsoleHandleIn = stdin_hdl;
 
@@ -222,7 +222,7 @@ METHOD(init, BOOL) (int fdOut, int fdIn)
 	 * of the console. */
 	if (GetConsoleMode(stdout_hdl, &dwFlagOut) == 0) {
 	    T(("GetConsoleMode() failed for stdout"));
-	    returnBool(FALSE);
+	    returnBool(false);
 	}
 	defaultCONPTY.core.ttyflags.dwFlagOut = dwFlagOut;
 
@@ -232,14 +232,14 @@ METHOD(init, BOOL) (int fdOut, int fdIn)
 	 * of the console. */
 	if (GetConsoleMode(stdin_hdl, &dwFlagIn) == 0) {
 	    T(("GetConsoleMode() failed for stdin"));
-	    returnBool(FALSE);
+	    returnBool(false);
 	}
 	defaultCONPTY.core.ttyflags.dwFlagIn = dwFlagIn;
 	MarkConsoleInitialized();
-	result = TRUE;
+	result = true;
     } else {
 	T(("Console already initialized, skipping initialization"));
-	result = TRUE;
+	result = true;
     }
     returnBool(result);
 }
@@ -283,12 +283,12 @@ METHOD(init, BOOL) (int fdOut, int fdIn)
  * time frame, we simply return FALSE without checking. This allows us to avoid unnecessary
  * calls to GetConsoleScreenBufferInfo while still detecting resizes in a timely manner when
  * they occur. */
-METHOD(size_changed, BOOL) (void)
+METHOD(size_changed, bool) (void)
 {
     static struct timeval lastCheck = {0, 0};
     struct timeval now;
     int current_lines, current_cols;
-    bool resized = FALSE;
+    bool resized = false;
 
     T((T_METHOD(size_changed,"()")));
 
@@ -297,7 +297,7 @@ METHOD(size_changed, BOOL) (void)
     gettimeofday(&now, NULL);
 
     if (_nc_timeval_diff_in_ms(lastCheck, now) < RESIZE_CHECK_THROTTLING_MS)
-	returnBool(FALSE);
+	returnBool(false);
 
     DispatchMethod(size) (&current_lines, &current_cols);
 
@@ -311,7 +311,7 @@ METHOD(size_changed, BOOL) (void)
 
 	    _nc_globals.have_sigwinch = 1;
 
-	    resized = TRUE;
+	    resized = true;
 	}
     }
     gettimeofday(&lastCheck, NULL);
@@ -461,7 +461,7 @@ ringbuffer_write(InputBuffer * pbuf, uint8_t *data, DWORD n)
  * thread. The function takes care of managing the head and tail indices of the ring
  * buffer, and it is protected by a critical section to ensure thread safety when
  * accessing the buffer. */
-static BOOL
+static bool
 ringbuffer_read(InputBuffer * pbuf, uint8_t *byte)
 {
     T((T_CALLED("lib_win32conpty::ringbuffer_read(pbuf=%p, byte=%p)"), pbuf, byte));
@@ -469,12 +469,12 @@ ringbuffer_read(InputBuffer * pbuf, uint8_t *byte)
     if (((pbuf->head - pbuf->tail + INPUT_BUFFER_SIZE) % INPUT_BUFFER_SIZE)
 	== 0) {
 	LeaveCriticalSection(&pbuf->lock);
-	returnBool(FALSE);
+	returnBool(false);
     }
     *byte = pbuf->buf[pbuf->tail];
     pbuf->tail = (pbuf->tail + 1) % INPUT_BUFFER_SIZE;
     LeaveCriticalSection(&pbuf->lock);
-    returnBool(TRUE);
+    returnBool(true);
 }
 
 /* This function is the entry point for the input thread. It continuously waits for 
@@ -711,8 +711,8 @@ METHOD(setmode, int) (int fd GCC_UNUSED, const TTY * arg)
 {
     HANDLE input_target = defaultCONPTY.core.ConsoleHandleIn;
     HANDLE output_target = defaultCONPTY.core.ConsoleHandleOut;
-    BOOL input_ok = FALSE;
-    BOOL output_ok = FALSE;
+    bool input_ok = false;
+    bool output_ok = false;
 
     T((T_METHOD(setmode,"(fd=%d, TTY*=%p)"), fd, arg));
 
@@ -750,7 +750,7 @@ METHOD(setmode, int) (int fd GCC_UNUSED, const TTY * arg)
 	    mode &= ~ENABLE_ECHO_INPUT;
 	}
 
-	input_ok = SetConsoleMode(input_target, mode);
+	input_ok = (bool)SetConsoleMode(input_target, mode);
 	if (input_ok) {
 	    /* Make sure the cached value reflects the real value we set, as the
 	     * caller may not have provided all necessary flags (e.g.
@@ -768,7 +768,7 @@ METHOD(setmode, int) (int fd GCC_UNUSED, const TTY * arg)
 
     if (output_target != INVALID_HANDLE_VALUE) {
 	DWORD mode = ENABLE_VIRTUAL_TERMINAL_PROCESSING | arg->dwFlagOut;
-	output_ok = SetConsoleMode(output_target, mode);
+	output_ok = (bool)SetConsoleMode(output_target, mode);
 	if (output_ok) {
 	    /* Make sure the cached value reflects the real value we set,
 	     * as the caller may not have provided all necessary flags

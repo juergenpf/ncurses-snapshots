@@ -304,10 +304,10 @@ init_direct_colors(NCURSES_SP_DCL0)
 /*
  * Reset the color pair, e.g., to whatever color pair 0 is.
  */
-static BOOL
+static bool
 reset_color_pair(NCURSES_SP_DCL0)
 {
-    BOOL result = FALSE;
+    bool result = false;
 #if USE_LEGACY_CONSOLE
     if (IsLegacyConsole()) {
 	return LEGACYCONSOLE.reset_color_pair();
@@ -317,7 +317,7 @@ reset_color_pair(NCURSES_SP_DCL0)
     (void) SP_PARM;
     if (orig_pair != NULL) {
 	(void) NCURSES_PUTP2("orig_pair", orig_pair);
-	result = TRUE;
+	result = true;
     }
     return result;
 }
