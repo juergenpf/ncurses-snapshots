@@ -804,6 +804,12 @@ NCURSES_SP_NAME(has_colors) (NCURSES_SP_DCL0)
     (void) SP_PARM;
     T((T_CALLED("has_colors(%p)"), (void *) SP_PARM));
     if (HasTerminal(SP_PARM)) {
+#if USE_LEGACY_CONSOLE
+	if (IsLegacyConsole()) {
+	    code = LEGACYCONSOLE.info.hascolor;
+	    returnBool(code);
+	}
+#endif
 	code = ((VALID_NUMERIC(max_colors) && VALID_NUMERIC(max_pairs)
 		 && (((set_foreground != NULL)
 		      && (set_background != NULL))
