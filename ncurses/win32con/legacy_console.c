@@ -35,7 +35,7 @@
 
 MODULE_ID("$Id$")
 
-#if USE_LEGACY_CONSOLE || JPF==0
+#if USE_LEGACY_CONSOLE
 #include <stdint.h>
 #include <sys/time.h>
 

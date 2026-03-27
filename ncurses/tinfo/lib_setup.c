@@ -1034,7 +1034,7 @@ _nc_setupterm(const char *tname,
 		   myname, free(myname));
     }
 #if USE_CONSOLE_API
-    CORECONSOLE.sp = (intptr_t) sp;
+    CORECONSOLE.sp = sp;
 #endif
     free(myname);
     returnCode(code);

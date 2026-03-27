@@ -339,7 +339,7 @@ NCURSES_SP_NAME(newterm) (NCURSES_SP_DCLx
 	    _nc_signal_handler(TRUE);
 	    result = SP_PARM;
 #if USE_CONSOLE_API
-	    CORECONSOLE.sp = (intptr_t) SP_PARM;
+	    CORECONSOLE.sp = SP_PARM;
 	    assert(CORECONSOLE.sp != 0);
 	}
 #endif
