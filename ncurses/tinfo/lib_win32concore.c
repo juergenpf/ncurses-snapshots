@@ -140,6 +140,15 @@ conpty_supported(void)
 }
 
 #if USE_LEGACY_CONSOLE
+/* Windows version prior to version 10 have mixed behaviour when it comes to console resizing. 
+ * In some versions, the console can be resized freely, but the application is not notified of 
+ * the resize events, which means that ncurses cannot update its internal state to reflect the 
+ * new console size. In other versions, resizing the console is not possible at all, which
+ * means that ncurses cannot function properly because it relies on being able to query the 
+ * console size and receive notifications of resize events. To work around these issues, we 
+ * disable resizing of the console window when running on legacy consoles, and we also check for 
+ * the Windows version to determine if there are any limitations on resizing that we need to be 
+ * aware of. */
 static BOOL
 has_limiuted_resize(void)
 {
@@ -314,24 +323,33 @@ _nc_console_setup(void) {
 	returnBool(res);
 }
 
+/* The central routine to get the TTY state. It dispatches in dependency 
+ * of the console type to the correct implementation. */
 NCURSES_EXPORT(int)
 _nc_console_gettty(int fd, ConsoleMode *buf) {
 	assert(_nc_CORECONSOLE);
 	return CORECONSOLE.getmode(fd, buf);
 }
 
+/* The central routine to set the TTY state. It dispatches in dependency 
+ * of the console type to the correct implementation. */
 NCURSES_EXPORT(int)
 _nc_console_settty(int fd, ConsoleMode *buf) {
 	assert(_nc_CORECONSOLE);
 	return CORECONSOLE.setmode(fd, buf);
 }
 
+/* Helper routine to compute the difference between two timevals in milliseconds. 
+ * We use this to measure the time between console resize events, to determine if 
+ * we need to update the console size information in ncurses. The function takes 
+ * two timeval structures as input, representing the start and end times, and 
+ * returns the difference in milliseconds as an integer. We assume that the time 
+ * difference is not large enough to cause an overflow of the int64_t type, which 
+ * should be safe for differences for slightly more than three weeks..
+ */
 NCURSES_EXPORT(int)
 _nc_timeval_diff_in_ms(struct timeval start, struct timeval end) 
 {
-    /* We simply assume that the time difference is not large enough to 
-     * cause an overflow of the int64_t type, which should be safe for 
-     * differences of up to several years. */
     int64_t diff_sec = (int64_t)end.tv_sec - (int64_t)start.tv_sec;
     int64_t diff_usec = (int64_t)end.tv_usec - (int64_t)start.tv_usec;
     return (int)((diff_sec * 1000) + (diff_usec / 1000));

@@ -35,7 +35,7 @@
 
 MODULE_ID("$Id$")
 
-#if USE_LEGACY_CONSOLE
+#if USE_LEGACY_CONSOLE || JPF==0
 #include <stdint.h>
 #include <sys/time.h>
 
@@ -266,6 +266,11 @@ get_SBI(void)
 	return rc;
 }
 
+/* Helper routine to initialize the legacy console interface. This is called during 
+ * the initialization of the library to set up the function pointers and data structures 
+ * needed for the legacy console implementation. It populates the key mapping tables, 
+ * retrieves the initial console screen buffer information, and sets up the color 
+ * capabilities of the console. */
 NCURSES_EXPORT(void)
 _nc_legacy_console_init(void)
 {
@@ -658,7 +663,6 @@ METHOD(curs_set, int)(int visibility)
 					 FROM_LEFT_4TH_BUTTON_PRESSED | \
 					 RIGHTMOST_BUTTON_PRESSED)
 #define NO_BUTTONS (mmask_t)0
-#define IsMouseActive(sp) (sp->_mouse_active == TRUE)
 
 static mmask_t
 filter_button_events(const SCREEN *sp, int mask)
@@ -775,6 +779,8 @@ METHOD(read, int)(int *buf)
 	HANDLE hdl = INVALID_HANDLE_VALUE;
 	SCREEN *sp;
 
+	T((T_METHOD(read,"(%p)"), buf));
+
 	assert(IsLegacyConsole());
 
 	sp = ConsoleScreen();
@@ -783,8 +789,6 @@ METHOD(read, int)(int *buf)
 
 	hdl = LEGACYCONSOLE.core.ConsoleHandleIn;
 	memset(&inp_rec, 0, sizeof(inp_rec));
-
-	T((T_METHOD(read,"(%p)"), buf));
 
 	while ((b = read_keycode(hdl, &inp_rec, 1, &nRead)))
 	{
@@ -1376,20 +1380,17 @@ METHOD(size_changed, BOOL)(void)
 	returnBool(resized);
 }
 
-/* This initializaton function can be called multiple time, and actually it is called from within
- * setupterm() the first time and potentially if we enter ncurses from newterm() the next time.
- * The main purpose is to initialize the defaultCONPTY structure when called the first time. The
- * first call will alway have fdIn set to -1, as setupterm() only cares about output. Please note
- * that setupterm() already handles redirection of stdout and assigns stderr for output if stdout
- * is not a tty.
- *
- * The other purpose of this routine is to manage the assignment of pseudo-console handles. If the
- * assigned filedescriptors are NOT valid pseudo-console handles, the call will return FALSE.
- *
- * The function will also return FALSE, if the Windows version we run on does not support ConPTY,
- * which is a requirement for the Windows Console backend of ncurses. This is because without
- * ConPTY, the Windows Console does not provide the necessary capabilities for ncurses and
- * especially the terminfo layer to function properly. */
+/* This initializaton function can be called multiple times, and actually it is called from within
+ * setupterm() and/or newterm(). It initializes the defaultCONPTY structure when called the first 
+ * time, and on subsequent calls it just returns TRUE.
+ * 
+ * The other purpose of this routine is to manage the assignment of console handles. If the
+ * assigned filedescriptors are NOT valid console handles, the call will return FALSE. 
+ * 
+ * Please note, that on systems that support both ConPTY and the legacy console, the legacy console 
+ * will never be used, the use of ConPTY will be forced, and this init function will never be called. 
+ * So the legacy console is basically a fallback for older Windows versions that don't support ConPTY.
+ * */
 METHOD(init, BOOL)(int fdOut, int fdIn)
 {
 	BOOL result = FALSE;
@@ -1425,12 +1426,7 @@ METHOD(init, BOOL)(int fdOut, int fdIn)
 
 		LEGACYCONSOLE.hShellMode = stdout_handle;
 
-		/* Especially with UCRT and wide mode, make sure we use an UTF-8 capable locale.
-		 * At least we set the codepage to a proper value that's either compatible with
-		 * ASCII or UTF-8, to ensure that the console can display characters properly.
-		 * The actual locale setting is not that important, as long as the code page is set
-		 * correctly, because we handle UTF-8 encoding and decoding ourselves and we don't
-		 * rely on the C runtime for that. */
+		// JPF FIXME - In theory there can be scenarios, where ConPTY is not supported, but UCRT is availabe. We need to think through how to deal with that.
 		// encoding_init();
 
 		if (stdout_handle == INVALID_HANDLE_VALUE || GetConsoleMode(stdout_handle,
@@ -1480,8 +1476,6 @@ METHOD(init, BOOL)(int fdOut, int fdIn)
 		if (LEGACYCONSOLE.hProgMode == INVALID_HANDLE_VALUE)
 		{
 			T(("... creating console buffer"));
-			/* Save the original active screen buffer handle so we can switch
-			 * back to it when endwin() / reset_shell_mode is called. */
 			LEGACYCONSOLE.hProgMode =
 				CreateConsoleScreenBuffer(GENERIC_READ | GENERIC_WRITE,
 										  FILE_SHARE_READ | FILE_SHARE_WRITE,

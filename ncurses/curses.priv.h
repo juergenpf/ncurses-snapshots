@@ -2533,7 +2533,7 @@ typedef struct {
     int sbi_lines;                   /* Cached console size */
     int sbi_cols;                    /* Cached console size */
 
-    intptr_t sp;                     /* Screen pointer */
+    SCREEN* sp;                      /* Screen pointer */
 
     // Methods
     BOOL (*init)(int fdOut, int fdIn);                 /* Initialize with I/O file descriptors. fdIn maybe -1 in first call */
@@ -2631,6 +2631,7 @@ extern NCURSES_EXPORT_VAR(LegacyConsoleInterface *) _nc_LEGACYCONSOLE;
 #endif /* USE_WIDEC_SUPPORT */
 
 #define MouseFifoHasEvent(sp) (sp->_drv_mouse_head < sp->_drv_mouse_tail)
+#define IsMouseActive(sp) (sp->_mouse_active == TRUE)
 
 #endif /* USE_LEGACY_CONSOLE */
 

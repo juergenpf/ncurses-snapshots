@@ -34,7 +34,7 @@
 
 MODULE_ID("$Id$")
 
-#if defined(_NC_WINDOWS_NATIVE) && USE_MODERN_CONSOLE
+#if USE_MODERN_CONSOLE
 #include <windows.h>
 #include <stdio.h>
 #include <string.h>
@@ -111,7 +111,7 @@ NCURSES_EXPORT_VAR (ConPtyInterface *)
  * a simple lazy read model, where the input thread only reads from the console when the main
  * thread signals that it wants to read. 
  * 
- * Please not, that although we are in a pseudo-console context, the hConsole... handles are not
+ * Please note, that although we are in a pseudo-console context, the hConsole... handles are not
  * really pipes and must not be used as such, but they are still console handles that we can read 
  * from and write to using the console API calls ReadFile and WriteFile, and we can also call 
  * GetConsoleMode and other console API calls on them to query metadata, but we should avoid to use
@@ -145,13 +145,10 @@ static unsigned __stdcall input_thread(LPVOID param);
 
 // ---------------------------------------------------------------------------------------
 
-/* This initializaton function can be called multiple time, and actually it is called from within
- * setupterm() the first time and potentially if we enter ncurses from newterm() the next time.
- * The main purpose is to initialize the defaultCONPTY structure when called the first time. The
- * first call will alway have fdIn set to -1, as setupterm() only cares about output. Please note
- * that setupterm() already handles redirection of stdout and assigns stderr for output if stdout
- * is not a tty.
- *
+/* This initializaton function can be called multiple times, and actually it is called from within
+ * setupterm() and/or newterm(). It initializes the defaultCONPTY structure when called the first 
+ * time, and on subsequent calls it just returns TRUE.
+ * 
  * The other purpose of this routine is to manage the assignment of pseudo-console handles. If the
  * assigned filedescriptors are NOT valid pseudo-console handles, the call will return FALSE.
  *
@@ -267,7 +264,7 @@ METHOD(init, BOOL) (int fdOut, int fdIn)
 	if (CORECONSOLE.getSBI(&csbi)) {
 	    *Lines = (int) (csbi.srWindow.Bottom + 1 - csbi.srWindow.Top);
 	    *Cols = (int) (csbi.srWindow.Right + 1 - csbi.srWindow.Left);
-	    return;
+	    returnVoid;
 	}
 	/* Fallback to cached values or defaults if we can't get the console size.
 	 * Windows Terminal default size is 120 columns x 30 rows.
@@ -275,6 +272,7 @@ METHOD(init, BOOL) (int fdOut, int fdIn)
 	*Lines = CORECONSOLE.sbi_lines != -1 ? CORECONSOLE.sbi_lines : DEFAULT_CONSOLE_LINES;
 	*Cols = CORECONSOLE.sbi_cols != -1 ? CORECONSOLE.sbi_cols : DEFAULT_CONSOLE_COLS;
     }
+    returnVoid;
 }
 
 /* Check if the Windows Console has been resized. Returns TRUE if a resize was detected.
@@ -658,19 +656,19 @@ METHOD(read, int) (int fd GCC_UNUSED, void *result, size_t count)
     assert(g_input_thread != NULL && g_stdin_handle != INVALID_HANDLE_VALUE);
 
     if (!result || g_input_thread == NULL || g_stdin_handle == INVALID_HANDLE_VALUE)
-	return -1;
+	returnCode(-1);
 
     if (count == 0)
-	return 0;
+	returnCode(0);
 
     // If the input thread is running, we read from the ring buffer it fills
     for (i = 0; i < count; i++) {
 	byte = get_byte_blocking();
 	if (byte == -1)
-	    return (int) i;	// Return the number of bytes read so far, which may be 0 if we fail on the first byte
+	    returnCode((int) i);	// Return the number of bytes read so far, which may be 0 if we fail on the first byte
 	((unsigned char *)result)[i] = (unsigned char) byte;
     }
-    return (int) count;
+    returnCode((int) count);
 }
 
 /* This function writes data to the console output. It is called by the main thread when it
@@ -691,17 +689,17 @@ METHOD(write, int) (int fd GCC_UNUSED, const void *buf, size_t count)
     assert(IsConPTY());
 
     if (hOut == INVALID_HANDLE_VALUE)
-	return -1;
+	returnCode(-1);
 
     if (!buf || count == 0)
-	return 0;
+	returnCode(0);
 
     if (!WriteFile(hOut, buf, (DWORD) count, &written, NULL)) {
 	T(("WriteFile failed with error %lu", GetLastError()));
-	return -1;
+	returnCode(-1);
     }
 
-    return (int) written;
+    returnCode((int) written);
 }
 
 /* This function sets the console mode for the input and output handles. It is called by the main thread
