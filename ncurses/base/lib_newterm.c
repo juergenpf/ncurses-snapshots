@@ -51,12 +51,8 @@
 
 MODULE_ID("$Id: lib_newterm.c,v 1.110 2025/12/27 12:28:45 tom Exp $")
 
-#if USE_TERM_DRIVER
 #if USE_LEGACY_CONSOLE
-#define NumLabels      (IsLegacyConsole() ? LEGACYCONSOLE.info.numlabels : InfoOf(SP_PARM).numlabels)
-#else
-#define NumLabels      InfoOf(SP_PARM).numlabels
-#endif
+#define NumLabels      (IsLegacyConsole() ? LEGACYCONSOLE.info.numlabels : num_labels)
 #else
 #define NumLabels      num_labels
 #endif
@@ -211,18 +207,14 @@ NCURSES_SP_NAME(newterm) (NCURSES_SP_DCLx
     current = CURRENT_SCREEN;
     its_term = (current ? current->_term : NULL);
 
-    INIT_TERM_DRIVER();
     /* this loads the capability entry, then sets LINES and COLS */
     if (
-	   TINFO_SETUP_TERM(&new_term, name,
-			    fileno(_ofp), &errret, FALSE) != ERR) {
+	   _nc_setupterm(name,
+			 fileno(_ofp), &errret, FALSE) != ERR) {
 	int slk_format;
 	bool filter_mode;
 
 	_nc_set_screen(NULL);
-#if USE_TERM_DRIVER
-	assert(new_term != NULL);
-#endif
 
 #if NCURSES_SP_FUNCS
 	slk_format = SP_PARM->slk_format;
@@ -257,18 +249,11 @@ NCURSES_SP_NAME(newterm) (NCURSES_SP_DCLx
 	    } else {		
 #endif
 
-#if USE_TERM_DRIVER
-	    TERMINAL_CONTROL_BLOCK *TCB;
-#elif !NCURSES_SP_FUNCS
+#if !NCURSES_SP_FUNCS
 	    _nc_set_screen(CURRENT_SCREEN);
 #endif
 	    assert(SP_PARM != NULL);
 	    cols = *(ptrCols(SP_PARM));
-#if USE_TERM_DRIVER
-	    _nc_set_screen(SP_PARM);
-	    TCB = (TERMINAL_CONTROL_BLOCK *) new_term;
-	    TCB->csp = SP_PARM;
-#endif
 	    /*
 	     * In setupterm() we did a set_curterm(), but it was before we set
 	     * CURRENT_SCREEN.  So the "current" screen's terminal pointer was
@@ -282,11 +267,7 @@ NCURSES_SP_NAME(newterm) (NCURSES_SP_DCLx
 	    if (current)
 		current->_term = its_term;
 
-#if USE_TERM_DRIVER
-	    SP_PARM->_term = new_term;
-#else
 	    new_term = SP_PARM->_term;
-#endif
 
 	    /* allow user to set maximum escape delay from the environment */
 	    if ((value = _nc_getenv_num("ESCDELAY")) >= 0) {
@@ -312,7 +293,6 @@ NCURSES_SP_NAME(newterm) (NCURSES_SP_DCLx
 	    SP_PARM->_use_meta = FALSE;
 #endif
 	    SP_PARM->_endwin = ewInitial;
-#if !USE_TERM_DRIVER
 	    /*
 	     * Check whether we can optimize scrolling under dumb terminals in
 	     * case we do not have any of these capabilities, scrolling
@@ -325,7 +305,6 @@ NCURSES_SP_NAME(newterm) (NCURSES_SP_DCLx
 				    (parm_index ||
 				     parm_delete_line ||
 				     delete_line)));
-#endif
 
 	    NCURSES_SP_NAME(baudrate) (NCURSES_SP_ARG);		/* sets a field in the screen structure */
 

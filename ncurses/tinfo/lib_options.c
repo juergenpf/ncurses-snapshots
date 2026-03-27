@@ -57,11 +57,7 @@ idlok(WINDOW *win, bool flag)
 
     if (win) {
 	SCREEN *sp = _nc_screen_of(win);
-	if (sp != NULL
-#if USE_TERM_DRIVER
-	    && IsTermInfo(sp)
-#endif
-	    ) {
+	if (sp != NULL) {
 	    sp->_nc_sp_idlok =
 		win->_idlok = (flag && (NCURSES_SP_NAME(has_il) (NCURSES_SP_ARG)
 					|| change_scroll_region));
@@ -167,21 +163,11 @@ meta(WINDOW *win GCC_UNUSED, bool flag)
 
     if (sp != NULL) {
 	sp->_use_meta = flag;
-#if USE_TERM_DRIVER
-	if (IsTermInfo(sp)) {
-	    if (flag) {
-		NCURSES_PUTP2("meta_on", meta_on);
-	    } else {
-		NCURSES_PUTP2("meta_off", meta_off);
-	    }
-	}
-#else
 	if (flag) {
 	    NCURSES_PUTP2("meta_on", meta_on);
 	} else {
 	    NCURSES_PUTP2("meta_off", meta_off);
 	}
-#endif
 	result = OK;
     }
     returnCode(result);

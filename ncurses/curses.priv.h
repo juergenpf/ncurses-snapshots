@@ -311,13 +311,7 @@ extern NCURSES_EXPORT(void *) _nc_memmove (void *, const void *, size_t);
 /*
  * Options for terminal drivers, etc...
  */
-#if USE_TERM_DRIVER
-#define NO_TERMINAL "unknown"
-#define USE_SP_RIPOFF     1
-#define USE_SP_TERMTYPE   1
-#else
 #define NO_TERMINAL 0
-#endif
 
 #define VALID_TERM_ENV(term_env, no_terminal) \
 	(term_env = (NonEmpty(term_env) \
@@ -420,17 +414,6 @@ typedef TRIES {
 
 #include <term.priv.h>		/* defines TERMIOS via term.h */
 
-#if USE_TERM_DRIVER
-#if defined(TERMIOS)
-#undef  USE_NAMED_PIPES
-#define USE_NAMED_PIPES 0
-#undef  USE_CONPTY
-#define USE_CONPTY 0
-#undef  USE_WIN32CON_DRIVER
-#elif defined(_NC_WINDOWS)
-#include <nc_win32.h>
-#endif /* TERMIOS */
-#endif /* USE_TERM_DRIVER */
 
 #undef USE_MODERN_CONSOLE
 #if USE_NAMED_PIPES || USE_CONPTY
@@ -1008,13 +991,6 @@ typedef int (*TYPE_Gpm_GetEvent) (Gpm_Event *);
 #define TRACEMSE_MAX	(80 + (5 * 10) + (32 * 15))
 #define TRACEMSE_FMT	"id %2d  at (%2d, %2d, %2d) state %4lx = {" /* } */
 
-#if USE_TERM_DRIVER
-struct DriverTCB; /* Terminal Control Block forward declaration */
-#define INIT_TERM_DRIVER()	_nc_globals.term_driver = _nc_get_driver
-#else
-#define INIT_TERM_DRIVER()	/* nothing */
-#endif
-
 extern NCURSES_EXPORT_VAR(NCURSES_GLOBALS) _nc_globals;
 
 /* The limit reserves one byte for a terminating NUL */
@@ -1286,7 +1262,7 @@ typedef struct screen {
 	int		_sysmouse_new_buttons;
 #endif
 
-#if USE_TERM_DRIVER || USE_LEGACY_CONSOLE
+#if USE_LEGACY_CONSOLE
 	MEVENT		_drv_mouse_fifo[FIFO_SIZE];
 	int		_drv_mouse_head;
 	int		_drv_mouse_tail;
@@ -2256,6 +2232,7 @@ extern NCURSES_EXPORT(void) _nc_setenv_num (const char *, int);
 extern NCURSES_EXPORT(void) _nc_signal_handler (int);
 extern NCURSES_EXPORT(void) _nc_synchook (WINDOW *);
 extern NCURSES_EXPORT(void) _nc_trace_tries (TRIES *);
+extern NCURSES_EXPORT(void) _nc_get_screensize(SCREEN *, int *, int *);
 
 #if NCURSES_EXT_NUMBERS
 extern NCURSES_EXPORT(const TERMTYPE2 *) _nc_fallback2 (const char *);
@@ -2453,7 +2430,7 @@ extern NCURSES_EXPORT(int) _nc_get_tty_mode(TTY *);
     }\
     sp->jump = outc
 
-#if USE_TERM_DRIVER || USE_LEGACY_CONSOLE
+#if USE_LEGACY_CONSOLE
 typedef struct _termInfo
 {
     bool caninit;
@@ -2475,42 +2452,10 @@ typedef struct _termInfo
 
     const color_t* defaultPalette;
 } TerminalInfo;
-#endif /* USE_TERM_DRIVER || USE_LEGACY_CONSOLE */
-
-#if USE_TERM_DRIVER
-typedef struct term_driver {
-    bool   isTerminfo;
-    const char* (*td_name)(struct DriverTCB*);
-    bool   (*td_CanHandle)(struct DriverTCB*, const char*, int*);
-    void   (*td_init)(struct DriverTCB*);
-} TERM_DRIVER;
-
-typedef struct DriverTCB
-{
-    TERMINAL      term;   /* needs to be the first Element !!! */
-    TERM_DRIVER*  drv;    /* The driver for that Terminal */
-    SCREEN*       csp;    /* The screen that owns that Terminal */
-    TerminalInfo  info;   /* Driver independent core capabilities of the Terminal */
-    long          magic;
-} TERMINAL_CONTROL_BLOCK;
-
-#define NCDRV_MAGIC(id) (0x47110000 | (id&0xffff))
-#define NCDRV_TINFO      0x01
-#define NCDRV_WINCONSOLE 0x02
-
-#define TCBOf(sp)    ((TERMINAL_CONTROL_BLOCK*)(TerminalOf(sp)))
-#define InfoOf(sp)   TCBOf(sp)->info
-#define CallDriver(sp,method)                        TCBOf(sp)->drv->method(TCBOf(sp))
-#define CallDriver_1(sp,method,arg1)                 TCBOf(sp)->drv->method(TCBOf(sp),arg1)
-#define CallDriver_2(sp,method,arg1,arg2)            TCBOf(sp)->drv->method(TCBOf(sp),arg1,arg2)
-#define CallDriver_3(sp,method,arg1,arg2,arg3)       TCBOf(sp)->drv->method(TCBOf(sp),arg1,arg2,arg3)
-#define CallDriver_4(sp,method,arg1,arg2,arg3,arg4)  TCBOf(sp)->drv->method(TCBOf(sp),arg1,arg2,arg3,arg4)
 
 extern NCURSES_EXPORT_VAR(const color_t*) _nc_cga_palette;
 extern NCURSES_EXPORT_VAR(const color_t*) _nc_hls_palette;
-
-extern NCURSES_EXPORT(int)      _nc_get_driver(TERMINAL_CONTROL_BLOCK*, const char*, int*);
-#endif /* USE_TERM_DRIVER */
+#endif /* USE_LEGACY_CONSOLE */
 
 #ifdef _NC_WINDOWS
 #if USE_WIDEC_SUPPORT
@@ -2524,33 +2469,6 @@ extern NCURSES_EXPORT(int)      _nc_get_driver(TERMINAL_CONTROL_BLOCK*, const ch
 #elif defined(__EMX__)
 #include <io.h>
 #endif
-
-/*
- * Entrypoints using an extra parameter with the terminal driver.
- */
-
-#if USE_TERM_DRIVER
-extern NCURSES_EXPORT(int)    _nc_setupterm_ex(TERMINAL **, const char *, int , int *, int);
-#define TINFO_SET_CURTERM(sp, tp) \
-	NCURSES_SP_NAME(set_curterm)(sp, tp)
-#define TINFO_SETUP_TERM(tpp, name, fd, err, reuse) \
-	_nc_setupterm_ex(tpp, name, fd, err, reuse)
-#else /* !USE_TERM_DRIVER */
-#define TINFO_SET_CURTERM(sp, tp) \
-	set_curterm(tp)
-#define TINFO_SETUP_TERM(tpp, name, fd, err, reuse) \
-	_nc_setupterm(name, fd, err, reuse)
-#endif /* !USE_TERM_DRIVER */
-
-#if USE_TERM_DRIVER
-extern NCURSES_EXPORT_VAR(TERM_DRIVER) _nc_WIN_DRIVER;
-extern NCURSES_EXPORT_VAR(TERM_DRIVER) _nc_TINFO_DRIVER;
-#endif /* USE_TERM_DRIVER */
-
-extern NCURSES_EXPORT(void)   _nc_get_screensize(SCREEN *, int *, int *);
-#define TINFO_GET_SIZE(sp, tp, lp, cp) \
-	_nc_get_screensize(sp, lp, cp)
-
 
 #if USE_MODERN_CONSOLE
 #define NC_READ(fd, buf, count) WINCONPTY.read(fd,buf,count)
@@ -2572,22 +2490,12 @@ extern NCURSES_EXPORT(void) _nc_legacy_console_init(void);
 	 && (value = ttyname(fd)) != NULL \
 	 && strncmp(value, "/dev/pts/", 9))
 
-#if USE_TERM_DRIVER
-#  define IsTermInfo(sp)       ((TCBOf(sp) != NULL) && ((TCBOf(sp)->drv != NULL)) && ((TCBOf(sp)->drv->isTerminfo)))
-#  define HasTInfoTerminal(sp) ((NULL != TerminalOf(sp)) && IsTermInfo(sp))
-#  if USE_CONSOLE_API
-#    define IsTermInfoOnConsole(sp) (IsConPTY())
-# else
-#    define IsTermInfoOnConsole(sp) FALSE
-#  endif
+#define IsTermInfo(sp)       TRUE
+#define HasTInfoTerminal(sp) (NULL != TerminalOf(sp))
+#if USE_CONSOLE_API
+#  define IsTermInfoOnConsole(sp) (IsConPTY())
 #else
-#  define IsTermInfo(sp)       TRUE
-#  define HasTInfoTerminal(sp) (NULL != TerminalOf(sp))
-#  if USE_CONSOLE_API
-#    define IsTermInfoOnConsole(sp) (IsConPTY())
-#  else
-#    define IsTermInfoOnConsole(sp) FALSE
-#  endif
+#  define IsTermInfoOnConsole(sp) FALSE
 #endif
 
 #define IsValidTIScreen(sp)  (HasTInfoTerminal(sp))
@@ -2817,8 +2725,6 @@ extern NCURSES_EXPORT(void)     NCURSES_SP_NAME(_nc_screen_wrap)(SCREEN*);
 extern NCURSES_EXPORT(void)     NCURSES_SP_NAME(_nc_scroll_oldhash)(SCREEN*, int n, int top, int bot);
 extern NCURSES_EXPORT(void)     NCURSES_SP_NAME(_nc_scroll_optimize)(SCREEN*);
 extern NCURSES_EXPORT(void)     NCURSES_SP_NAME(_nc_set_buffer)(SCREEN*, FILE *, int);
-
-extern NCURSES_EXPORT(void)     _nc_cookie_init(SCREEN *sp);
 
 #if defined(TRACE) || defined(SCROLLDEBUG) || defined(HASHDEBUG)
 extern NCURSES_EXPORT(void)     NCURSES_SP_NAME(_nc_linedump)(SCREEN*);

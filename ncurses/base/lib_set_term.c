@@ -59,14 +59,9 @@
 
 MODULE_ID("$Id: lib_set_term.c,v 1.199 2025/12/27 12:28:45 tom Exp $")
 
-#if USE_TERM_DRIVER
 #if USE_LEGACY_CONSOLE
-#define MaxColors      (IsLegacyConsole() ? LEGACYCONSOLE.info.maxcolors : InfoOf(SP_PARM).maxcolors)
-#define NumLabels      (IsLegacyConsole() ? LEGACYCONSOLE.info.numlabels : InfoOf(SP_PARM).numlabels)
-#else
-#define MaxColors      InfoOf(sp).maxcolors
-#define NumLabels      InfoOf(sp).numlabels
-#endif
+#define MaxColors      (IsLegacyConsole() ? LEGACYCONSOLE.info.maxcolors : max_colors)
+#define NumLabels      (IsLegacyConsole() ? LEGACYCONSOLE.info.numlabels : num_labels)
 #else
 #define MaxColors      max_colors
 #define NumLabels      num_labels
@@ -87,7 +82,7 @@ set_term(SCREEN *screenp)
     newSP = screenp;
 
     if (newSP != NULL) {
-	TINFO_SET_CURTERM(newSP, newSP->_term);
+	set_curterm(newSP->_term);
 #if !USE_REENTRANT
 	curscr = CurScreen(newSP);
 	newscr = NewScreen(newSP);
@@ -96,7 +91,7 @@ set_term(SCREEN *screenp)
 	COLOR_PAIRS = newSP->_pair_count;
 #endif
     } else {
-	TINFO_SET_CURTERM(oldSP, NULL);
+	set_curterm(NULL);
 #if !USE_REENTRANT
 	curscr = NULL;
 	newscr = NULL;
@@ -323,15 +318,11 @@ NCURSES_SP_NAME(_nc_setupscreen) (
 				     bool filtered,
 				     int slk_format)
 {
-#if !USE_TERM_DRIVER
     static const TTY null_TTY;	/* all zeros iff uninitialized */
-#endif
     char *env;
     int bottom_stolen = 0;
     SCREEN *sp;
-#if !USE_TERM_DRIVER
     bool support_cookies = USE_XMC_SUPPORT;
-#endif
 
     T((T_CALLED("_nc_setupscreen(%d, %d, %p, %d, %d)"),
        slines, scolumns, (void *) output, filtered, slk_format));
@@ -540,9 +531,6 @@ NCURSES_SP_NAME(_nc_setupscreen) (
     if (NCURSES_SP_NAME(has_colors) (NCURSES_SP_ARG)) {
 	sp->_ok_attributes |= A_COLOR;
     }
-#if USE_TERM_DRIVER
-    _nc_cookie_init(sp);
-#else
 #if USE_XMC_SUPPORT
     /*
      * If we have no magic-cookie support compiled-in, or if it is suppressed
@@ -613,7 +601,7 @@ NCURSES_SP_NAME(_nc_setupscreen) (
     }
 
     /* initialize normal acs before wide, since we use mapping in the latter */
-#if !USE_WIDEC_SUPPORT
+    #if !USE_WIDEC_SUPPORT
     if (_nc_unicode_locale() && _nc_locale_breaks_acs(sp->_term)) {
 	acs_chars = NULL;
 	ena_acs = NULL;
@@ -621,7 +609,6 @@ NCURSES_SP_NAME(_nc_setupscreen) (
 	exit_alt_charset_mode = NULL;
 	set_attributes = NULL;
     }
-#endif
 #endif
 
     NCURSES_SP_NAME(_nc_init_acs) (NCURSES_SP_ARG);
@@ -677,10 +664,8 @@ NCURSES_SP_NAME(_nc_setupscreen) (
      * Get the current tty-modes. setupterm() may already have done this,
      * unless we use the term-driver.
      */
-#if !USE_TERM_DRIVER
     if (cur_term != NULL &&
 	!memcmp(&cur_term->Ottyb, &null_TTY, sizeof(TTY)))
-#endif
     {
 	NCURSES_SP_NAME(def_shell_mode) (NCURSES_SP_ARG);
 	NCURSES_SP_NAME(def_prog_mode) (NCURSES_SP_ARG);

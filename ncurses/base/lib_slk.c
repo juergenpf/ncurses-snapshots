@@ -50,18 +50,11 @@
 
 MODULE_ID("$Id: lib_slk.c,v 1.52 2025/12/27 12:41:23 tom Exp $")
 
-#if USE_TERM_DRIVER
 #if USE_LEGACY_CONSOLE
-#define NumLabels    (IsLegacyConsole() ? LEGACYCONSOLE.info.numlabels : InfoOf(SP_PARM).numlabels)
-#define NoColorVideo (IsLegacyConsole() ? LEGACYCONSOLE.info.nocolorvideo : InfoOf(SP_PARM).nocolorvideo)
-#define LabelWidth   (IsLegacyConsole() ? LEGACYCONSOLE.info.labelwidth : InfoOf(SP_PARM).labelwidth)
-#define LabelHeight  (IsLegacyConsole() ? LEGACYCONSOLE.info.labelheight : InfoOf(SP_PARM).labelheight)
-#else
-#define NumLabels    InfoOf(SP_PARM).numlabels
-#define NoColorVideo InfoOf(SP_PARM).nocolorvideo
-#define LabelWidth   InfoOf(SP_PARM).labelwidth
-#define LabelHeight  InfoOf(SP_PARM).labelheight
-#endif
+#define NumLabels      (IsLegacyConsole() ? LEGACYCONSOLE.info.numlabels : num_labels)
+#define NoColorVideo   (IsLegacyConsole() ? LEGACYCONSOLE.info.nocolorvideo : no_color_video)
+#define LabelWidth     (IsLegacyConsole() ? LEGACYCONSOLE.info.labelwidth : label_width)
+#define LabelHeight    (IsLegacyConsole() ? LEGACYCONSOLE.info.labelheight : label_height)
 #else
 #define NumLabels    num_labels
 #define NoColorVideo no_color_video

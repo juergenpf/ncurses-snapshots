@@ -56,11 +56,7 @@ MODULE_ID("$Id: report_offsets.c,v 1.32 2025/12/27 12:34:03 tom Exp $")
 #define show_COLORS(type,member)	/* nothing */
 #endif
 
-#if USE_TERM_DRIVER
-#define show_DRIVER(type,member) { flag = "d"; show_offset(type,member); }
-#else
 #define show_DRIVER(type,member)	/* nothing */
-#endif
 
 #if NO_LEAKS
 #define show_MLEAKS(type,member) { flag = "L"; show_offset(type,member); }

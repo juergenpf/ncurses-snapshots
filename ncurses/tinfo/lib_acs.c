@@ -59,7 +59,7 @@ NCURSES_EXPORT_VAR (chtype) acs_map[ACS_LEN] =
 };
 #endif
 
-#if USE_TERM_DRIVER || USE_LEGACY_CONSOLE
+#if USE_LEGACY_CONSOLE
 NCURSES_EXPORT(chtype)
 NCURSES_SP_NAME(_nc_acs_char) (NCURSES_SP_DCLx int c)
 {
@@ -75,7 +75,7 @@ NCURSES_SP_NAME(_nc_acs_char) (NCURSES_SP_DCLx int c)
 	;
     return map[c];
 }
-#endif /* USE_TERM_DRIVER */
+#endif /* USE_LEGACY_CONSOLE */
 
 NCURSES_EXPORT(void)
 NCURSES_SP_NAME(_nc_init_acs) (NCURSES_SP_DCL0)

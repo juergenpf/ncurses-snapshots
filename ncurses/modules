@@ -246,7 +246,6 @@ gettimeofday	   lib		$(win32con)	$(HEADER_DEPS)
 lib_win32concore   lib		$(tinfo)	$(HEADER_DEPS)
 wcwidth		       lib             $(win32con)	$(HEADER_DEPS)
 widechars	       lib             $(wide)		$(HEADER_DEPS)
-win32_driver	   lib             $(win32con)	$(HEADER_DEPS)
 legacy_console	   lib        $(win32con)	$(HEADER_DEPS)
 
 # MinGW-W64, using Console API and named pipes
@@ -255,7 +254,6 @@ gettimeofday	 lib		$(win32con)	$(HEADER_DEPS)
 lib_win32concore lib		$(tinfo)	$(HEADER_DEPS)
 lib_win32conpty	 lib		$(tinfo)	$(HEADER_DEPS)
 wcwidth		     lib        $(win32con)	$(HEADER_DEPS)
-win32_driver	 lib        $(win32con)	$(HEADER_DEPS)
 legacy_console	 lib        $(win32con)	$(HEADER_DEPS)
 
 # MinGW-W64 or Windows native, using ConPTY
@@ -266,6 +264,5 @@ lib_win32conpty  lib        $(tinfo)    $(HEADER_DEPS)
 wcwidth		     lib        $(win32con)	$(HEADER_DEPS)
 
 @ port_tinfo
-tinfo_driver	lib		$(tinfo)	$(HEADER_DEPS)	$(INCDIR)/tic.h
 
 # vile:makemode
