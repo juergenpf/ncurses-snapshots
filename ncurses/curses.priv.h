@@ -414,7 +414,7 @@ typedef TRIES {
 
 #include <term.priv.h>		/* defines TERMIOS via term.h */
 
-
+// FIXME - USE_MODERN_CONSOLE and/or USE_LEGACY_CONSOLE should be set by autoconf. USE_NAMED_PIPES, USE_CONPTY and USE_WIN32CON_DRIVER should disappear.
 #undef USE_MODERN_CONSOLE
 #if USE_NAMED_PIPES || USE_CONPTY
 #  if defined(TERMIOS)
@@ -425,12 +425,14 @@ typedef TRIES {
 #  define USE_MODERN_CONSOLE 0
 #endif /* USE_NAMED_PIPES || USE_CONPTY */
 
+#undef USE_LEGACY_CONSOLE
 #if defined(USE_WIN32CON_DRIVER)
 # define USE_LEGACY_CONSOLE 1
 #else
 # define USE_LEGACY_CONSOLE 0
 #endif /* USE_WIN32CON_DRIVER */
 
+#undef USE_CONSOLE_API
 #if USE_MODERN_CONSOLE || USE_LEGACY_CONSOLE
   // We define USE_CONSOLE_API to describe that we use either conpty or legacy.
 # define USE_CONSOLE_API 1	
@@ -2430,33 +2432,6 @@ extern NCURSES_EXPORT(int) _nc_get_tty_mode(TTY *);
     }\
     sp->jump = outc
 
-#if USE_LEGACY_CONSOLE
-typedef struct _termInfo
-{
-    bool caninit;
-
-    bool hascolor;
-    bool initcolor;
-    bool canchange;
-
-    int  tabsize;
-
-    int  maxcolors;
-    int  maxpairs;
-    int  nocolorvideo;
-
-    int  numbuttons;
-    int  numlabels;
-    int  labelwidth;
-    int  labelheight;
-
-    const color_t* defaultPalette;
-} TerminalInfo;
-
-extern NCURSES_EXPORT_VAR(const color_t*) _nc_cga_palette;
-extern NCURSES_EXPORT_VAR(const color_t*) _nc_hls_palette;
-#endif /* USE_LEGACY_CONSOLE */
-
 #ifdef _NC_WINDOWS
 #if USE_WIDEC_SUPPORT
 #include <wchar.h>
@@ -2579,7 +2554,33 @@ extern NCURSES_EXPORT(bool) _nc_console_setup(void);
     }
 
 #if USE_LEGACY_CONSOLE
+typedef struct _termInfo
+{
+    bool caninit;
+
+    bool hascolor;
+    bool initcolor;
+    bool canchange;
+
+    int  tabsize;
+
+    int  maxcolors;
+    int  maxpairs;
+    int  nocolorvideo;
+
+    int  numbuttons;
+    int  numlabels;
+    int  labelwidth;
+    int  labelheight;
+
+    const color_t* defaultPalette;
+} TerminalInfo;
+
+extern NCURSES_EXPORT_VAR(const color_t*) _nc_cga_palette;
+extern NCURSES_EXPORT_VAR(const color_t*) _nc_hls_palette;
+
 #define CON_NUMPAIRS 64
+
 typedef struct {
     ConsoleCoreInterface core;
 
