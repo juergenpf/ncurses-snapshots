@@ -144,7 +144,13 @@ check_mouse_activity(SCREEN *sp, int delay EVENTLIST_2nd(_nc_eventlist * evl))
 
 #if USE_LEGACY_CONSOLE
     if (IsLegacyConsole()) {
-	return LEGACYCONSOLE.testmouse(delay EVENTLIST_2nd(evl));
+	SCREEN *spc = ConsoleScreen();
+	assert(spc);
+	assert(sp==spc);
+	return(MouseFifoHasEvent(spc) 
+		? 
+		TW_MOUSE : 
+		LEGACYCONSOLE.twait(TWAIT_MASK, delay, (int*)0 EVENTLIST_2nd(evl)));
     }
 #endif /* !USE_LEGACY_CONSOLE */
 # if USE_SYSMOUSE

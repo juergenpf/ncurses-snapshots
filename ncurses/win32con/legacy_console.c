@@ -70,7 +70,6 @@ METHOD(setcolor, void)(BOOL fg, int color);
 METHOD(curs_set, int)(int visibility);
 METHOD(read, int)(int *buf);
 METHOD(twait,int)(int mode,int milliseconds,int *timeleft EVENTLIST_2nd(_nc_eventlist *evl));
-METHOD(testmouse,int)(int delay EVENTLIST_2nd(_nc_eventlist *));
 METHOD(mvcur, int)(int yold, int xold, int y, int x);
 METHOD(doupdate, int)(void);
 
@@ -108,7 +107,6 @@ static LegacyConsoleInterface legacyCONSOLE =
 		Dispatch(curs_set),
 		Dispatch(read),
 		Dispatch(twait),
-		Dispatch(testmouse),
 		Dispatch(mvcur),
 		Dispatch(doupdate)
 };
@@ -1124,30 +1122,6 @@ end:
 		*timeleft = milliseconds;
 
 	return code;
-}
-
-METHOD(testmouse,int)(int delay EVENTLIST_2nd(_nc_eventlist *))
-{
-	int rc = 0;
-	SCREEN *sp;
-
-	T((T_METHOD(testmouse,"(delay=%d)"), delay));
-
-	assert(IsLegacyConsole());
-
-	sp = ConsoleScreen();
-	assert(sp);
-
-	if (sp->_drv_mouse_head < sp->_drv_mouse_tail)
-	{
-		rc = TW_MOUSE;
-	}
-	else
-	{
-		rc = DispatchMethod(twait)(TWAIT_MASK, delay, (int *)0 EVENTLIST_2nd(evl));
-	}
-
-	returnCode(rc);
 }
 
 /* This function sets the console mode for the input and output handles. It is called by the main thread

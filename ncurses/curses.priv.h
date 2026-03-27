@@ -2609,10 +2609,9 @@ typedef struct {
     void (*setcolor)(BOOL fg, int color);	   // Pointer to the setcolor function used by the legacy console.)
     int (*curs_set)(int visibility);               // Pointer to the curs_set function used by the legacy console.
     int (*read)(int *buf); 		           // Pointer to the read function used by the legacy console.
-     int (*twait)(int, int, int* EVENTLIST_2nd(_nc_eventlist*)); 
-     int (*testmouse)(int EVENTLIST_2nd(_nc_eventlist*));
-     int (*mvcur)(int yold, int xold, int y, int x);
-     int (*doupdate)(void);
+    int (*twait)(int, int, int* EVENTLIST_2nd(_nc_eventlist*)); 
+    int (*mvcur)(int yold, int xold, int y, int x);
+    int (*doupdate)(void);
 } LegacyConsoleInterface;
 extern NCURSES_EXPORT_VAR(LegacyConsoleInterface *) _nc_LEGACYCONSOLE;
 #define LEGACYCONSOLE (*_nc_LEGACYCONSOLE)
@@ -2630,6 +2629,8 @@ extern NCURSES_EXPORT_VAR(LegacyConsoleInterface *) _nc_LEGACYCONSOLE;
 #define KeyEventChar KeyEvent.uChar.AsciiChar
 #define CharInfoChar Char.AsciiChar
 #endif /* USE_WIDEC_SUPPORT */
+
+#define MouseFifoHasEvent(sp) (sp->_drv_mouse_head < sp->_drv_mouse_tail)
 
 #endif /* USE_LEGACY_CONSOLE */
 
