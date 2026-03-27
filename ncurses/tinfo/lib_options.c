@@ -256,13 +256,13 @@ typeahead(int fd)
 */
 
 #if NCURSES_EXT_FUNCS
-static BOOL
+static bool
 has_key_internal(int keycode, TRIES * tp)
 {
     if (tp == NULL)
-	return (FALSE);
+	return (false);
     else if (tp->value == keycode)
-	return (TRUE);
+	return (true);
     else
 	return (has_key_internal(keycode, tp->child)
 		|| has_key_internal(keycode, tp->sibling));
@@ -272,7 +272,7 @@ NCURSES_EXPORT(int)
 NCURSES_SP_NAME(has_key) (NCURSES_SP_DCLx int keycode)
 {
     T((T_CALLED("has_key(%p,%d)"), (void *) SP_PARM, keycode));
-    returnCode(SP != NULL ? has_key_internal(keycode, SP_PARM->_keytry) : FALSE);
+    returnCode(SP != NULL ? has_key_internal(keycode, SP_PARM->_keytry) : false);
 }
 
 #if NCURSES_SP_FUNCS
