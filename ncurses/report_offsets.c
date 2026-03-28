@@ -172,7 +172,7 @@ main(int argc, char *argv[])
 #if USE_SYSMOUSE
     show_OPTION(SCREEN, _sysmouse_fifo);
 #endif
-    show_DRIVER(SCREEN, _drv_mouse_fifo);
+    show_DRIVER(SCREEN, _console_mouse_fifo);
 #if USE_SIZECHANGE
     show_OPTION(SCREEN, _resize);
 #endif

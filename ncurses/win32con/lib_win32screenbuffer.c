@@ -40,7 +40,7 @@ MODULE_ID("$Id$")
 #include <sys/time.h>
 
 // FIXME JPF - For now, we disable mouse support as we need to debug why it not works
-#define NO_MOUSE_SUPPORT
+//#define NO_MOUSE_SUPPORT
 
 #define EXP_OPTIMIZE 0
 
@@ -340,7 +340,7 @@ _nc_screenbuffered_console_init(void)
 	SCREENBUFFEREDCONSOLE.info.labelheight = 0;
 	SCREENBUFFEREDCONSOLE.info.nocolorvideo = 1;
 	SCREENBUFFEREDCONSOLE.info.tabsize = 8;
-	SCREENBUFFEREDCONSOLE.info.numbuttons = SCREENBUFFEREDCONSOLE.numButtons;
+	SCREENBUFFEREDCONSOLE.info.numbuttons = 1;
 	SCREENBUFFEREDCONSOLE.info.defaultPalette = _nc_cga_palette;
 }
 
@@ -726,29 +726,29 @@ handle_mouse(SCREEN *sp, MOUSE_EVENT_RECORD mer)
 	returnBool(false);
 #endif
 
-	sp->_drv_mouse_old_buttons = sp->_drv_mouse_new_buttons;
-	sp->_drv_mouse_new_buttons = mer.dwButtonState & BUTTON_MASK;
+	sp->_console_mouse_old_buttons = sp->_console_mouse_new_buttons;
+	sp->_console_mouse_new_buttons = mer.dwButtonState & BUTTON_MASK;
 
 	/*
 	 * We're only interested if the button is pressed or released.
 	 * FIXME: implement continuous event-tracking.
 	 */
-	if (sp->_drv_mouse_new_buttons != sp->_drv_mouse_old_buttons)
+	if (sp->_console_mouse_new_buttons != sp->_console_mouse_old_buttons)
 	{
 		T(("... button state changed: old=%08x new=%08x",
-		   sp->_drv_mouse_old_buttons, sp->_drv_mouse_new_buttons));
+		   sp->_console_mouse_old_buttons, sp->_console_mouse_new_buttons));
 
 		memset(&work, 0, sizeof(work));
 
-		if (sp->_drv_mouse_new_buttons)
+		if (sp->_console_mouse_new_buttons)
 		{
-			work.bstate |= filter_button_events(sp, sp->_drv_mouse_new_buttons);
+			work.bstate |= filter_button_events(sp, sp->_console_mouse_new_buttons);
 		}
 		else
 		{
 			T(("... button state cleared, reporting release"));
 			/* cf: BUTTON_PRESSED, BUTTON_RELEASED */
-			work.bstate |= (filter_button_events(sp, sp->_drv_mouse_old_buttons) >> 1);
+			work.bstate |= (filter_button_events(sp, sp->_console_mouse_old_buttons) >> 1);
 			result = true;
 		}
 
@@ -756,15 +756,30 @@ handle_mouse(SCREEN *sp, MOUSE_EVENT_RECORD mer)
 		work.y = mer.dwMousePosition.Y - AdjustY();
 		T(("... event at (%d, %d), bstate=%08x", work.x, work.y, work.bstate));
 
-		if (sp->_drv_mouse_tail < 0 || sp->_drv_mouse_tail >= FIFO_SIZE)
+		/*
+		 * Only store events for buttons that the application is
+		 * actually tracking via mousemask().  If we let through events
+		 * whose bstate has no bits in _mouse_mask2, _nc_mouse_parse will
+		 * invalidate all events in the ring and its unbounded adjustment
+		 * loop will spin forever.  xterm avoids this by not sending
+		 * events for unregistered buttons; we must filter here instead.
+		 */
+		if (sp->_mouse_mask2 && !(work.bstate & sp->_mouse_mask2))
+		{
+			T(("... bstate %08x not in _mouse_mask2 %08x, dropping",
+			   (unsigned)work.bstate, (unsigned)sp->_mouse_mask2));
+			returnBool(false);
+		}
+
+		if (sp->_console_mouse_tail < 0 || sp->_console_mouse_tail >= FIFO_SIZE)
 		{
 			T(("... mouse FIFO overflow, dropping event"));
 			returnBool(false);
 		}
-		assert(sp->_drv_mouse_tail >= 0);
-		assert(sp->_drv_mouse_tail < FIFO_SIZE);
-		sp->_drv_mouse_fifo[sp->_drv_mouse_tail] = work;
-		sp->_drv_mouse_tail += 1;
+		assert(sp->_console_mouse_tail >= 0);
+		assert(sp->_console_mouse_tail < FIFO_SIZE);
+		sp->_console_mouse_fifo[sp->_console_mouse_tail] = work;
+		sp->_console_mouse_tail += 1;
 	}
 	returnBool(result);
 }
@@ -849,12 +864,16 @@ METHOD(read, int)(int *buf)
 			}
 			else if (inp_rec.EventType == MOUSE_EVENT)
 			{
-				handle_mouse(sp, inp_rec.Event.MouseEvent);
 #ifdef NO_MOUSE_SUPPORT
-					/* Mouse support is disabled, so we ignore the event. */
+				/* Mouse support is disabled, so we ignore the event. */
+				continue;
+#else
+				handle_mouse(sp, inp_rec.Event.MouseEvent);
+				/* Only report KEY_MOUSE when handle_mouse actually stored an
+				 * event.  Position-only moves (no button change) and events
+				 * received while mouse is inactive are silently discarded. */
+				if (!MouseFifoHasEvent(sp))
 					continue;
-				#else
-					/* We report mouse events as KEY_MOUSE, and the actual event data is stored in the mouse FIFO. */
 				*buf = KEY_MOUSE;
 				break;
 #endif
@@ -1071,18 +1090,42 @@ METHOD(twait,int)(int mode, int milliseconds, int *timeleft EVENTLIST_2nd(_nc_ev
 							CONSUME();
 							continue;
 #else
-							if (filter_button_events(sp,
-									pInpRec[i].Event.MouseEvent.dwButtonState & BUTTON_MASK) != NO_BUTTONS)
+						{
+							int newBtns = pInpRec[i].Event.MouseEvent.dwButtonState & BUTTON_MASK;
+							/*
+							 * A button event is relevant if the raw Win32 button
+							 * state differs from what handle_mouse last recorded.
+							 * This correctly catches both presses (newBtns != 0)
+							 * and releases (newBtns == 0 when a button was down).
+							 * Pure mouse moves have the same state as the last
+							 * handle_mouse call and are consumed as irrelevant.
+							 *
+							 * Also check that the resulting ncurses bstate would
+							 * have bits in _mouse_mask2.  If not, the event will
+							 * be discarded by handle_mouse anyway; treat it as
+							 * irrelevant here so read() is not called only to
+							 * stall waiting for the next real input.
+							 */
+							if (newBtns != sp->_console_mouse_new_buttons)
 							{
-								/* Relevant button state: leave at queue head for reader */
-								T(("twait:event MOUSE_EVENT: buttonState=%08lx",
-								   (unsigned long)pInpRec[i].Event.MouseEvent.dwButtonState));
-								code |= TW_MOUSE;
-								goto end;
+								mmask_t bstate;
+								if (newBtns)
+									bstate = filter_button_events(sp, newBtns);
+								else
+									bstate = (mmask_t)(filter_button_events(sp, sp->_console_mouse_new_buttons) >> 1);
+								if (!sp->_mouse_mask2 || (bstate & sp->_mouse_mask2))
+								{
+									T(("twait:event MOUSE_EVENT: buttonState=%08lx (was %08x)",
+									   (unsigned long)pInpRec[i].Event.MouseEvent.dwButtonState,
+									   sp->_console_mouse_new_buttons));
+									code |= TW_MOUSE;
+									goto end;
+								}
 							}
-							/* No relevant buttons (mouse move etc.): consume it */
-							T(("twait: consuming irrelevant MOUSE_EVENT"));
+							/* Irrelevant button event or unregistered button: consume it */
+							T(("twait: consuming irrelevant MOUSE_EVENT (no state change or not in mask)"));
 							CONSUME();
+						}
 #endif
 						}
 						else

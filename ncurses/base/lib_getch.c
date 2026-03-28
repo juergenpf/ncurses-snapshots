@@ -264,7 +264,7 @@ fifo_push(SCREEN *sp EVENTLIST_2nd(_nc_eventlist * evl))
 #endif
 #if USE_SCREENBUFFERED_CONSOLE
 	if ((sp->_mouse_type == M_WINDOWS_CONSOLE)
-	    && (sp->_drv_mouse_head < sp->_drv_mouse_tail)) {
+	    && (sp->_console_mouse_head < sp->_console_mouse_tail)) {
 	sp->_mouse_event(sp);
 	ch = KEY_MOUSE;
 	n = 1;
@@ -281,8 +281,21 @@ fifo_push(SCREEN *sp EVENTLIST_2nd(_nc_eventlist * evl))
 #if USE_SCREENBUFFERED_CONSOLE
 	if (IsScreenBufferedConsole()) {
 	    int buf;
-	    n = SCREENBUFFEREDCONSOLE.read(&buf);	
-	   ch = buf;
+	    _nc_set_read_thread(TRUE);
+	    n = SCREENBUFFEREDCONSOLE.read(&buf);
+	    _nc_set_read_thread(FALSE);
+	    ch = buf;
+	    /*
+	     * read() calls handle_mouse() internally and stores the event in
+	     * the driver FIFO.  Transfer it to the ncurses mouse-event ring
+	     * now, exactly as the M_WINDOWS_CONSOLE early-branch above does
+	     * when the FIFO is pre-populated.
+	     */
+	    if (ch == KEY_MOUSE
+		&& (sp->_mouse_type == M_WINDOWS_CONSOLE)
+		&& (sp->_console_mouse_head < sp->_console_mouse_tail)) {
+		sp->_mouse_event(sp);
+	    }
 	} else {
 #endif /* USE_SCREENBUFFERED_CONSOLE */
 	unsigned char c2 = 0;

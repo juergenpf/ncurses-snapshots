@@ -1260,11 +1260,11 @@ typedef struct screen {
 #endif
 
 #if USE_SCREENBUFFERED_CONSOLE
-	MEVENT		_drv_mouse_fifo[FIFO_SIZE];
-	int		_drv_mouse_head;
-	int		_drv_mouse_tail;
-	int		_drv_mouse_old_buttons;
-	int		_drv_mouse_new_buttons;
+	MEVENT		_console_mouse_fifo[FIFO_SIZE];
+	int		_console_mouse_head;
+	int		_console_mouse_tail;
+	int		_console_mouse_old_buttons;
+	int		_console_mouse_new_buttons;
 #endif
 	/*
 	 * This supports automatic resizing
@@ -2627,7 +2627,7 @@ extern NCURSES_EXPORT_VAR(ScreenBufferedConsoleInterface *) _nc_SCREENBUFFEREDCO
 #define CharInfoChar Char.AsciiChar
 #endif /* USE_WIDEC_SUPPORT */
 
-#define MouseFifoHasEvent(sp) (sp->_drv_mouse_head < sp->_drv_mouse_tail)
+#define MouseFifoHasEvent(sp) (sp->_console_mouse_head < sp->_console_mouse_tail)
 #define IsMouseActive(sp) (sp->_mouse_active == true)
 
 #endif /* USE_SCREENBUFFERED_CONSOLE */

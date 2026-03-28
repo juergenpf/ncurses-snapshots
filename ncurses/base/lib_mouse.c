@@ -812,8 +812,6 @@ _nc_mouse_event(SCREEN *sp)
     MEVENT *eventp = EventAt(sp, sp->_mouse_write);
     bool result = FALSE;
 
-    (void) eventp;
-
     switch (sp->_mouse_type) {
     case M_XTERM:
 	/* xterm: never have to query, mouse events are in the keyboard stream */
@@ -908,15 +906,18 @@ _nc_mouse_event(SCREEN *sp)
 
 #if USE_SCREENBUFFERED_CONSOLE
     case M_WINDOWS_CONSOLE:
-	while (sp->_drv_mouse_head < sp->_drv_mouse_tail) {
+	if (sp->_console_mouse_head < sp->_console_mouse_tail) {
 	    /*
-	     * Point the fifo-head to the next possible location.  If there
-	     * are none, reset the indices.
+	     * Copy the event data from the driver FIFO into the ncurses
+	     * mouse event list, then advance the driver FIFO head.
+	     * Process one event per call so the wgetch gesture-collection
+	     * loop can accumulate press/release pairs normally.
 	     */
-	    sp->_drv_mouse_head += 1;
-	    if (sp->_drv_mouse_head == sp->_drv_mouse_tail) {
-		sp->_drv_mouse_tail = 0;
-		sp->_drv_mouse_head = 0;
+	    *eventp = sp->_console_mouse_fifo[sp->_console_mouse_head];
+	    sp->_console_mouse_head += 1;
+	    if (sp->_console_mouse_head == sp->_console_mouse_tail) {
+		sp->_console_mouse_tail = 0;
+		sp->_console_mouse_head = 0;
 	    }
 
 	    /* bump the next-free pointer into the circular list */
@@ -1403,6 +1404,47 @@ _nc_mouse_inline(SCREEN *sp)
 	    }
 	}
     }
+#if USE_SCREENBUFFERED_CONSOLE
+    else if (sp->_mouse_type == M_WINDOWS_CONSOLE) {
+	/*
+	 * The event data was already placed in _mouse_events by
+	 * _nc_mouse_event() (called from fifo_push before KEY_MOUSE was
+	 * queued).  _mouse_write was incremented there too, so the current
+	 * event sits at _mouse_write-1.  We must NOT read from the console
+	 * input stream here -- all data comes through the driver FIFO.
+	 *
+	 * Guard against a spurious KEY_MOUSE where _nc_mouse_event was not
+	 * called: _mouse_write == _mouse_read means no new event was placed
+	 * in the ring, and accessing _mouse_write-1 would be an underflow.
+	 */
+	if (sp->_mouse_write <= sp->_mouse_read)
+	    returnCode(FALSE);
+	MEVENT *ep = EventAt(sp, sp->_mouse_write - 1);
+
+	TR(MY_TRACE,
+	   ("_nc_mouse_inline: slot %ld %s",
+	    (long) IndexEV(sp, ep),
+	    _nc_tracemouse(sp, ep)));
+
+	result = (ep->bstate & REPORT_MOUSE_POSITION) ? TRUE : FALSE;
+	if (!result) {
+	    /* Treat wheel-mouse buttons like position reports: no matching
+	     * release event will ever arrive, so break the gesture loop
+	     * immediately.
+	     */
+	    if (ep->bstate & BUTTON_PRESSED) {
+		int b;
+
+		for (b = 4; b <= MAX_BUTTONS; ++b) {
+		    if ((ep->bstate & MASK_PRESS(b))) {
+			result = TRUE;
+			break;
+		    }
+		}
+	    }
+	}
+    }
+#endif /* USE_SCREENBUFFERED_CONSOLE */
 
     returnCode(result);
 }
