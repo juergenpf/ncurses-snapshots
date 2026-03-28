@@ -2537,6 +2537,7 @@ extern NCURSES_EXPORT_VAR(ConsoleCoreInterface*) _nc_CORECONSOLE;
 #define IsConsoleProgMode() (CORECONSOLE.status & CONSOLE_STATUS_PROG_MODE)
 #define SetConsoleProgMode() (CORECONSOLE.status |= CONSOLE_STATUS_PROG_MODE)
 #define ClearConsoleProgMode() (CORECONSOLE.status &= ~CONSOLE_STATUS_PROG_MODE)
+#define IsConPTYProgMode() (IsConPTY() && IsConsoleProgMode())
 
 #define HasConsolePendingResize() (CORECONSOLE.status & CONSOLE_STATUS_RESIZE_PENDING)
 #define SetConsolePendingResize() (CORECONSOLE.status |= CONSOLE_STATUS_RESIZE_PENDING)
