@@ -59,7 +59,7 @@
 #include <os2.h>
 #endif
 
-#if USE_MODERN_CONSOLE
+#if USE_CONPTY
 #include <windows.h>
 #include <io.h>
 #endif
@@ -142,13 +142,13 @@ _nc_eventlist_timeout(_nc_eventlist * evl)
 }
 #endif /* NCURSES_WGETCH_EVENTS */
 
-#if (USE_FUNC_POLL || HAVE_SELECT || USE_MODERN_CONSOLE)
+#if (USE_FUNC_POLL || HAVE_SELECT || USE_CONPTY)
 #  define MAYBE_UNUSED
 #else
 #  define MAYBE_UNUSED GCC_UNUSED
 #endif
 
-#if USE_MODERN_CONSOLE
+#if USE_CONPTY
 #define pollfd pty_pollfd
 #define poll WINCONPTY.poll
 #endif
@@ -181,8 +181,8 @@ _nc_timed_wait(const SCREEN *sp MAYBE_UNUSED,
     int count;
     int result = TW_NONE;
     TimeType t0;
-#if (USE_FUNC_POLL || HAVE_SELECT || USE_MODERN_CONSOLE)
-# if USE_MODERN_CONSOLE
+#if (USE_FUNC_POLL || HAVE_SELECT || USE_CONPTY)
+# if USE_CONPTY
     GCC_UNUSED
 # endif
     int fd;
@@ -193,8 +193,8 @@ _nc_timed_wait(const SCREEN *sp MAYBE_UNUSED,
     int n;
 #endif
 
-#if USE_FUNC_POLL || USE_MODERN_CONSOLE
-#if USE_MODERN_CONSOLE
+#if USE_FUNC_POLL || USE_CONPTY
+#if USE_CONPTY
 #define MIN_FDS 1
 #else
 #define MIN_FDS 2
@@ -246,7 +246,7 @@ _nc_timed_wait(const SCREEN *sp MAYBE_UNUSED,
 	evl->result_flags = 0;
 #endif
 
-#if USE_FUNC_POLL || USE_MODERN_CONSOLE
+#if USE_FUNC_POLL || USE_CONPTY
     memset(fd_list, 0, sizeof(fd_list));
 
 #ifdef NCURSES_WGETCH_EVENTS
@@ -263,7 +263,7 @@ _nc_timed_wait(const SCREEN *sp MAYBE_UNUSED,
 	fds[count].events = POLLIN;
 	count++;
     }
-#if !USE_MODERN_CONSOLE
+#if !USE_CONPTY
     if ((mode & TW_MOUSE)
 	&& (fd = sp->_mouse_fd) >= 0) {
 	fds[count].fd = fd;
@@ -499,7 +499,7 @@ _nc_timed_wait(const SCREEN *sp MAYBE_UNUSED,
     if (result != 0) {
 	if (result > 0) {
 	    result = 0;
-#if USE_FUNC_POLL || USE_MODERN_CONSOLE
+#if USE_FUNC_POLL || USE_CONPTY
 	    for (count = 0; count < MIN_FDS; count++) {
 		if ((mode & (1 << count))
 		    && (fds[count].revents & POLLIN)) {
@@ -525,7 +525,7 @@ _nc_timed_wait(const SCREEN *sp MAYBE_UNUSED,
 	result |= TW_EVENT;
 #endif
 
-#if USE_FUNC_POLL || USE_MODERN_CONSOLE
+#if USE_FUNC_POLL || USE_CONPTY
 #ifdef NCURSES_WGETCH_EVENTS
     if (fds != fd_list)
 	free((char *) fds);

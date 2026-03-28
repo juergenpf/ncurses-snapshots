@@ -1004,7 +1004,7 @@
 ./ncurses/widechar/widechars.c
 ./ncurses/win32con/gettimeofday.c
 ./ncurses/win32con/wcwidth.c
-./ncurses/win32con/legacy_console.c
+./ncurses/win32con/lib_win32screenbuffer.c
 ./package/debian-mingw/changelog
 ./package/debian-mingw/compat
 ./package/debian-mingw/control

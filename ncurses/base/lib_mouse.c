@@ -388,7 +388,7 @@ handle_sysmouse(int sig GCC_UNUSED)
 }
 #endif /* USE_SYSMOUSE */
 
-#if USE_MODERN_CONSOLE
+#if USE_CONPTY
 #define xterm_kmous "\033[M"
 
 static void
@@ -445,7 +445,7 @@ init_xterm_mouse(SCREEN *sp)
 	}
     }
 }
-#endif /* USE_MODERN_CONSOLE */
+#endif /* USE_CONPTY */
 
 static void
 enable_xterm_mouse(SCREEN *sp, bool enable)
@@ -752,9 +752,9 @@ initialize_mousetype(SCREEN *sp)
 #endif /* USE_SYSMOUSE */
 
 #if USE_CONSOLE_API
-#if USE_LEGACY_CONSOLE
-    if (IsLegacyConsole()) {
-	sp->_mouse_type = M_LEGACY_CONSOLE;
+#if USE_SCREENBUFFERED_CONSOLE
+    if (IsScreenBufferedConsole()) {
+	sp->_mouse_type = M_WINDOWS_CONSOLE;
 	returnVoid;
     } 
 #endif
@@ -906,8 +906,8 @@ _nc_mouse_event(SCREEN *sp)
 	break;
 #endif /* USE_SYSMOUSE */
 
-#if USE_LEGACY_CONSOLE
-    case M_LEGACY_CONSOLE:
+#if USE_SCREENBUFFERED_CONSOLE
+    case M_WINDOWS_CONSOLE:
 	while (sp->_drv_mouse_head < sp->_drv_mouse_tail) {
 	    /*
 	     * Point the fifo-head to the next possible location.  If there
@@ -1442,8 +1442,8 @@ mouse_activate(SCREEN *sp, bool on)
 	    sp->_mouse_active = TRUE;
 	    break;
 #endif
-#if USE_LEGACY_CONSOLE
-	case M_LEGACY_CONSOLE:
+#if USE_SCREENBUFFERED_CONSOLE
+	case M_WINDOWS_CONSOLE:
 	    sp->_mouse_active = TRUE;
 	    break;
 #endif
@@ -1479,8 +1479,8 @@ mouse_activate(SCREEN *sp, bool on)
 	    sp->_mouse_active = FALSE;
 	    break;
 #endif
-#if USE_LEGACY_CONSOLE
-	case M_LEGACY_CONSOLE:
+#if USE_SCREENBUFFERED_CONSOLE
+	case M_WINDOWS_CONSOLE:
 	    sp->_mouse_active = FALSE;
 	    break;
 #endif
@@ -1797,8 +1797,8 @@ _nc_mouse_wrap(SCREEN *sp)
 	mouse_activate(sp, FALSE);
 	break;
 #endif
-#if USE_LEGACY_CONSOLE
-    case M_LEGACY_CONSOLE:
+#if USE_SCREENBUFFERED_CONSOLE
+    case M_WINDOWS_CONSOLE:
 	mouse_activate(sp, FALSE);
 	break;
 #endif
@@ -1834,8 +1834,8 @@ _nc_mouse_resume(SCREEN *sp)
 	break;
 #endif
 
-#if USE_LEGACY_CONSOLE
-    case M_LEGACY_CONSOLE:
+#if USE_SCREENBUFFERED_CONSOLE
+    case M_WINDOWS_CONSOLE:
 	mouse_activate(sp, TRUE);
 	break;
 #endif

@@ -380,9 +380,9 @@ NCURSES_SP_NAME(termattrs) (NCURSES_SP_DCL0)
     T((T_CALLED("termattrs(%p)"), (void *) SP_PARM));
 
     if (HasTerminal(SP_PARM)) {
-#if USE_LEGACY_CONSOLE
-	if (IsLegacyConsole())
-	    returnChtype(LEGACYCONSOLE.termattrs());
+#if USE_SCREENBUFFERED_CONSOLE
+	if (IsScreenBufferedConsole())
+	    returnChtype(SCREENBUFFEREDCONSOLE.termattrs());
 #endif
 	if (enter_alt_charset_mode)
 	    attrs |= A_ALTCHARSET;

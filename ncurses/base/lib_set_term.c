@@ -59,9 +59,9 @@
 
 MODULE_ID("$Id: lib_set_term.c,v 1.199 2025/12/27 12:28:45 tom Exp $")
 
-#if USE_LEGACY_CONSOLE
-#define MaxColors      (IsLegacyConsole() ? LEGACYCONSOLE.info.maxcolors : max_colors)
-#define NumLabels      (IsLegacyConsole() ? LEGACYCONSOLE.info.numlabels : num_labels)
+#if USE_SCREENBUFFERED_CONSOLE
+#define MaxColors      (IsScreenBufferedConsole() ? SCREENBUFFEREDCONSOLE.info.maxcolors : max_colors)
+#define NumLabels      (IsScreenBufferedConsole() ? SCREENBUFFEREDCONSOLE.info.numlabels : num_labels)
 #else
 #define MaxColors      max_colors
 #define NumLabels      num_labels

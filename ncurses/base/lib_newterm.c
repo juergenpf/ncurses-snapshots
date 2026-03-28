@@ -51,8 +51,8 @@
 
 MODULE_ID("$Id: lib_newterm.c,v 1.110 2025/12/27 12:28:45 tom Exp $")
 
-#if USE_LEGACY_CONSOLE
-#define NumLabels      (IsLegacyConsole() ? LEGACYCONSOLE.info.numlabels : num_labels)
+#if USE_SCREENBUFFERED_CONSOLE
+#define NumLabels      (IsScreenBufferedConsole() ? SCREENBUFFEREDCONSOLE.info.numlabels : num_labels)
 #else
 #define NumLabels      num_labels
 #endif
@@ -88,7 +88,7 @@ _nc_initscr(NCURSES_SP_DCL0)
 	buf.c_oflag &= (unsigned) ~(ONLCR);
 #elif HAVE_SGTTY_H
 	buf.sg_flags &= ~(ECHO | CRMOD);
-#elif USE_MODERN_CONSOLE
+#elif USE_CONPTY
 	buf.dwFlagIn  = ENABLE_PROCESSED_INPUT;
         buf.dwFlagOut = ENABLE_PROCESSED_OUTPUT 
 			| ENABLE_WRAP_AT_EOL_OUTPUT;

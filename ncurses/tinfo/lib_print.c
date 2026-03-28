@@ -52,8 +52,8 @@ NCURSES_SP_NAME(mcprint) (NCURSES_SP_DCLx char *data, int len)
     size_t onsize, offsize;
     size_t need;
 
-#if USE_LEGACY_CONSOLE
-    if (IsLegacyConsole()) {
+#if USE_SCREENBUFFERED_CONSOLE
+    if (IsScreenBufferedConsole()) {
         return (ERR);           
     }
 #endif

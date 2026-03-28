@@ -750,9 +750,9 @@ NCURSES_SP_NAME(doupdate)(NCURSES_SP_DCL0)
 #endif /* USE_TRACE_TIMES */
 
     T((T_CALLED("_nc_tinfo:doupdate(%p)"), (void *) SP_PARM));
-#if USE_LEGACY_CONSOLE
-    if (IsLegacyConsole()) {
-	returnCode(LEGACYCONSOLE.doupdate());
+#if USE_SCREENBUFFERED_CONSOLE
+    if (IsScreenBufferedConsole()) {
+	returnCode(SCREENBUFFEREDCONSOLE.doupdate());
     }
 #endif
     _nc_lock_global(update);

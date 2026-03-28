@@ -68,10 +68,10 @@ initscr(void)
 
 	env = getenv("TERM");
 	(void) VALID_TERM_ENV(env, "unknown");
-#if USE_LEGACY_CONSOLE
+#if USE_SCREENBUFFERED_CONSOLE
 	AssertConsoleSetup();
-	if (IsLegacyConsole()) {
-	    env = LEGACYCONSOLE.termname(FALSE);
+	if (IsScreenBufferedConsole()) {
+	    env = SCREENBUFFEREDCONSOLE.termname(FALSE);
 	} 
 #endif
 	if ((name = strdup(env)) == NULL) {

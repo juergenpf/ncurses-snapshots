@@ -142,17 +142,17 @@ check_mouse_activity(SCREEN *sp, int delay EVENTLIST_2nd(_nc_eventlist * evl))
 {
     int rc;
 
-#if USE_LEGACY_CONSOLE
-    if (IsLegacyConsole()) {
+#if USE_SCREENBUFFERED_CONSOLE
+    if (IsScreenBufferedConsole()) {
 	SCREEN *spc = ConsoleScreen();
 	assert(spc);
 	assert(sp==spc);
 	return(MouseFifoHasEvent(spc) 
 		? 
 		TW_MOUSE : 
-		LEGACYCONSOLE.twait(TWAIT_MASK, delay, (int*)0 EVENTLIST_2nd(evl)));
+		SCREENBUFFEREDCONSOLE.twait(TWAIT_MASK, delay, (int*)0 EVENTLIST_2nd(evl)));
     }
-#endif /* !USE_LEGACY_CONSOLE */
+#endif /* !USE_SCREENBUFFERED_CONSOLE */
 # if USE_SYSMOUSE
     if ((sp->_mouse_type == M_SYSMOUSE)
 	&& (sp->_sysmouse_head < sp->_sysmouse_tail)) {
@@ -262,8 +262,8 @@ fifo_push(SCREEN *sp EVENTLIST_2nd(_nc_eventlist * evl))
 	n = 1;
     } else
 #endif
-#if USE_LEGACY_CONSOLE
-	if ((sp->_mouse_type == M_LEGACY_CONSOLE)
+#if USE_SCREENBUFFERED_CONSOLE
+	if ((sp->_mouse_type == M_WINDOWS_CONSOLE)
 	    && (sp->_drv_mouse_head < sp->_drv_mouse_tail)) {
 	sp->_mouse_event(sp);
 	ch = KEY_MOUSE;
@@ -278,13 +278,13 @@ fifo_push(SCREEN *sp EVENTLIST_2nd(_nc_eventlist * evl))
     } else
 #endif
     {				/* Can block... */
-#if USE_LEGACY_CONSOLE
-	if (IsLegacyConsole()) {
+#if USE_SCREENBUFFERED_CONSOLE
+	if (IsScreenBufferedConsole()) {
 	    int buf;
-	    n = LEGACYCONSOLE.read(&buf);	
+	    n = SCREENBUFFEREDCONSOLE.read(&buf);	
 	   ch = buf;
 	} else {
-#endif /* USE_LEGACY_CONSOLE */
+#endif /* USE_SCREENBUFFERED_CONSOLE */
 	unsigned char c2 = 0;
 
 	_nc_set_read_thread(TRUE);
@@ -292,9 +292,9 @@ fifo_push(SCREEN *sp EVENTLIST_2nd(_nc_eventlist * evl))
 	_nc_set_read_thread(FALSE);
 	ch = c2;
     }
-#if USE_LEGACY_CONSOLE
+#if USE_SCREENBUFFERED_CONSOLE
     }
-#endif /* USE_LEGACY_CONSOLE */
+#endif /* USE_SCREENBUFFERED_CONSOLE */
 
     if ((n == -1) || (n == 0)) {
 	TR(TRACE_IEVENT, ("read(%d,&ch,1)=%d, errno=%d", sp->_ifd, n, errno));

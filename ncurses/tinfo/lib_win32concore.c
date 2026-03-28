@@ -139,7 +139,7 @@ conpty_supported(void)
     returnBool(result);
 }
 
-#if USE_LEGACY_CONSOLE
+#if USE_SCREENBUFFERED_CONSOLE
 /* Windows version prior to version 10 have mixed behaviour when it comes to console resizing. 
  * In some versions, the console can be resized freely, but the application is not notified of 
  * the resize events, which means that ncurses cannot update its internal state to reflect the 
@@ -162,7 +162,7 @@ has_limiuted_resize(void)
     }
     return result;
 }
-#endif /* USE_LEGACY_CONSOLE */
+#endif /* USE_SCREENBUFFERED_CONSOLE */
 
 NCURSES_EXPORT_VAR(ConsoleCoreInterface*) 
 _nc_CORECONSOLE = NULL;
@@ -270,7 +270,7 @@ _nc_console_setup(void) {
 
 	T((T_CALLED("lib_win32concore::_nc_console_setup()")));
 	if (conpty_supported()) {
-#if USE_MODERN_CONSOLE
+#if USE_CONPTY
 		_nc_CORECONSOLE = & (WINCONPTY.core);
 		status |= CONSOLE_STATUS_IS_CONPTY;
 		/* Especially with UCRT and wide mode, make sure we use an UTF-8 capable locale.
@@ -282,13 +282,13 @@ _nc_console_setup(void) {
 		encoding_init();
 #endif
 	} else {
-#if USE_LEGACY_CONSOLE
+#if USE_SCREENBUFFERED_CONSOLE
 		HWND hwnd = GetConsoleWindow();
 		LONG style = GetWindowLong(hwnd, GWL_STYLE);
 		style &= ~(WS_SIZEBOX | WS_MAXIMIZEBOX);
 		T(("lib_win32concore::_nc_console_setup - Legacy console detected, disabling resizing"));
 		SetWindowLong(hwnd, GWL_STYLE, style);
-		_nc_CORECONSOLE = & (LEGACYCONSOLE.core);
+		_nc_CORECONSOLE = & (SCREENBUFFEREDCONSOLE.core);
 		if (has_limiuted_resize()) {
 			T(("lib_win32concore::_nc_console_setup - Legacy console has resize limitations"));
 			status |= CONSOLE_STATUS_LIMITED_RESIZE;
@@ -298,7 +298,7 @@ _nc_console_setup(void) {
 			    COORD newSize;
 			    newSize.X = (short)(csbi.srWindow.Right - csbi.srWindow.Left + 1);
 			    newSize.Y = (short)(csbi.srWindow.Bottom - csbi.srWindow.Top + 1);
-			    SetConsoleScreenBufferSize(LEGACYCONSOLE.core.ConsoleHandleOut, newSize);
+			    SetConsoleScreenBufferSize(SCREENBUFFEREDCONSOLE.core.ConsoleHandleOut, newSize);
 			}
 		}
 #endif

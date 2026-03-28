@@ -34,7 +34,7 @@
 
 MODULE_ID("$Id$")
 
-#if USE_MODERN_CONSOLE
+#if USE_CONPTY
 #include <windows.h>
 #include <stdio.h>
 #include <string.h>
@@ -861,4 +861,4 @@ METHOD(getmode, int) (int fd GCC_UNUSED, TTY * arg)
     returnCode(OK);
 }
 
-#endif /* defined(_NC_WINDOWS_NATIVE) && USE_MODERN_CONSOLE */
+#endif /* defined(_NC_WINDOWS_NATIVE) && USE_CONPTY */

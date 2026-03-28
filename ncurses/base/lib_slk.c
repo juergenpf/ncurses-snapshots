@@ -50,11 +50,11 @@
 
 MODULE_ID("$Id: lib_slk.c,v 1.52 2025/12/27 12:41:23 tom Exp $")
 
-#if USE_LEGACY_CONSOLE
-#define NumLabels      (IsLegacyConsole() ? LEGACYCONSOLE.info.numlabels : num_labels)
-#define NoColorVideo   (IsLegacyConsole() ? LEGACYCONSOLE.info.nocolorvideo : no_color_video)
-#define LabelWidth     (IsLegacyConsole() ? LEGACYCONSOLE.info.labelwidth : label_width)
-#define LabelHeight    (IsLegacyConsole() ? LEGACYCONSOLE.info.labelheight : label_height)
+#if USE_SCREENBUFFERED_CONSOLE
+#define NumLabels      (IsScreenBufferedConsole() ? SCREENBUFFEREDCONSOLE.info.numlabels : num_labels)
+#define NoColorVideo   (IsScreenBufferedConsole() ? SCREENBUFFEREDCONSOLE.info.nocolorvideo : no_color_video)
+#define LabelWidth     (IsScreenBufferedConsole() ? SCREENBUFFEREDCONSOLE.info.labelwidth : label_width)
+#define LabelHeight    (IsScreenBufferedConsole() ? SCREENBUFFEREDCONSOLE.info.labelheight : label_height)
 #else
 #define NumLabels    num_labels
 #define NoColorVideo no_color_video

@@ -64,9 +64,9 @@ NCURSES_SP_NAME(beep) (NCURSES_SP_DCL0)
 
     T((T_CALLED("beep(%p)"), (void *) SP_PARM));
 
-#if USE_LEGACY_CONSOLE
-    if (IsLegacyConsole())
-        returnCode(LEGACYCONSOLE.beeporflash(TRUE));
+#if USE_SCREENBUFFERED_CONSOLE
+    if (IsScreenBufferedConsole())
+        returnCode(SCREENBUFFEREDCONSOLE.beeporflash(TRUE));
 #endif
     /* FIXME: should make sure that we are not in altchar mode */
     if (cur_term == NULL) {

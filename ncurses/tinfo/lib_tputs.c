@@ -60,14 +60,9 @@ NCURSES_EXPORT_VAR(NCURSES_OSPEED) ospeed = 0;        /* used by termcap library
 NCURSES_EXPORT_VAR(int) _nc_nulls_sent = 0;
 
 #if USE_CONSOLE_API
-static int 
-console_write(int fd, const char *buf, size_t len) {
-    if (IsConPTY())
-        return WINCONPTY.write(fd,buf, len);
-    else
-        return write(fd, buf, len);
-}
-#define write(fd,buf,len) console_write(fd, buf, len)
+#define NC_WRITE(fd,buf,len) (IsConPTY() ? WINCONPTY.write(fd,buf, len) : write(fd, buf, len))
+#else
+#define NC_WRITE(fd,buf,len) write(fd, buf, len)
 #endif /* USE_CONSOLE_API */
 
 #if NCURSES_NO_PADDING
@@ -147,7 +142,7 @@ NCURSES_SP_NAME(_nc_flush) (NCURSES_SP_DCL0)
 	    TR(TRACE_CHARPUT, ("flushing %ld/%ld bytes",
 			       (unsigned long) amount, _nc_outchars));
 	    while (amount) {
-		ssize_t res = write(SP_PARM->_ofd, buf, amount);
+		ssize_t res = NC_WRITE(SP_PARM->_ofd, buf, amount);
 		if (res > 0) {
 		    /* if the write was incomplete, try again */
 		    amount -= (size_t) res;
@@ -202,12 +197,12 @@ NCURSES_SP_NAME(_nc_outch) (NCURSES_SP_DCLx int ch)
 	     * POSIX says write() is safe in a signal handler, but the
 	     * buffered I/O is not.
 	     */
-	    if (write(fileno(NC_OUTPUT(SP_PARM)), &tmp, (size_t) 1) == -1)
+	    if (NC_WRITE(fileno(NC_OUTPUT(SP_PARM)), &tmp, (size_t) 1) == -1)
 		rc = ERR;
 	}
     } else {
 	char tmp = (char) ch;
-	if (write(fileno(stdout), &tmp, (size_t) 1) == -1)
+	if (NC_WRITE(fileno(stdout), &tmp, (size_t) 1) == -1)
 	    rc = ERR;
     }
     return rc;

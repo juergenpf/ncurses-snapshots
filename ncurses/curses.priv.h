@@ -414,26 +414,28 @@ typedef TRIES {
 
 #include <term.priv.h>		/* defines TERMIOS via term.h */
 
-// FIXME - USE_MODERN_CONSOLE and/or USE_LEGACY_CONSOLE should be set by autoconf. USE_NAMED_PIPES, USE_CONPTY and USE_WIN32CON_DRIVER should disappear.
-#undef USE_MODERN_CONSOLE
+// FIXME - USE_CONPTY and/orUSE_SCREENBUFFERED_CONSOLE should be set by autoconf. USE_NAMED_PIPES and USE_WIN32CON_DRIVER should disappear.
 #if USE_NAMED_PIPES || USE_CONPTY
+#  ifdef USE_CONPTY
+#    undef USE_CONPTY
+#  endif
 #  if defined(TERMIOS)
 #     error Unsupported configuration: named pipes and conpty are only supported on Windows
 #  endif
-#  define USE_MODERN_CONSOLE 1
+#  define USE_CONPTY 1
 #else
-#  define USE_MODERN_CONSOLE 0
+#  define USE_CONPTY 0
 #endif /* USE_NAMED_PIPES || USE_CONPTY */
 
-#undef USE_LEGACY_CONSOLE
+#undef USE_SCREENBUFFERED_CONSOLE
 #if defined(USE_WIN32CON_DRIVER)
-# define USE_LEGACY_CONSOLE 1
+# define USE_SCREENBUFFERED_CONSOLE 1
 #else
-# define USE_LEGACY_CONSOLE 0
+# define USE_SCREENBUFFERED_CONSOLE 0
 #endif /* USE_WIN32CON_DRIVER */
 
 #undef USE_CONSOLE_API
-#if USE_MODERN_CONSOLE || USE_LEGACY_CONSOLE
+#if USE_CONPTY || USE_SCREENBUFFERED_CONSOLE
   // We define USE_CONSOLE_API to describe that we use either conpty or legacy.
 # define USE_CONSOLE_API 1	
   //  Although Windows doesn't have SIGWINCH actually, we can use the console API
@@ -861,8 +863,8 @@ typedef enum {
 #if USE_SYSMOUSE
 	,M_SYSMOUSE		/* FreeBSD sysmouse on console */
 #endif
-#if USE_LEGACY_CONSOLE
-	,M_LEGACY_CONSOLE		/* Win32 console, etc */
+#if USE_SCREENBUFFERED_CONSOLE
+	,M_WINDOWS_CONSOLE		/* Win32 console, etc */
 #endif
 } MouseType;
 
@@ -1264,7 +1266,7 @@ typedef struct screen {
 	int		_sysmouse_new_buttons;
 #endif
 
-#if USE_LEGACY_CONSOLE
+#if USE_SCREENBUFFERED_CONSOLE
 	MEVENT		_drv_mouse_fifo[FIFO_SIZE];
 	int		_drv_mouse_head;
 	int		_drv_mouse_tail;
@@ -2306,7 +2308,7 @@ extern NCURSES_EXPORT(int) _nc_eventlist_timeout(_nc_eventlist *);
  */
 #if USE_WIDEC_SUPPORT
 
-#if defined(_NC_WINDOWS_NATIVE) && !defined(_NC_MSC) && !USE_MODERN_CONSOLE // JPF check
+#if defined(_NC_WINDOWS_NATIVE) && !defined(_NC_MSC) && !USE_CONPTY // JPF check
 /*
  * MinGW has wide-character functions, but they do not work correctly.
  */
@@ -2445,14 +2447,14 @@ extern NCURSES_EXPORT(int) _nc_get_tty_mode(TTY *);
 #include <io.h>
 #endif
 
-#if USE_MODERN_CONSOLE
+#if USE_CONPTY
 #define NC_READ(fd, buf, count) WINCONPTY.read(fd,buf,count)
 #else
 #define NC_READ(fd, buf, count) read(fd, buf, count)
 #endif
 
-#if USE_LEGACY_CONSOLE
-extern NCURSES_EXPORT(void) _nc_legacy_console_init(void);
+#if USE_SCREENBUFFERED_CONSOLE
+extern NCURSES_EXPORT(void) _nc_screenbuffered_console_init(void);
 #endif
 
 #define NC_ISATTY(fd) isatty(fd)
@@ -2527,7 +2529,7 @@ extern NCURSES_EXPORT_VAR(ConsoleCoreInterface*) _nc_CORECONSOLE;
 #define CoreConsoleInitialized() (_nc_CORECONSOLE != NULL)
 
 #define IsConPTY() (CORECONSOLE.status & CONSOLE_STATUS_IS_CONPTY)
-#define IsLegacyConsole() (!(CORECONSOLE.status & CONSOLE_STATUS_IS_CONPTY) )
+#define IsScreenBufferedConsole() (!(CORECONSOLE.status & CONSOLE_STATUS_IS_CONPTY) )
 
 #define IsConsoleInitialized() (CORECONSOLE.status & CONSOLE_STATUS_INITIALIZED)
 #define MarkConsoleInitialized() (CORECONSOLE.status |= CONSOLE_STATUS_INITIALIZED)
@@ -2553,7 +2555,7 @@ extern NCURSES_EXPORT(bool) _nc_console_setup(void);
 	} \
     }
 
-#if USE_LEGACY_CONSOLE
+#if USE_SCREENBUFFERED_CONSOLE
 typedef struct _termInfo
 {
     bool caninit;
@@ -2597,25 +2599,25 @@ typedef struct {
 
     TerminalInfo info;			      // Core capabilities.
 
-    char* (*termname)(bool longname);	           // Pointer to the name function used by the legacy console.
+    char* (*termname)(bool longname);	           // Pointer to the name function used by the buffered console.
     bool (*adjust_size)(void);                     // Adjust the console buffer size.
-    chtype (*termattrs)(void);                     // Pointer to the termattrs function used by the legacy console.
-    int (*keypad)(bool);                           // Pointer to the keypad function used by the legacy console.
-    int (*beeporflash)(bool);                      // Pointer to the beep or flash function used by the legacy console.
-    int (*keyok)(int keycode,int flag);            // Pointer to the keyok function used by the legacy console.
-    int (*has_key)(int keycode);                   // Pointer to the has_key function used by the legacy console.
-    void (*init_acs)(chtype *acs);                 // Pointer to the init_acs function used by the legacy console.
-    bool (*reset_color_pair)(void);                // Pointer to the reset_color_pair function used by the legacy console.
-    int (*init_pair)(int pair, int fg, int bg);    // Pointer to the init_pair function used by the legacy console.')
-    void (*setcolor)(bool fg, int color);	   // Pointer to the setcolor function used by the legacy console.)
-    int (*curs_set)(int visibility);               // Pointer to the curs_set function used by the legacy console.
-    int (*read)(int *buf); 		           // Pointer to the read function used by the legacy console.
+    chtype (*termattrs)(void);                     // Pointer to the termattrs function used by the buffered console.
+    int (*keypad)(bool);                           // Pointer to the keypad function used by the buffered console.
+    int (*beeporflash)(bool);                      // Pointer to the beep or flash function used by the buffered console.
+    int (*keyok)(int keycode,int flag);            // Pointer to the keyok function used by the buffered console.
+    int (*has_key)(int keycode);                   // Pointer to the has_key function used by the buffered console.
+    void (*init_acs)(chtype *acs);                 // Pointer to the init_acs function used by the buffered console.
+    bool (*reset_color_pair)(void);                // Pointer to the reset_color_pair function used by the buffered console.
+    int (*init_pair)(int pair, int fg, int bg);    // Pointer to the init_pair function used by the buffered console.')
+    void (*setcolor)(bool fg, int color);	   // Pointer to the setcolor function used by the buffered console.)
+    int (*curs_set)(int visibility);               // Pointer to the curs_set function used by the buffered console.
+    int (*read)(int *buf); 		           // Pointer to the read function used by the buffered console.
     int (*twait)(int, int, int* EVENTLIST_2nd(_nc_eventlist*)); 
     int (*mvcur)(int yold, int xold, int y, int x);
     int (*doupdate)(void);
-} LegacyConsoleInterface;
-extern NCURSES_EXPORT_VAR(LegacyConsoleInterface *) _nc_LEGACYCONSOLE;
-#define LEGACYCONSOLE (*_nc_LEGACYCONSOLE)
+} ScreenBufferedConsoleInterface;
+extern NCURSES_EXPORT_VAR(ScreenBufferedConsoleInterface *) _nc_SCREENBUFFEREDCONSOLE;
+#define SCREENBUFFEREDCONSOLE (*_nc_SCREENBUFFEREDCONSOLE)
 
 #if USE_WIDEC_SUPPORT
 #define write_screen WriteConsoleOutputW
@@ -2634,9 +2636,9 @@ extern NCURSES_EXPORT_VAR(LegacyConsoleInterface *) _nc_LEGACYCONSOLE;
 #define MouseFifoHasEvent(sp) (sp->_drv_mouse_head < sp->_drv_mouse_tail)
 #define IsMouseActive(sp) (sp->_mouse_active == true)
 
-#endif /* USE_LEGACY_CONSOLE */
+#endif /* USE_SCREENBUFFERED_CONSOLE */
 
-#if USE_MODERN_CONSOLE
+#if USE_CONPTY
 
 #if !defined(POLLIN)
 # define POLLIN  0x0001  // Input available (for stdin/pipe)
@@ -2668,7 +2670,7 @@ typedef struct {
 // Guaranteed to be statically initialzed.
 extern NCURSES_EXPORT_VAR(ConPtyInterface*) _nc_currentCONPTY;
 #define WINCONPTY (*_nc_currentCONPTY)
-#endif /* USE_MODERN_CONSOLE */
+#endif /* USE_CONPTY */
 
 #endif /* USE_CONSOLE_API */
 

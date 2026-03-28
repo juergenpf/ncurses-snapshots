@@ -357,8 +357,8 @@ NCURSES_SP_NAME(resize_term) (NCURSES_SP_DCLx int ToLines, int ToCols)
        (void *) SP_PARM, ToLines, ToCols,
        (SP_PARM == NULL) ? -1 : screen_lines(SP_PARM),
        (SP_PARM == NULL) ? -1 : screen_columns(SP_PARM)));
-#if USE_LEGACY_CONSOLE
-    if (IsLegacyConsole()) 
+#if USE_SCREENBUFFERED_CONSOLE
+    if (IsScreenBufferedConsole()) 
 	returnCode(ERR);   
 #endif
     if (SP_PARM == NULL || ToLines <= 0 || ToCols <= 0) {

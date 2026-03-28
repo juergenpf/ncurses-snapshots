@@ -59,7 +59,7 @@ NCURSES_EXPORT_VAR (chtype) acs_map[ACS_LEN] =
 };
 #endif
 
-#if USE_LEGACY_CONSOLE
+#if USE_SCREENBUFFERED_CONSOLE
 NCURSES_EXPORT(chtype)
 NCURSES_SP_NAME(_nc_acs_char) (NCURSES_SP_DCLx int c)
 {
@@ -75,7 +75,7 @@ NCURSES_SP_NAME(_nc_acs_char) (NCURSES_SP_DCLx int c)
 	;
     return map[c];
 }
-#endif /* USE_LEGACY_CONSOLE */
+#endif /* USE_SCREENBUFFERED_CONSOLE */
 
 NCURSES_EXPORT(void)
 NCURSES_SP_NAME(_nc_init_acs) (NCURSES_SP_DCL0)
@@ -166,9 +166,9 @@ NCURSES_SP_NAME(_nc_init_acs) (NCURSES_SP_DCL0)
     real_map['Y'] = '|';	/* vertical line */
     real_map['E'] = '+';	/* large plus or crossover */
 
-#if USE_LEGACY_CONSOLE
-    if (IsLegacyConsole()) {
-        LEGACYCONSOLE.init_acs(real_map);
+#if USE_SCREENBUFFERED_CONSOLE
+    if (IsScreenBufferedConsole()) {
+        SCREENBUFFEREDCONSOLE.init_acs(real_map);
         return;
     }
 #endif

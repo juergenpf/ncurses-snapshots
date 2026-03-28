@@ -186,9 +186,9 @@ NCURSES_SP_NAME(curs_set) (NCURSES_SP_DCLx int vis)
 	if (vis == cursor) {
 	    code = cursor;
 	} else {
-#if USE_LEGACY_CONSOLE
-	    if (IsLegacyConsole()) {
-		code = LEGACYCONSOLE.curs_set(vis);
+#if USE_SCREENBUFFERED_CONSOLE
+	    if (IsScreenBufferedConsole()) {
+		code = SCREENBUFFEREDCONSOLE.curs_set(vis);
 		if (code != ERR)
 		    SP_PARM->_cursor = vis;
 		returnCode(code);
@@ -335,9 +335,9 @@ _nc_keypad(SCREEN *sp, bool flag)
 	} else
 #endif
 	{
-#if USE_LEGACY_CONSOLE
-	    if (IsLegacyConsole()) 
-		return(LEGACYCONSOLE.keypad(flag));
+#if USE_SCREENBUFFERED_CONSOLE
+	    if (IsScreenBufferedConsole()) 
+		return(SCREENBUFFEREDCONSOLE.keypad(flag));
 #endif
 	    if (flag) {
 		(void) NCURSES_PUTP2_FLUSH("keypad_xmit", keypad_xmit);

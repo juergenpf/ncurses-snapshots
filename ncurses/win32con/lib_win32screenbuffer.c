@@ -35,7 +35,7 @@
 
 MODULE_ID("$Id$")
 
-#if USE_LEGACY_CONSOLE
+#if USE_SCREENBUFFERED_CONSOLE
 #include <stdint.h>
 #include <sys/time.h>
 
@@ -44,11 +44,11 @@ MODULE_ID("$Id$")
 
 #define EXP_OPTIMIZE 0
 
-#define DispatchMethod(name) legacy_##name
+#define DispatchMethod(name) screenbuffer_##name
 #define Dispatch(name) .name = DispatchMethod(name)
 #define NoDispatch(name) .name = NULL
 #define METHOD(name, type) static type DispatchMethod(name)
-#define T_METHOD(name,fmt) "called {legacy_console::legacy_" #name fmt
+#define T_METHOD(name,fmt) "called {lib_win32screenbuffer::screenbuffer_" #name fmt
 
 METHOD(init, bool)(int fdOut, int fdIn);
 METHOD(size, void)(int *Lines, int *Cols);
@@ -73,7 +73,7 @@ METHOD(twait,int)(int mode,int milliseconds,int *timeleft EVENTLIST_2nd(_nc_even
 METHOD(mvcur, int)(int yold, int xold, int y, int x);
 METHOD(doupdate, int)(void);
 
-static LegacyConsoleInterface legacyCONSOLE =
+static ScreenBufferedConsoleInterface legacyCONSOLE =
 	{
 		.core =
 			{
@@ -110,8 +110,8 @@ static LegacyConsoleInterface legacyCONSOLE =
 		Dispatch(mvcur),
 		Dispatch(doupdate)
 };
-NCURSES_EXPORT_VAR(LegacyConsoleInterface *)
-_nc_LEGACYCONSOLE = &legacyCONSOLE;
+NCURSES_EXPORT_VAR(ScreenBufferedConsoleInterface *)
+_nc_SCREENBUFFEREDCONSOLE = &legacyCONSOLE;
 
 #define RevAttr(attr) (WORD)(((attr) & 0xff00) |       \
 							 ((((attr) & 0x07) << 4) | \
@@ -196,7 +196,7 @@ MapKey(WORD vKey)
 	LONG key = GenMap(vKey, 0);
 
 	res = bsearch(&key,
-				  LEGACYCONSOLE.map,
+				  SCREENBUFFEREDCONSOLE.map,
 				  (size_t)(N_INI + FKEYS),
 				  sizeof(keylist[0]),
 				  keycompare);
@@ -221,7 +221,7 @@ AnsiKey(WORD vKey)
 	LONG key = GenMap(vKey, 0);
 
 	res = bsearch(&key,
-				  LEGACYCONSOLE.ansi_map,
+				  SCREENBUFFEREDCONSOLE.ansi_map,
 				  (size_t)(N_INI + FKEYS),
 				  sizeof(keylist[0]),
 				  keycompare);
@@ -240,23 +240,23 @@ static bool
 get_SBI(void)
 {
 	bool rc = false;
-	if (CORECONSOLE.getSBI(&(LEGACYCONSOLE.SBI)))
+	if (CORECONSOLE.getSBI(&(SCREENBUFFEREDCONSOLE.SBI)))
 	{
 		T(("GetConsoleScreenBufferInfo"));
 		T(("... buffer(X:%d Y:%d)",
-		   LEGACYCONSOLE.SBI.dwSize.X,
-		   LEGACYCONSOLE.SBI.dwSize.Y));
+		   SCREENBUFFEREDCONSOLE.SBI.dwSize.X,
+		   SCREENBUFFEREDCONSOLE.SBI.dwSize.Y));
 		T(("... window(X:%d Y:%d)",
-		   LEGACYCONSOLE.SBI.dwMaximumWindowSize.X,
-		   LEGACYCONSOLE.SBI.dwMaximumWindowSize.Y));
+		   SCREENBUFFEREDCONSOLE.SBI.dwMaximumWindowSize.X,
+		   SCREENBUFFEREDCONSOLE.SBI.dwMaximumWindowSize.Y));
 		T(("... cursor(X:%d Y:%d)",
-		   LEGACYCONSOLE.SBI.dwCursorPosition.X,
-		   LEGACYCONSOLE.SBI.dwCursorPosition.Y));
+		   SCREENBUFFEREDCONSOLE.SBI.dwCursorPosition.X,
+		   SCREENBUFFEREDCONSOLE.SBI.dwCursorPosition.Y));
 		T(("... display(Top:%d Bottom:%d Left:%d Right:%d)",
-		   LEGACYCONSOLE.SBI.srWindow.Top,
-		   LEGACYCONSOLE.SBI.srWindow.Bottom,
-		   LEGACYCONSOLE.SBI.srWindow.Left,
-		   LEGACYCONSOLE.SBI.srWindow.Right));
+		   SCREENBUFFEREDCONSOLE.SBI.srWindow.Top,
+		   SCREENBUFFEREDCONSOLE.SBI.srWindow.Bottom,
+		   SCREENBUFFEREDCONSOLE.SBI.srWindow.Left,
+		   SCREENBUFFEREDCONSOLE.SBI.srWindow.Right));
 		rc = true;
 	}
 	else
@@ -272,81 +272,81 @@ get_SBI(void)
  * retrieves the initial console screen buffer information, and sets up the color 
  * capabilities of the console. */
 NCURSES_EXPORT(void)
-_nc_legacy_console_init(void)
+_nc_screenbuffered_console_init(void)
 {
 	WORD a;
 	int i;
 	DWORD num_buttons;
 
-	LEGACYCONSOLE.map = (LPDWORD)malloc(sizeof(DWORD) * MAPSIZE);
-	LEGACYCONSOLE.rmap = (LPDWORD)malloc(sizeof(DWORD) * MAPSIZE);
-	LEGACYCONSOLE.ansi_map = (LPDWORD)malloc(sizeof(DWORD) * MAPSIZE);
+	SCREENBUFFEREDCONSOLE.map = (LPDWORD)malloc(sizeof(DWORD) * MAPSIZE);
+	SCREENBUFFEREDCONSOLE.rmap = (LPDWORD)malloc(sizeof(DWORD) * MAPSIZE);
+	SCREENBUFFEREDCONSOLE.ansi_map = (LPDWORD)malloc(sizeof(DWORD) * MAPSIZE);
 
 	for (i = 0; i < (N_INI + FKEYS); i++)
 	{
 		if (i < N_INI)
 		{
-			LEGACYCONSOLE.rmap[i] = LEGACYCONSOLE.map[i] =
+			SCREENBUFFEREDCONSOLE.rmap[i] = SCREENBUFFEREDCONSOLE.map[i] =
 				(DWORD)keylist[i];
-			LEGACYCONSOLE.ansi_map[i] = (DWORD)ansi_keys[i];
+			SCREENBUFFEREDCONSOLE.ansi_map[i] = (DWORD)ansi_keys[i];
 		}
 		else
 		{
-			LEGACYCONSOLE.rmap[i] = LEGACYCONSOLE.map[i] =
+			SCREENBUFFEREDCONSOLE.rmap[i] = SCREENBUFFEREDCONSOLE.map[i] =
 				(DWORD)GenMap((VK_F1 + (i - N_INI)),
 							  (KEY_F(1) + (i - N_INI)));
-			LEGACYCONSOLE.ansi_map[i] =
+			SCREENBUFFEREDCONSOLE.ansi_map[i] =
 				(DWORD)GenMap((VK_F1 + (i - N_INI)),
 							  (';' + (i - N_INI)));
 		}
 	}
-	qsort(LEGACYCONSOLE.ansi_map,
+	qsort(SCREENBUFFEREDCONSOLE.ansi_map,
 		  (size_t)(MAPSIZE),
 		  sizeof(keylist[0]),
 		  keycompare);
-	qsort(LEGACYCONSOLE.map,
+	qsort(SCREENBUFFEREDCONSOLE.map,
 		  (size_t)(MAPSIZE),
 		  sizeof(keylist[0]),
 		  keycompare);
-	qsort(LEGACYCONSOLE.rmap,
+	qsort(SCREENBUFFEREDCONSOLE.rmap,
 		  (size_t)(MAPSIZE),
 		  sizeof(keylist[0]),
 		  rkeycompare);
 
 	if (GetNumberOfConsoleMouseButtons(&num_buttons))
-		LEGACYCONSOLE.numButtons = (int)num_buttons;
+		SCREENBUFFEREDCONSOLE.numButtons = (int)num_buttons;
 	else
-		LEGACYCONSOLE.numButtons = 1;
+		SCREENBUFFEREDCONSOLE.numButtons = 1;
 
 	a = console_MapColor(TRUE, COLOR_WHITE) |
 		console_MapColor(FALSE, COLOR_BLACK);
 	for (i = 0; i < CON_NUMPAIRS; i++)
-		LEGACYCONSOLE.pairs[i] = a;
+		SCREENBUFFEREDCONSOLE.pairs[i] = a;
 
 	get_SBI();
-	GetConsoleCursorInfo(LEGACYCONSOLE.core.ConsoleHandleOut, &LEGACYCONSOLE.save_CI);
+	GetConsoleCursorInfo(SCREENBUFFEREDCONSOLE.core.ConsoleHandleOut, &SCREENBUFFEREDCONSOLE.save_CI);
 	T(("... initial cursor is %svisible, %d%%",
-	   (LEGACYCONSOLE.save_CI.bVisible ? "" : "not-"),
-	   (int)LEGACYCONSOLE.save_CI.dwSize));
+	   (SCREENBUFFEREDCONSOLE.save_CI.bVisible ? "" : "not-"),
+	   (int)SCREENBUFFEREDCONSOLE.save_CI.dwSize));
 
-	LEGACYCONSOLE.info.initcolor = TRUE;
-	LEGACYCONSOLE.info.canchange = FALSE;
-	LEGACYCONSOLE.info.hascolor = TRUE;
-	LEGACYCONSOLE.info.caninit = TRUE;
-	LEGACYCONSOLE.info.maxpairs = CON_NUMPAIRS;
-	LEGACYCONSOLE.info.maxcolors = 8;
-	LEGACYCONSOLE.info.numlabels = 0;
-	LEGACYCONSOLE.info.labelwidth = 0;
-	LEGACYCONSOLE.info.labelheight = 0;
-	LEGACYCONSOLE.info.nocolorvideo = 1;
-	LEGACYCONSOLE.info.tabsize = 8;
-	LEGACYCONSOLE.info.numbuttons = LEGACYCONSOLE.numButtons;
-	LEGACYCONSOLE.info.defaultPalette = _nc_cga_palette;
+	SCREENBUFFEREDCONSOLE.info.initcolor = TRUE;
+	SCREENBUFFEREDCONSOLE.info.canchange = FALSE;
+	SCREENBUFFEREDCONSOLE.info.hascolor = TRUE;
+	SCREENBUFFEREDCONSOLE.info.caninit = TRUE;
+	SCREENBUFFEREDCONSOLE.info.maxpairs = CON_NUMPAIRS;
+	SCREENBUFFEREDCONSOLE.info.maxcolors = 8;
+	SCREENBUFFEREDCONSOLE.info.numlabels = 0;
+	SCREENBUFFEREDCONSOLE.info.labelwidth = 0;
+	SCREENBUFFEREDCONSOLE.info.labelheight = 0;
+	SCREENBUFFEREDCONSOLE.info.nocolorvideo = 1;
+	SCREENBUFFEREDCONSOLE.info.tabsize = 8;
+	SCREENBUFFEREDCONSOLE.info.numbuttons = SCREENBUFFEREDCONSOLE.numButtons;
+	SCREENBUFFEREDCONSOLE.info.defaultPalette = _nc_cga_palette;
 }
 
 METHOD(termname, char *)(bool longname)
 {
-	assert(IsLegacyConsole());
+	assert(IsScreenBufferedConsole());
 	return longname ? "Windows Legacy Console" : "#win32console";
 }
 
@@ -358,7 +358,7 @@ METHOD(adjust_size, bool)(void)
 
 	T((T_METHOD(adjust_size," ")));
 
-	assert(IsLegacyConsole());
+	assert(IsScreenBufferedConsole());
 
 	if (HasConsoleResizeLimitations())
 	{
@@ -371,7 +371,7 @@ METHOD(adjust_size, bool)(void)
 	 * In older Versions of Windows (before Windows 10), the conhost behaves differently
 	 * when resizing the console window.
 	 */
-	if (!GetConsoleScreenBufferInfo(LEGACYCONSOLE.core.ConsoleHandleOut, &csbi))
+	if (!GetConsoleScreenBufferInfo(SCREENBUFFEREDCONSOLE.core.ConsoleHandleOut, &csbi))
 	{
 		T(("GetConsoleScreenBufferInfo failed"));
 		returnBool(res);
@@ -381,11 +381,11 @@ METHOD(adjust_size, bool)(void)
 	newSize.Y = (short)(csbi.srWindow.Bottom - csbi.srWindow.Top + 1);
 
 	T(("New console size: %d x %d", newSize.X, newSize.Y));
-	SetConsoleScreenBufferSize(LEGACYCONSOLE.core.ConsoleHandleOut, newSize);
+	SetConsoleScreenBufferSize(SCREENBUFFEREDCONSOLE.core.ConsoleHandleOut, newSize);
 
-	LEGACYCONSOLE.core.getSBI(&(LEGACYCONSOLE.SBI));
-	LEGACYCONSOLE.core.sbi_lines = newSize.Y;
-	LEGACYCONSOLE.core.sbi_cols = newSize.X;
+	SCREENBUFFEREDCONSOLE.core.getSBI(&(SCREENBUFFEREDCONSOLE.SBI));
+	SCREENBUFFEREDCONSOLE.core.sbi_lines = newSize.Y;
+	SCREENBUFFEREDCONSOLE.core.sbi_cols = newSize.X;
 	res = TRUE;
 
 	returnBool(res);
@@ -395,7 +395,7 @@ METHOD(termattrs, chtype)(void)
 {
 	chtype res = A_NORMAL;
 
-	assert(IsLegacyConsole());
+	assert(IsScreenBufferedConsole());
 
 	res |= (A_BOLD | A_DIM | A_REVERSE | A_STANDOUT | A_COLOR);
 	return res;
@@ -408,7 +408,7 @@ METHOD(keypad, int)(bool flag)
 
 	T((T_METHOD(keypad,"(%d)"), flag));
 
-	assert(IsLegacyConsole());
+	assert(IsScreenBufferedConsole());
 
 	sp = ConsoleScreen();
 	if (sp)
@@ -426,12 +426,12 @@ METHOD(beeporflash, int)(bool beepFlag)
 	int high, wide, max_cells;
 	int i;
 
-	assert(IsLegacyConsole());
+	assert(IsScreenBufferedConsole());
 
-	high = (LEGACYCONSOLE.SBI.srWindow.Bottom -
-				LEGACYCONSOLE.SBI.srWindow.Top + 1);
-	wide = (LEGACYCONSOLE.SBI.srWindow.Right -
-				LEGACYCONSOLE.SBI.srWindow.Left + 1);
+	high = (SCREENBUFFEREDCONSOLE.SBI.srWindow.Bottom -
+				SCREENBUFFEREDCONSOLE.SBI.srWindow.Top + 1);
+	wide = (SCREENBUFFEREDCONSOLE.SBI.srWindow.Right -
+				SCREENBUFFEREDCONSOLE.SBI.srWindow.Left + 1);
 	max_cells = (high * wide);
 
 	MakeArray(this_screen, CHAR_INFO, max_cells);
@@ -440,10 +440,10 @@ METHOD(beeporflash, int)(bool beepFlag)
 	SMALL_RECT this_region;
 	COORD bufferCoord;
 
-	this_region.Top = LEGACYCONSOLE.SBI.srWindow.Top;
-	this_region.Left = LEGACYCONSOLE.SBI.srWindow.Left;
-	this_region.Bottom = LEGACYCONSOLE.SBI.srWindow.Bottom;
-	this_region.Right = LEGACYCONSOLE.SBI.srWindow.Right;
+	this_region.Top = SCREENBUFFEREDCONSOLE.SBI.srWindow.Top;
+	this_region.Left = SCREENBUFFEREDCONSOLE.SBI.srWindow.Left;
+	this_region.Bottom = SCREENBUFFEREDCONSOLE.SBI.srWindow.Bottom;
+	this_region.Right = SCREENBUFFEREDCONSOLE.SBI.srWindow.Right;
 
 	this_size.X = (SHORT)wide;
 	this_size.Y = (SHORT)high;
@@ -452,7 +452,7 @@ METHOD(beeporflash, int)(bool beepFlag)
 	bufferCoord.Y = this_region.Top;
 
 	if (!beepFlag &&
-		read_screen(LEGACYCONSOLE.core.ConsoleHandleOut,
+		read_screen(SCREENBUFFEREDCONSOLE.core.ConsoleHandleOut,
 					this_screen,
 					this_size,
 					bufferCoord,
@@ -469,10 +469,10 @@ METHOD(beeporflash, int)(bool beepFlag)
 				RevAttr(that_screen[i].Attributes);
 		}
 
-		write_screen(LEGACYCONSOLE.core.ConsoleHandleOut, that_screen, this_size,
+		write_screen(SCREENBUFFEREDCONSOLE.core.ConsoleHandleOut, that_screen, this_size,
 					 bufferCoord, &this_region);
 		Sleep(200);
-		write_screen(LEGACYCONSOLE.core.ConsoleHandleOut, this_screen, this_size,
+		write_screen(SCREENBUFFEREDCONSOLE.core.ConsoleHandleOut, this_screen, this_size,
 					 bufferCoord, &this_region);
 	}
 	else
@@ -493,10 +493,10 @@ METHOD(keyok, int)(int keycode, int flag)
 
 	T((T_METHOD(keyok,"(%d, %d)"), keycode, flag));
 
-	assert(IsLegacyConsole());
+	assert(IsScreenBufferedConsole());
 
 	res = bsearch(&key,
-				  LEGACYCONSOLE.rmap,
+				  SCREENBUFFEREDCONSOLE.rmap,
 				  (size_t)(N_INI + FKEYS),
 				  sizeof(keylist[0]),
 				  rkeycompare);
@@ -521,10 +521,10 @@ METHOD(has_key, int)(int keycode)
 
 	T((T_METHOD(has_key,"(%d)"), keycode));
 
-	assert(IsLegacyConsole());
+	assert(IsScreenBufferedConsole());
 
 	res = bsearch(&key,
-				  LEGACYCONSOLE.rmap,
+				  SCREENBUFFEREDCONSOLE.rmap,
 				  (size_t)(N_INI + FKEYS),
 				  sizeof(keylist[0]),
 				  rkeycompare);
@@ -576,7 +576,7 @@ METHOD(init_acs, void)(chtype *real_map)
 	unsigned n;
 	SCREEN *sp;
 
-	assert(IsLegacyConsole());
+	assert(IsScreenBufferedConsole());
 
 	sp = ConsoleScreen();
 	for (n = 0; n < SIZEOF(table); ++n)
@@ -593,9 +593,9 @@ METHOD(reset_color_pair, bool)(void)
 	bool res = false;
 	WORD a = FOREGROUND_BLUE | FOREGROUND_RED | FOREGROUND_GREEN;
 
-	assert(IsLegacyConsole());
+	assert(IsScreenBufferedConsole());
 
-	SetConsoleTextAttribute(LEGACYCONSOLE.core.ConsoleHandleOut, a);
+	SetConsoleTextAttribute(SCREENBUFFEREDCONSOLE.core.ConsoleHandleOut, a);
 	get_SBI();
 	res = true;
 	return res;
@@ -606,12 +606,12 @@ METHOD(init_pair, int)(int pair, int f, int b)
 	int code = ERR;
 	int num_colors;
 
-	assert(IsLegacyConsole());
+	assert(IsScreenBufferedConsole());
 
-	num_colors = LEGACYCONSOLE.info.maxcolors;
+	num_colors = SCREENBUFFEREDCONSOLE.info.maxcolors;
 	if ((pair > 0) && (pair < CON_NUMPAIRS) && (f >= 0) && (f < num_colors) && (b >= 0) && (b < num_colors))
 	{
-		LEGACYCONSOLE.pairs[pair] =
+		SCREENBUFFEREDCONSOLE.pairs[pair] =
 			console_MapColor(TRUE, f) |
 			console_MapColor(FALSE, b);
 		T(("... legacy_init_pair: pair %d: fg=%d, bg=%d", pair, f, b));
@@ -624,10 +624,10 @@ METHOD(setcolor, void)(bool fore, int color)
 {
 	WORD a = console_MapColor(fore, color);
 
-	assert(IsLegacyConsole());
+	assert(IsScreenBufferedConsole());
 
-	a |= (WORD)((LEGACYCONSOLE.SBI.wAttributes) & ((fore) ? 0xfff8 : 0xff8f));
-	SetConsoleTextAttribute(LEGACYCONSOLE.core.ConsoleHandleOut, a);
+	a |= (WORD)((SCREENBUFFEREDCONSOLE.SBI.wAttributes) & ((fore) ? 0xfff8 : 0xff8f));
+	SetConsoleTextAttribute(SCREENBUFFEREDCONSOLE.core.ConsoleHandleOut, a);
 	get_SBI();
 }
 
@@ -638,9 +638,9 @@ METHOD(curs_set, int)(int visibility)
 
 	T((T_METHOD(curs_set,"(%d)"), visibility));
 
-	assert(IsLegacyConsole());
+	assert(IsScreenBufferedConsole());
 
-	this_CI = LEGACYCONSOLE.save_CI;
+	this_CI = SCREENBUFFEREDCONSOLE.save_CI;
 	switch (visibility)
 	{
 	case 0:
@@ -652,7 +652,7 @@ METHOD(curs_set, int)(int visibility)
 		this_CI.dwSize = 100;
 		break;
 	}
-	SetConsoleCursorInfo(LEGACYCONSOLE.core.ConsoleHandleOut, &this_CI);
+	SetConsoleCursorInfo(SCREENBUFFEREDCONSOLE.core.ConsoleHandleOut, &this_CI);
 	returnCode(res);
 }
 
@@ -685,7 +685,7 @@ filter_button_events(const SCREEN *sp, int mask)
 
 	if (mask & RIGHTMOST_BUTTON_PRESSED)
 	{
-		switch (LEGACYCONSOLE.numButtons)
+		switch (SCREENBUFFEREDCONSOLE.numButtons)
 		{
 		case 1:
 			result |= BUTTON1_PRESSED;
@@ -781,13 +781,13 @@ METHOD(read, int)(int *buf)
 
 	T((T_METHOD(read,"(%p)"), buf));
 
-	assert(IsLegacyConsole());
+	assert(IsScreenBufferedConsole());
 
 	sp = ConsoleScreen();
 	assert(buf);
 	assert(sp);
 
-	hdl = LEGACYCONSOLE.core.ConsoleHandleIn;
+	hdl = SCREENBUFFEREDCONSOLE.core.ConsoleHandleIn;
 	memset(&inp_rec, 0, sizeof(inp_rec));
 
 	while ((b = (bool)read_keycode(hdl, &inp_rec, 1, &nRead)))
@@ -897,10 +897,10 @@ METHOD(twait,int)(int mode, int milliseconds, int *timeleft EVENTLIST_2nd(_nc_ev
 	TR(TRACE_IEVENT, ("start twait: %d milliseconds, mode: %d",
 				  milliseconds, mode));
 
-	assert(IsLegacyConsole());
+	assert(IsScreenBufferedConsole());
 
 	sp = ConsoleScreen();
-	hdl = LEGACYCONSOLE.core.ConsoleHandleIn;
+	hdl = SCREENBUFFEREDCONSOLE.core.ConsoleHandleIn;
 	assert(sp);
 
 #ifdef NCURSES_WGETCH_EVENTS
@@ -1143,10 +1143,10 @@ METHOD(setmode, int)(int fd GCC_UNUSED, const TTY *arg)
 
 	T((T_METHOD(setmode,"(fd=%d, TTY*=%p)"), fd, arg));
 
-	assert(IsLegacyConsole());
+	assert(IsScreenBufferedConsole());
 
-	input_target = LEGACYCONSOLE.core.ConsoleHandleIn;
-	output_target = LEGACYCONSOLE.core.ConsoleHandleOut;
+	input_target = SCREENBUFFEREDCONSOLE.core.ConsoleHandleIn;
+	output_target = SCREENBUFFEREDCONSOLE.core.ConsoleHandleOut;
 	sp = ConsoleScreen();
 
 	if (!arg)
@@ -1186,11 +1186,11 @@ METHOD(setmode, int)(int fd GCC_UNUSED, const TTY *arg)
 			DWORD realMode;
 			if (GetConsoleMode(input_target, &realMode))
 			{
-				LEGACYCONSOLE.core.ttyflags.dwFlagIn = realMode;
+				SCREENBUFFEREDCONSOLE.core.ttyflags.dwFlagIn = realMode;
 			}
 			else
 			{
-				LEGACYCONSOLE.core.ttyflags.dwFlagIn = mode;
+				SCREENBUFFEREDCONSOLE.core.ttyflags.dwFlagIn = mode;
 			}
 		}
 		else
@@ -1211,11 +1211,11 @@ METHOD(setmode, int)(int fd GCC_UNUSED, const TTY *arg)
 			DWORD realMode;
 			if (GetConsoleMode(output_target, &realMode))
 			{
-				LEGACYCONSOLE.core.ttyflags.dwFlagOut = realMode;
+				SCREENBUFFEREDCONSOLE.core.ttyflags.dwFlagOut = realMode;
 			}
 			else
 			{
-				LEGACYCONSOLE.core.ttyflags.dwFlagOut = mode;
+				SCREENBUFFEREDCONSOLE.core.ttyflags.dwFlagOut = mode;
 			}
 		}
 		else
@@ -1236,21 +1236,21 @@ METHOD(setmode, int)(int fd GCC_UNUSED, const TTY *arg)
 				NCURSES_SP_NAME(_nc_flush)(sp);
 			}
 
-			if (LEGACYCONSOLE.hShellMode != INVALID_HANDLE_VALUE)
+			if (SCREENBUFFEREDCONSOLE.hShellMode != INVALID_HANDLE_VALUE)
 			{
-				T(("... LEGACYCONSOLE: switching to shell mode buffer"));
-				LEGACYCONSOLE.core.ConsoleHandleOut = LEGACYCONSOLE.hShellMode;
-				SetConsoleActiveScreenBuffer(LEGACYCONSOLE.core.ConsoleHandleOut);
-				SetConsoleCursorInfo(LEGACYCONSOLE.core.ConsoleHandleOut, &LEGACYCONSOLE.save_CI);
+				T(("... SCREENBUFFEREDCONSOLE: switching to shell mode buffer"));
+				SCREENBUFFEREDCONSOLE.core.ConsoleHandleOut = SCREENBUFFEREDCONSOLE.hShellMode;
+				SetConsoleActiveScreenBuffer(SCREENBUFFEREDCONSOLE.core.ConsoleHandleOut);
+				SetConsoleCursorInfo(SCREENBUFFEREDCONSOLE.core.ConsoleHandleOut, &SCREENBUFFEREDCONSOLE.save_CI);
 			}
 			else
 			{
-				T(("... LEGACYCONSOLE: no valid shell mode buffer"));
+				T(("... SCREENBUFFEREDCONSOLE: no valid shell mode buffer"));
 			}
 		}
 		else
 		{
-			T(("... LEGACYCONSOLE: Already in shell mode"));
+			T(("... SCREENBUFFEREDCONSOLE: Already in shell mode"));
 		}
 	}
 	else if (arg->kind == TTY_MODE_PROGRAM)
@@ -1265,21 +1265,21 @@ METHOD(setmode, int)(int fd GCC_UNUSED, const TTY *arg)
 					_nc_keypad(sp, TRUE);
 			}
 
-			if (LEGACYCONSOLE.hProgMode != INVALID_HANDLE_VALUE)
+			if (SCREENBUFFEREDCONSOLE.hProgMode != INVALID_HANDLE_VALUE)
 			{
-				T(("... LEGACYCONSOLE: switching to program mode buffer"));
-				LEGACYCONSOLE.core.ConsoleHandleOut = LEGACYCONSOLE.hProgMode;
-				SetConsoleActiveScreenBuffer(LEGACYCONSOLE.core.ConsoleHandleOut);
-				SetConsoleCursorInfo(LEGACYCONSOLE.core.ConsoleHandleOut, &LEGACYCONSOLE.save_CI);
+				T(("... SCREENBUFFEREDCONSOLE: switching to program mode buffer"));
+				SCREENBUFFEREDCONSOLE.core.ConsoleHandleOut = SCREENBUFFEREDCONSOLE.hProgMode;
+				SetConsoleActiveScreenBuffer(SCREENBUFFEREDCONSOLE.core.ConsoleHandleOut);
+				SetConsoleCursorInfo(SCREENBUFFEREDCONSOLE.core.ConsoleHandleOut, &SCREENBUFFEREDCONSOLE.save_CI);
 			}
 			else
 			{
-				T(("... LEGACYCONSOLE: no valid program mode buffer"));
+				T(("... SCREENBUFFEREDCONSOLE: no valid program mode buffer"));
 			}
 		}
 		else
 		{
-			T(("... LEGACYCONSOLE: Already in program mode"));
+			T(("... SCREENBUFFEREDCONSOLE: Already in program mode"));
 		}
 	}
 
@@ -1306,12 +1306,12 @@ METHOD(getmode, int)(int fd GCC_UNUSED, TTY *arg)
 {
 	T((T_METHOD(getmode,"(fd=%d, TTY*=%p)"), fd, arg));
 
-	assert(IsLegacyConsole());
+	assert(IsScreenBufferedConsole());
 
 	if (NULL == arg)
 		returnCode(ERR);
 
-	*arg = LEGACYCONSOLE.core.ttyflags;
+	*arg = SCREENBUFFEREDCONSOLE.core.ttyflags;
 	arg->kind = TTY_MODE_UNSPECIFIED;
 	returnCode(OK);
 }
@@ -1334,7 +1334,7 @@ METHOD(defmode, int)(TTY *arg, short kind)
 
 	T((T_METHOD(defmode,"(TTY*=%p, kind=%d)"), arg, kind));
 
-	assert(IsLegacyConsole());
+	assert(IsScreenBufferedConsole());
 
 	if (NULL == arg)
 		returnCode(ERR);
@@ -1351,14 +1351,14 @@ METHOD(defmode, int)(TTY *arg, short kind)
 METHOD(size, void)(int *Lines, int *Cols)
 {
 
-	assert(IsLegacyConsole());
+	assert(IsScreenBufferedConsole());
 
 	if (Lines != NULL && Cols != NULL)
 	{
-		*Lines = (int)(LEGACYCONSOLE.SBI.srWindow.Bottom + 1 -
-					   LEGACYCONSOLE.SBI.srWindow.Top);
-		*Cols = (int)(LEGACYCONSOLE.SBI.srWindow.Right + 1 -
-					  LEGACYCONSOLE.SBI.srWindow.Left);
+		*Lines = (int)(SCREENBUFFEREDCONSOLE.SBI.srWindow.Bottom + 1 -
+					   SCREENBUFFEREDCONSOLE.SBI.srWindow.Top);
+		*Cols = (int)(SCREENBUFFEREDCONSOLE.SBI.srWindow.Right + 1 -
+					  SCREENBUFFEREDCONSOLE.SBI.srWindow.Left);
 		T(("win32_driver::legacy_size() returns %d lines, %d cols", *Lines, *Cols));
 	}
 }
@@ -1368,7 +1368,7 @@ METHOD(size_changed, bool)(void)
 	bool resized = false;
 	T((T_METHOD(size_changed,"()")));
 
-	assert(IsLegacyConsole());
+	assert(IsScreenBufferedConsole());
 
 	if (HasConsolePendingResize())
 	{
@@ -1397,7 +1397,7 @@ METHOD(init, bool)(int fdOut, int fdIn)
 
 	T((T_METHOD(init,"(fdOut=%d, fdIn=%d)"), fdOut, fdIn));
 
-	assert(IsLegacyConsole());
+	assert(IsScreenBufferedConsole());
 
 	/* initialize once, or not at all */
 	if (!IsConsoleInitialized())
@@ -1424,7 +1424,7 @@ METHOD(init, bool)(int fdOut, int fdIn)
 			FILE_SHARE_WRITE,
 			NULL, OPEN_EXISTING, 0, NULL);
 
-		LEGACYCONSOLE.hShellMode = stdout_handle;
+		SCREENBUFFEREDCONSOLE.hShellMode = stdout_handle;
 
 		// JPF FIXME - In theory there can be scenarios, where ConPTY is not supported, but UCRT is availabe. We need to think through how to deal with that.
 		// encoding_init();
@@ -1435,7 +1435,7 @@ METHOD(init, bool)(int fdOut, int fdIn)
 			T(("Output handle is not a console"));
 			returnBool(false);
 		}
-		LEGACYCONSOLE.core.ConsoleHandleOut = stdout_handle;
+		SCREENBUFFEREDCONSOLE.core.ConsoleHandleOut = stdout_handle;
 
 		if (stdin_handle == INVALID_HANDLE_VALUE || GetConsoleMode(stdin_handle,
 																   &dwFlag) == 0)
@@ -1443,7 +1443,7 @@ METHOD(init, bool)(int fdOut, int fdIn)
 			T(("StdIn handle is not a console"));
 			returnBool(false);
 		}
-		LEGACYCONSOLE.core.ConsoleHandleIn = stdin_handle;
+		SCREENBUFFEREDCONSOLE.core.ConsoleHandleIn = stdin_handle;
 
 		SetConsoleMode(stdout_handle, dwFlagOut);
 		/* We immediately read the console mode back to reflect any changes the
@@ -1454,7 +1454,7 @@ METHOD(init, bool)(int fdOut, int fdIn)
 			T(("GetConsoleMode() failed for stdout"));
 			returnBool(false);
 		}
-		LEGACYCONSOLE.core.ttyflags.dwFlagOut = dwFlagOut;
+		SCREENBUFFEREDCONSOLE.core.ttyflags.dwFlagOut = dwFlagOut;
 
 		dwFlagIn &= ~(ENABLE_QUICK_EDIT_MODE);
 		SetConsoleMode(stdin_handle, dwFlagIn);
@@ -1466,24 +1466,24 @@ METHOD(init, bool)(int fdOut, int fdIn)
 			T(("GetConsoleMode() failed for stdin"));
 			returnBool(false);
 		}
-		LEGACYCONSOLE.core.ttyflags.dwFlagIn = dwFlagIn;
+		SCREENBUFFEREDCONSOLE.core.ttyflags.dwFlagIn = dwFlagIn;
 
-		_nc_legacy_console_init();
+		_nc_screenbuffered_console_init();
 
-		LEGACYCONSOLE.core.ConsoleHandleIn = stdin_handle;
-		LEGACYCONSOLE.core.ConsoleHandleOut = stdout_handle;
+		SCREENBUFFEREDCONSOLE.core.ConsoleHandleIn = stdin_handle;
+		SCREENBUFFEREDCONSOLE.core.ConsoleHandleOut = stdout_handle;
 
-		if (LEGACYCONSOLE.hProgMode == INVALID_HANDLE_VALUE)
+		if (SCREENBUFFEREDCONSOLE.hProgMode == INVALID_HANDLE_VALUE)
 		{
 			T(("... creating console buffer"));
-			LEGACYCONSOLE.hProgMode =
+			SCREENBUFFEREDCONSOLE.hProgMode =
 				CreateConsoleScreenBuffer(GENERIC_READ | GENERIC_WRITE,
 										  FILE_SHARE_READ | FILE_SHARE_WRITE,
 										  NULL,
 										  CONSOLE_TEXTMODE_BUFFER,
 										  NULL);
 		}
-		if (LEGACYCONSOLE.hProgMode == INVALID_HANDLE_VALUE || GetConsoleMode(LEGACYCONSOLE.hProgMode, &dwFlagOut) == 0)
+		if (SCREENBUFFEREDCONSOLE.hProgMode == INVALID_HANDLE_VALUE || GetConsoleMode(SCREENBUFFEREDCONSOLE.hProgMode, &dwFlagOut) == 0)
 		{
 			T(("Output handle is not a console"));
 			returnBool(false);
@@ -1504,11 +1504,11 @@ METHOD(mvcur,int)(int oldrow GCC_UNUSED, int oldcol GCC_UNUSED, int newrow, int 
 	int result = ERR;
 	COORD pos;
 
-	assert(IsLegacyConsole());
+	assert(IsScreenBufferedConsole());
 
 	pos.X = (SHORT)newcol;
 	pos.Y = (SHORT)newrow;
-	if (SetConsoleCursorPosition(LEGACYCONSOLE.core.ConsoleHandleOut, pos))
+	if (SetConsoleCursorPosition(SCREENBUFFEREDCONSOLE.core.ConsoleHandleOut, pos))
 	{
 		result = OK;
 	}
@@ -1526,7 +1526,7 @@ MapAttr(WORD res, attr_t ch)
 		if (p >= 0 && p < CON_NUMPAIRS)
 		{
 			WORD a;
-			a = LEGACYCONSOLE.pairs[p];
+			a = SCREENBUFFEREDCONSOLE.pairs[p];
 			res = (WORD)((res & 0xff00) | a);
 		}
 	}
@@ -1575,7 +1575,7 @@ con_write16(int y, int x, cchar_t *str, int limit)
 		if (isWidecExt(ch))
 			continue;
 		ci[actual].CharInfoChar = CharOf(ch);
-		ci[actual].Attributes = MapAttr(LEGACYCONSOLE.SBI.wAttributes,
+		ci[actual].Attributes = MapAttr(SCREENBUFFEREDCONSOLE.SBI.wAttributes,
 										AttrOf(ch));
 		if (AttrOf(ch) & A_ALTCHARSET)
 		{
@@ -1605,7 +1605,7 @@ con_write16(int y, int x, cchar_t *str, int limit)
 	rec.Right = (SHORT)(x + limit - 1);
 	rec.Bottom = rec.Top;
 
-	return (bool)write_screen(LEGACYCONSOLE.core.ConsoleHandleOut, ci, siz, loc, &rec);
+	return (bool)write_screen(SCREENBUFFEREDCONSOLE.core.ConsoleHandleOut, ci, siz, loc, &rec);
 }
 
 
@@ -1625,7 +1625,7 @@ con_write8(int y, int x, chtype *str, int n)
 	{
 		ch = str[i];
 		ci[i].CharInfoChar = ChCharOf(ch);
-		ci[i].Attributes = MapAttr(LEGACYCONSOLE.SBI.wAttributes,
+		ci[i].Attributes = MapAttr(SCREENBUFFEREDCONSOLE.SBI.wAttributes,
 								   ChAttrOf(ch));
 		if (ChAttrOf(ch) & A_ALTCHARSET)
 		{
@@ -1645,7 +1645,7 @@ con_write8(int y, int x, chtype *str, int n)
 	rec.Right = (short)(x + n - 1);
 	rec.Bottom = rec.Top;
 
-	return (bool)write_screen(LEGACYCONSOLE.core.ConsoleHandleOut, ci, siz, loc, &rec);
+	return (bool)write_screen(SCREENBUFFEREDCONSOLE.core.ConsoleHandleOut, ci, siz, loc, &rec);
 }
 #define con_write(y, x, str, n) con_write8(y, x, str, n)
 #endif
@@ -1753,7 +1753,7 @@ METHOD(doupdate,int)(void)
 
 	T((T_METHOD(doupdate,"()")));
 
-	assert(IsLegacyConsole());
+	assert(IsScreenBufferedConsole());
 
 	sp = ConsoleScreen();
 
@@ -1887,11 +1887,11 @@ METHOD(doupdate,int)(void)
 	{
 		CurScreen(sp)->_curx = NewScreen(sp)->_curx;
 		CurScreen(sp)->_cury = NewScreen(sp)->_cury;
-		LEGACYCONSOLE.mvcur(0, 0, CurScreen(sp)->_cury, CurScreen(sp)->_curx);
+		SCREENBUFFEREDCONSOLE.mvcur(0, 0, CurScreen(sp)->_cury, CurScreen(sp)->_curx);
 	}
 	// selectActiveHandle();
 	result = OK;
 
 	returnCode(result);
 }
-#endif /* USE_LEGACY_CONSOLE */
+#endif /* USE_SCREENBUFFERED_CONSOLE */

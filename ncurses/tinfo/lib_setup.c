@@ -470,11 +470,11 @@ _nc_get_screensize(SCREEN *sp,
 {
     int my_tabsize;
 
-#if USE_LEGACY_CONSOLE
+#if USE_SCREENBUFFERED_CONSOLE
     assert(linep != NULL && colp != NULL);
-    if (IsLegacyConsole()) {
-	my_tabsize = LEGACYCONSOLE.info.tabsize;
-	LEGACYCONSOLE.core.size(linep, colp);
+    if (IsScreenBufferedConsole()) {
+	my_tabsize = SCREENBUFFEREDCONSOLE.info.tabsize;
+	SCREENBUFFEREDCONSOLE.core.size(linep, colp);
 #if USE_REENTRANT
         if (sp != NULL) {
 	    sp->_TABSIZE = my_tabsize;
@@ -486,14 +486,14 @@ _nc_get_screensize(SCREEN *sp,
     T(("TABSIZE = %d", my_tabsize));
     }
     returnVoid
-#endif /* !USE_LEGACY_CONSOLE */
+#endif /* !USE_SCREENBUFFERED_CONSOLE */
 
     TERMINAL *termp = cur_term;
     bool useEnv = _nc_prescreen.use_env;
     bool useTioctl = _nc_prescreen.use_tioctl;
 
     T((T_CALLED("_nc_get_screensize (%p)"), (void *) sp));
-#if USE_MODERN_CONSOLE
+#if USE_CONPTY
     /* If we are here, then Windows console is used in terminfo mode.
        We need to figure out the size using the console API
      */
@@ -628,18 +628,18 @@ _nc_update_screensize(SCREEN *sp)
     int old_cols;
     TERMINAL *termp = cur_term;
 
-#if USE_LEGACY_CONSOLE
+#if USE_SCREENBUFFERED_CONSOLE
     assert(sp != NULL);
-    if (IsLegacyConsole()) {
+    if (IsScreenBufferedConsole()) {
 	old_lines = CORECONSOLE.sbi_lines;
 	old_cols = CORECONSOLE.sbi_cols;
-	LEGACYCONSOLE.adjust_size();
+	SCREENBUFFEREDCONSOLE.adjust_size();
 	// JPF TODO FIXME : Not sure we can let run that through for legacy console... need to check.
     } else {
 #endif
        old_lines = lines;
        old_cols = columns;
-#if USE_LEGACY_CONSOLE
+#if USE_SCREENBUFFERED_CONSOLE
    }
 #endif
 
@@ -849,9 +849,9 @@ _nc_setupterm(const char *tname,
 
     if (tname == NULL) {
 	tname = getenv("TERM");
-#if USE_LEGACY_CONSOLE
-    if (IsLegacyConsole()) {
-	tname = LEGACYCONSOLE.termname(FALSE);
+#if USE_SCREENBUFFERED_CONSOLE
+    if (IsScreenBufferedConsole()) {
+	tname = SCREENBUFFEREDCONSOLE.termname(FALSE);
     } else {
 	if (!VALID_TERM_ENV(tname, NO_TERMINAL)) {
 	    T(("Failure with TERM=%s", NonNull(tname)));
@@ -954,8 +954,8 @@ _nc_setupterm(const char *tname,
 	}
 
 	if (status != TGETENT_YES) {
-#if USE_LEGACY_CONSOLE
-	    if (IsLegacyConsole()) {
+#if USE_SCREENBUFFERED_CONSOLE
+	    if (IsScreenBufferedConsole()) {
 		/* Legacy console has no terminfo entry; initialize with defaults */
 		_nc_init_termtype(&TerminalType(termp));
 		status = TGETENT_YES;

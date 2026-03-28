@@ -46,8 +46,8 @@
 
 MODULE_ID("$Id: lib_slkrefr.c,v 1.35 2025/12/27 12:41:23 tom Exp $")
 
-#if USE_LEGACY_CONSOLE
-#define NumLabels      (IsLegacyConsole() ? LEGACYCONSOLE.info.numlabels : num_labels)
+#if USE_SCREENBUFFERED_CONSOLE
+#define NumLabels      (IsScreenBufferedConsole() ? SCREENBUFFEREDCONSOLE.info.numlabels : num_labels)
 #else
 #define NumLabels      num_labels
 #endif

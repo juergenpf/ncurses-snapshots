@@ -63,9 +63,9 @@ NCURSES_SP_NAME(flash) (NCURSES_SP_DCL0)
     int res = ERR;
 
     T((T_CALLED("flash(%p)"), (void *) SP_PARM));
-#if USE_LEGACY_CONSOLE
-    if (IsLegacyConsole())
-        returnCode(LEGACYCONSOLE.beeporflash(FALSE));
+#if USE_SCREENBUFFERED_CONSOLE
+    if (IsScreenBufferedConsole())
+        returnCode(SCREENBUFFEREDCONSOLE.beeporflash(FALSE));
 #endif
     if (HasTerminal(SP_PARM)) {
 	    /* FIXME: should make sure that we are not in altchar mode */

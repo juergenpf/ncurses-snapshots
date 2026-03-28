@@ -43,8 +43,8 @@
 #define CUR SP_TERMTYPE
 #endif
 
-#if USE_LEGACY_CONSOLE
-#define MaxColors      (IsLegacyConsole() ? LEGACYCONSOLE.info.maxcolors : max_colors)
+#if USE_SCREENBUFFERED_CONSOLE
+#define MaxColors      (IsScreenBufferedConsole() ? SCREENBUFFEREDCONSOLE.info.maxcolors : max_colors)
 #else
 #define MaxColors      max_colors
 #endif

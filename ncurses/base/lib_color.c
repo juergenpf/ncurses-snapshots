@@ -51,13 +51,13 @@
 
 MODULE_ID("$Id: lib_color.c,v 1.157 2025/12/27 12:31:03 tom Exp $")
 
-#if USE_LEGACY_CONSOLE
-#define CanChange      (IsLegacyConsole() ? LEGACYCONSOLE.info.canchange : can_change)
-#define DefaultPalette (IsLegacyConsole() ? LEGACYCONSOLE.info.defaultPalette : (hue_lightness_saturation ? hls_palette : cga_palette))
-#define HasColor       (IsLegacyConsole() ? LEGACYCONSOLE.info.hascolor : has_color)
-#define InitColor      (IsLegacyConsole() ? LEGACYCONSOLE.info.initcolor : (initialize_color!=NULL))
-#define MaxColors      (IsLegacyConsole() ? LEGACYCONSOLE.info.maxcolors : max_colors)
-#define MaxPairs       (IsLegacyConsole() ? LEGACYCONSOLE.info.maxpairs : max_pairs)
+#if USE_SCREENBUFFERED_CONSOLE
+#define CanChange      (IsScreenBufferedConsole() ? SCREENBUFFEREDCONSOLE.info.canchange : can_change)
+#define DefaultPalette (IsScreenBufferedConsole() ? SCREENBUFFEREDCONSOLE.info.defaultPalette : (hue_lightness_saturation ? hls_palette : cga_palette))
+#define HasColor       (IsScreenBufferedConsole() ? SCREENBUFFEREDCONSOLE.info.hascolor : has_color)
+#define InitColor      (IsScreenBufferedConsole() ? SCREENBUFFEREDCONSOLE.info.initcolor : (initialize_color!=NULL))
+#define MaxColors      (IsScreenBufferedConsole() ? SCREENBUFFEREDCONSOLE.info.maxcolors : max_colors)
+#define MaxPairs       (IsScreenBufferedConsole() ? SCREENBUFFEREDCONSOLE.info.maxpairs : max_pairs)
 #define UseHlsPalette  (DefaultPalette == _nc_hls_palette)
 #else
 #define CanChange      can_change
@@ -131,7 +131,7 @@ static const color_t hls_palette[] =
     DATA(	0,	50,	100),		/* COLOR_WHITE */
 };
 
-#if USE_LEGACY_CONSOLE
+#if USE_SCREENBUFFERED_CONSOLE
 NCURSES_EXPORT_VAR(const color_t*) _nc_cga_palette = cga_palette;
 NCURSES_EXPORT_VAR(const color_t*) _nc_hls_palette = hls_palette;
 #endif
@@ -178,9 +178,9 @@ toggled_colors(int c)
 static void
 set_background_color(NCURSES_SP_DCLx int bg, NCURSES_SP_OUTC outc)
 {
-#if USE_LEGACY_CONSOLE
-    if (IsLegacyConsole()) {
-	LEGACYCONSOLE.setcolor(FALSE, bg);
+#if USE_SCREENBUFFERED_CONSOLE
+    if (IsScreenBufferedConsole()) {
+	SCREENBUFFEREDCONSOLE.setcolor(FALSE, bg);
 	return;
     }
 #endif
@@ -200,9 +200,9 @@ set_background_color(NCURSES_SP_DCLx int bg, NCURSES_SP_OUTC outc)
 static void
 set_foreground_color(NCURSES_SP_DCLx int fg, NCURSES_SP_OUTC outc)
 {
-#if USE_LEGACY_CONSOLE
-    if (IsLegacyConsole()) {
-	LEGACYCONSOLE.setcolor(TRUE, fg);
+#if USE_SCREENBUFFERED_CONSOLE
+    if (IsScreenBufferedConsole()) {
+	SCREENBUFFEREDCONSOLE.setcolor(TRUE, fg);
 	return;
     }
 #endif
@@ -308,9 +308,9 @@ static bool
 reset_color_pair(NCURSES_SP_DCL0)
 {
     bool result = false;
-#if USE_LEGACY_CONSOLE
-    if (IsLegacyConsole()) {
-	return LEGACYCONSOLE.reset_color_pair();
+#if USE_SCREENBUFFERED_CONSOLE
+    if (IsScreenBufferedConsole()) {
+	return SCREENBUFFEREDCONSOLE.reset_color_pair();
     }
 #endif
 
@@ -337,8 +337,8 @@ NCURSES_SP_NAME(_nc_reset_colors) (NCURSES_SP_DCL0)
 	SP_PARM->_color_defs = -(SP_PARM->_color_defs);
     if (reset_color_pair(NCURSES_SP_ARG))
 	result = TRUE;
-#if USE_LEGACY_CONSOLE
-    if (IsLegacyConsole()) {
+#if USE_SCREENBUFFERED_CONSOLE
+    if (IsScreenBufferedConsole()) {
 	returnBool(FALSE);
     }
 #endif
@@ -660,9 +660,9 @@ _nc_init_pair(SCREEN *sp, int pair, int f, int b)
     if (GET_SCREEN_PAIR(sp) == pair)
 	SET_SCREEN_PAIR(sp, (int) (~0));	/* force attribute update */
 
-#if USE_LEGACY_CONSOLE
-    if (IsLegacyConsole()) {
-	returnCode(LEGACYCONSOLE.init_pair(pair, f, b));
+#if USE_SCREENBUFFERED_CONSOLE
+    if (IsScreenBufferedConsole()) {
+	returnCode(SCREENBUFFEREDCONSOLE.init_pair(pair, f, b));
     }
 #endif
     if (initialize_pair && InPalette(f) && InPalette(b)) {
@@ -804,9 +804,9 @@ NCURSES_SP_NAME(has_colors) (NCURSES_SP_DCL0)
     (void) SP_PARM;
     T((T_CALLED("has_colors(%p)"), (void *) SP_PARM));
     if (HasTerminal(SP_PARM)) {
-#if USE_LEGACY_CONSOLE
-	if (IsLegacyConsole()) {
-	    code = LEGACYCONSOLE.info.hascolor;
+#if USE_SCREENBUFFERED_CONSOLE
+	if (IsScreenBufferedConsole()) {
+	    code = SCREENBUFFEREDCONSOLE.info.hascolor;
 	    returnBool(code);
 	}
 #endif

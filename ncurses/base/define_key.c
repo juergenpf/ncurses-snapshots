@@ -47,8 +47,8 @@ NCURSES_SP_NAME(define_key) (NCURSES_SP_DCLx const char *str, int keycode)
     } else if (keycode > 0) {
 	unsigned ukey = (unsigned) keycode;
 
-#if USE_LEGACY_CONSOLE
-#define CallHasKey(keycode) (IsLegacyConsole() ? LEGACYCONSOLE.has_key(keycode) : NCURSES_SP_NAME(has_key)(NCURSES_SP_ARGx keycode))
+#if USE_SCREENBUFFERED_CONSOLE
+#define CallHasKey(keycode) (IsScreenBufferedConsole() ? SCREENBUFFEREDCONSOLE.has_key(keycode) : NCURSES_SP_NAME(has_key)(NCURSES_SP_ARGx keycode))
 #else
 #define CallHasKey(keycode) NCURSES_SP_NAME(has_key)(NCURSES_SP_ARGx keycode)
 #endif
