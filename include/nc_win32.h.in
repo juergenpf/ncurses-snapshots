@@ -39,13 +39,14 @@
 
 #include <ncurses_cfg.h>
 
-#if defined(_WIN32) || defined(_WIN64) || defined(USE_WIN32CON_DRIVER)
-
-#if @USE_NAMED_PIPES@	/* USE_NAMED_PIPES */
+#if defined(_WIN32) || defined(_WIN64)
 
 #ifndef _NC_WINDOWS_NATIVE
 #  define _NC_WINDOWS_NATIVE
 #endif
+
+#if @USE_CONPTY@	/* USE_CONPTY */
+
 
 #ifdef TERMIOS
 #error TERMIOS must not be defined on Windows
@@ -71,7 +72,7 @@
 
 #include <windows.h>
 
-#else /* !USE_NAMED_PIPES */
+#else /* !USE_CONPTY */
 
 #ifdef WINVER
 #  if WINVER < 0x0501
@@ -94,11 +95,11 @@
 #undef sleep
 #define sleep(n) Sleep((DWORD)((n) * 1000))
 
-#endif /* USE_NAMED_PIPES */
+#endif /* USE_CONPTY */
 
 #include <stdint.h>		/* for uint32_t */
 
-#if defined(USE_WIN32CON_DRIVER) && defined(_UCRT)
+#if USE_SCREENBUFFERED_CONSOLE && defined(_UCRT) && !USE_CONPTY
 # warning Using the legacy console code in UCRT environments may lead to unexpected behaviour. Most legacy sysems need special updates to even support UCRT.
 #endif
 /*

@@ -470,11 +470,10 @@ _nc_get_screensize(SCREEN *sp,
 {
     int my_tabsize;
 
-#if USE_SCREENBUFFERED_CONSOLE
+#if USE_CONSOLE_API
     assert(linep != NULL && colp != NULL);
     if (IsScreenBufferedConsole()) {
 	my_tabsize = SCREENBUFFEREDCONSOLE.info.tabsize;
-	SCREENBUFFEREDCONSOLE.core.size(linep, colp);
 #if USE_REENTRANT
         if (sp != NULL) {
 	    sp->_TABSIZE = my_tabsize;
@@ -483,8 +482,9 @@ _nc_get_screensize(SCREEN *sp,
         (void) sp;
         TABSIZE = my_tabsize;
 #endif
-    T(("TABSIZE = %d", my_tabsize));
+        T(("TABSIZE = %d", my_tabsize));
     }
+    CORECONSOLE.size(linep, colp);
     returnVoid
 #endif /* !USE_SCREENBUFFERED_CONSOLE */
 

@@ -131,9 +131,45 @@ hooks for interop, I recommend using these options:
 	--enable-database
 	--disable-termcap
 	--enable-sp-funcs
-	--enable-term-driver
-	--enable-named-pipes
+	--enable-conpty
+	--disable-win-console
 	--enable-interop
+
+The two relevant configure options for Windows are:
+
+--enable-conpty
+  This option compiles ncurses with support for the Windows Pseudo-Console that is
+  available since Windows 10 Version 1809 (released October 2018). In this configuration
+  ncurses on Windows fully supports terminfo and behaves identical to the implementation
+  on UNIX based systems. If you target the universal C runtime (UCRT) - which has full
+  support for UTF-8 locales - you also get a fully functional wide character version of
+  ncurses on Windows.
+
+--enable-win-console
+  This option compiles ncurses with support for older Windows versions (before Windows 10 1809).
+  It uses a console screen buffer of the Windows console API to render display content. It
+  supports the upper layers of the ncurses library (curses,panel,menu,form), but NOT terminfo.
+  The reason is simply, that the classicaö console is not a character device terminal, but A
+  buffer oriented display device.
+
+You can use both of these options together to compile a ncurses library that automatically uses
+the best implementation on the detected Windows platform. On modern Windows, it will automatically
+use ConPTY, on older Windows it uses the screen buffered console and doesn't support terminfo.
+But be aware, if you target older Windows platforms, you should not target UCRT as C runtime, but
+stay with msvcrt. The reason is, that older Windows version do usually not support UCRT out of the
+box. UCRT was introduced with Windows 10 and is avaiable on older Windows versions (back to Windows 8
+and some Server versions) as an optional install. 
+
+In theory you can also use --enable-win-console only and dismiss ConPTY completely. The downside of this
+approach is, that there are issues when using the classical screen buffered console on newer Windows systems.
+The newer Windows systems were built with ConPTY in mind to have better support for terminal based tools
+in the Windows console (ssh, WSL2, docker etc.). Certain aspects of the traditional API may not work as
+expected in that context, and the way how the traditional API is supported varies between the Windows
+versions and the different console hosts (e.g. Windows Terminal, conhost, VS Code etc.)
+
+So my clear recommendation is: compile with --enable-win-console only if you have to support older windows
+versions, but always also compile with --enable-conpty to ensure you use the pseudo console interface on
+recent Windows versions.
 
 The following example demonstrates the configuration command line which I am using 
 at the moment, assuming you are in your ncurses source directory. I assume you have 
@@ -180,8 +216,8 @@ $ ../configure \
 	--without-shared \
 	--without-manpages \
 	--without-libtool \
-	--enable-term-driver \
-	--enable-named-pipes \
+	--disable-win-console \
+	--enable-conpty \
 	--without-pkg-config \
 	--with-fallbacks=ms-terminal \
 	--disable-reentrant \

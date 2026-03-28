@@ -112,9 +112,6 @@ conpty_supported(void)
 	} else
 	    result = true;
     }
-#ifdef SIMULATE_CONPTY_UNSUPPORTED
-    result = false;
-#endif
     if (result == true) {
 		HANDLE hOut = GetStdHandle(STD_OUTPUT_HANDLE);
 		if (hOut == INVALID_HANDLE_VALUE) {

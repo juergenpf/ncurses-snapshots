@@ -414,25 +414,18 @@ typedef TRIES {
 
 #include <term.priv.h>		/* defines TERMIOS via term.h */
 
-// FIXME - USE_CONPTY and/orUSE_SCREENBUFFERED_CONSOLE should be set by autoconf. USE_NAMED_PIPES and USE_WIN32CON_DRIVER should disappear.
-#if USE_NAMED_PIPES || USE_CONPTY
-#  ifdef USE_CONPTY
-#    undef USE_CONPTY
-#  endif
+#ifndef USE_CONPTY
+# define USE_CONPTY 0
+#endif
+#ifndef USE_SCREENBUFFERED_CONSOLE
+# define USE_SCREENBUFFERED_CONSOLE 0
+#endif
+
+#if USE_CONPTY
 #  if defined(TERMIOS)
 #     error Unsupported configuration: named pipes and conpty are only supported on Windows
 #  endif
-#  define USE_CONPTY 1
-#else
-#  define USE_CONPTY 0
 #endif /* USE_NAMED_PIPES || USE_CONPTY */
-
-#undef USE_SCREENBUFFERED_CONSOLE
-#if defined(USE_WIN32CON_DRIVER)
-# define USE_SCREENBUFFERED_CONSOLE 1
-#else
-# define USE_SCREENBUFFERED_CONSOLE 0
-#endif /* USE_WIN32CON_DRIVER */
 
 #undef USE_CONSOLE_API
 #if USE_CONPTY || USE_SCREENBUFFERED_CONSOLE
