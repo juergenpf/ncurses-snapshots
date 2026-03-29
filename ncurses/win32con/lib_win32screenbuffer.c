@@ -343,6 +343,7 @@ _nc_screenbuffered_console_init(void)
 	SCREENBUFFEREDCONSOLE.info.nocolorvideo = 1;
 	SCREENBUFFEREDCONSOLE.info.tabsize = 8;
 	SCREENBUFFEREDCONSOLE.info.numbuttons = 1;
+	SCREENBUFFEREDCONSOLE.info.wacs_map = NULL;
 }
 
 METHOD(termname, const char *)(bool longname)
@@ -580,12 +581,13 @@ METHOD(init_acs, void)(chtype *real_map)
 	assert(IsScreenBufferedConsole());
 
 	sp = ConsoleScreen();
+	assert(sp);
+
 	for (n = 0; n < SIZEOF(table); ++n)
 	{
 		real_map[table[n].acs_code] =
 			(chtype)table[n].use_code | A_ALTCHARSET;
-		if (sp != NULL)
-			sp->_screen_acs_map[table[n].acs_code] = TRUE;
+		sp->_screen_acs_map[table[n].acs_code] = TRUE;
 	}
 }
 
@@ -1274,7 +1276,7 @@ METHOD(setmode, int)(int fd GCC_UNUSED, const TTY *arg)
 			if (sp)
 			{
 				_nc_keypad(sp, FALSE);
-				NCURSES_SP_NAME(_nc_flush)(sp);
+				SCREENBUFFEREDCONSOLE.core.flush(sp->_ifd);
 			}
 
 			if (SCREENBUFFEREDCONSOLE.hShellMode != INVALID_HANDLE_VALUE)
@@ -1606,7 +1608,7 @@ METHOD(writeat,bool)(int y, int x, const cchar_t *str, int limit)
 	SMALL_RECT rec;
 	int i;
 	cchar_t ch;
-	SCREEN *sp = ConsoleScreen();
+	// JPF unused: SCREEN *sp = ConsoleScreen();
 
 
 	for (i = actual = 0; i < limit; i++)
@@ -1619,12 +1621,12 @@ METHOD(writeat,bool)(int y, int x, const cchar_t *str, int limit)
 										AttrOf(ch));
 		if (AttrOf(ch) & A_ALTCHARSET)
 		{
-			if (_nc_wacs)
+			if (SCREENBUFFEREDCONSOLE.info.wacs_map)
 			{
 				int which = CharOf(ch);
-				if (which > 0 && which < ACS_LEN && CharOf(_nc_wacs[which]) != 0)
+				if (which > 0 && which < ACS_LEN && CharOf(SCREENBUFFEREDCONSOLE.info.wacs_map[which]) != 0)
 				{
-					ci[actual].CharInfoChar = CharOf(_nc_wacs[which]);
+					ci[actual].CharInfoChar = CharOf(SCREENBUFFEREDCONSOLE.info.wacs_map[which]);
 				}
 				else
 				{
@@ -1650,6 +1652,8 @@ METHOD(writeat,bool)(int y, int x, const cchar_t *str, int limit)
 
 
 #else
+#define ACS_CHAR(sp,c) (c<0 || c>=ACS_LEN ? (chtype)0 : (sp)->_acs_map[c])
+
 METHOD(writeat,bool)(int y, int x, const chtype *str, int limit)
 {
 	MakeArray(ci, CHAR_INFO, limit);
@@ -1669,7 +1673,7 @@ METHOD(writeat,bool)(int y, int x, const chtype *str, int limit)
 		{
 			if (sp->_acs_map)
 				ci[i].CharInfoChar =
-					ChCharOf(NCURSES_SP_NAME(_nc_acs_char)(sp, ChCharOf(ch)));
+					ChCharOf(ACS_CHAR(sp, ChCharOf(ch)));
 		}
 	}
 

@@ -59,24 +59,6 @@ NCURSES_EXPORT_VAR (chtype) acs_map[ACS_LEN] =
 };
 #endif
 
-#if USE_SCREENBUFFERED_CONSOLE
-NCURSES_EXPORT(chtype)
-NCURSES_SP_NAME(_nc_acs_char) (NCURSES_SP_DCLx int c)
-{
-    chtype *map;
-    if (c < 0 || c >= ACS_LEN)
-	return (chtype) 0;
-    map = (SP_PARM != NULL) ? SP_PARM->_acs_map :
-#if BROKEN_LINKER || USE_REENTRANT
-	_nc_prescreen.real_acs_map
-#else
-	acs_map
-#endif
-	;
-    return map[c];
-}
-#endif /* USE_SCREENBUFFERED_CONSOLE */
-
 NCURSES_EXPORT(void)
 NCURSES_SP_NAME(_nc_init_acs) (NCURSES_SP_DCL0)
 {

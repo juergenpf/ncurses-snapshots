@@ -2568,6 +2568,9 @@ typedef struct _termInfo
     int  numlabels;
     int  labelwidth;
     int  labelheight;
+#if USE_WIDEC_SUPPORT
+    cchar_t *wacs_map;
+#endif
 } TerminalInfo;
 
 extern NCURSES_EXPORT_VAR(const color_t*) _nc_cga_palette;

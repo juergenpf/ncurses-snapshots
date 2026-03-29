@@ -251,6 +251,9 @@ lib_win32conpty          lib        $(tinfo)    $(HEADER_DEPS)
 
 # MinGW, using Console API only
 @ port_win32con
+gettimeofday			 lib		$(win32con)	$(HEADER_DEPS)
+wcwidth				     lib        $(win32con)	$(HEADER_DEPS)
+widechars	             lib        $(wide)		$(HEADER_DEPS)
 lib_win32concore         lib		$(tinfo)	$(HEADER_DEPS)
 lib_win32screenbuffer    lib        $(win32con) $(HEADER_DEPS)
 
