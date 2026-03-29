@@ -365,7 +365,7 @@ wGet_wchar(WINDOW *win, wint_t *result)
 #else
     c = wget_wch(win, result);
 #endif
-    if (c < 0) {
+    if (c < 0 && wgetdelay(win) < 0) {
 	failed("wGet_wchar");
     }
     return c;
