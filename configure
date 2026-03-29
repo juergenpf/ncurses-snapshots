@@ -28260,9 +28260,19 @@ test "x$with_ext_funcs" = xyes && LIB_SUBSETS="${LIB_SUBSETS}+ext_tinfo"
 case "$cf_cv_system_name" in
 (*mingw32*|*mingw64*)
 	if test "x$with_conpty" = xyes; then
-		LIB_SUBSETS="${LIB_SUBSETS}+port_win32"
+	    if test "x$with_windows_console" = xyes; then
+		    LIB_SUBSETS="${LIB_SUBSETS}+port_win32"
+        else
+		    LIB_SUBSETS="${LIB_SUBSETS}+port_win32_conpty"
+	    fi
 	else
-		LIB_SUBSETS="${LIB_SUBSETS}+port_win32con"
+	    if test "x$with_windows_console" = xyes; then
+		    LIB_SUBSETS="${LIB_SUBSETS}+port_win32con"
+		else
+		    { { echo "$as_me:28272: error: \"On Windows" >&5
+echo "$as_me: error: \"On Windows" >&2;}
+   { (exit either --enable-conpty); exit either --enable-conpty; }; }
+		fi
 	fi
 	;;
 (*msys*|*cygwin*)
@@ -28286,7 +28296,7 @@ case "$cf_cv_system_name" in
 	;;
 esac
 
-echo "$as_me:28289: result: $LIB_SUBSETS" >&5
+echo "$as_me:28299: result: $LIB_SUBSETS" >&5
 echo "${ECHO_T}$LIB_SUBSETS" >&6
 
 ### Construct the list of include-directories to be generated
@@ -28317,7 +28327,7 @@ elif test "$includedir" != "/usr/include"; then
 fi
 
 ### Build up pieces for makefile rules
-echo "$as_me:28320: checking default library suffix" >&5
+echo "$as_me:28330: checking default library suffix" >&5
 echo $ECHO_N "checking default library suffix... $ECHO_C" >&6
 
 	case $DFT_LWR_MODEL in
@@ -28328,10 +28338,10 @@ echo $ECHO_N "checking default library suffix... $ECHO_C" >&6
 	(shared)  DFT_ARG_SUFFIX=''   ;;
 	esac
 	test -n "$LIB_SUFFIX" && DFT_ARG_SUFFIX="${LIB_SUFFIX}${DFT_ARG_SUFFIX}"
-echo "$as_me:28331: result: $DFT_ARG_SUFFIX" >&5
+echo "$as_me:28341: result: $DFT_ARG_SUFFIX" >&5
 echo "${ECHO_T}$DFT_ARG_SUFFIX" >&6
 
-echo "$as_me:28334: checking default library-dependency suffix" >&5
+echo "$as_me:28344: checking default library-dependency suffix" >&5
 echo $ECHO_N "checking default library-dependency suffix... $ECHO_C" >&6
 
 	case X$DFT_LWR_MODEL in
@@ -28414,10 +28424,10 @@ echo $ECHO_N "checking default library-dependency suffix... $ECHO_C" >&6
 		DFT_LIB_SUFFIX="${LIB_SUFFIX}${EXTRA_SUFFIX}${DFT_LIB_SUFFIX}"
 		DFT_DEP_SUFFIX="${LIB_SUFFIX}${EXTRA_SUFFIX}${DFT_DEP_SUFFIX}"
 	fi
-echo "$as_me:28417: result: $DFT_DEP_SUFFIX" >&5
+echo "$as_me:28427: result: $DFT_DEP_SUFFIX" >&5
 echo "${ECHO_T}$DFT_DEP_SUFFIX" >&6
 
-echo "$as_me:28420: checking default object directory" >&5
+echo "$as_me:28430: checking default object directory" >&5
 echo $ECHO_N "checking default object directory... $ECHO_C" >&6
 
 	case $DFT_LWR_MODEL in
@@ -28433,11 +28443,11 @@ echo $ECHO_N "checking default object directory... $ECHO_C" >&6
 			DFT_OBJ_SUBDIR='obj_s' ;;
 		esac
 	esac
-echo "$as_me:28436: result: $DFT_OBJ_SUBDIR" >&5
+echo "$as_me:28446: result: $DFT_OBJ_SUBDIR" >&5
 echo "${ECHO_T}$DFT_OBJ_SUBDIR" >&6
 
 if test "x$cf_with_cxx" = xyes ; then
-echo "$as_me:28440: checking c++ library-dependency suffix" >&5
+echo "$as_me:28450: checking c++ library-dependency suffix" >&5
 echo $ECHO_N "checking c++ library-dependency suffix... $ECHO_C" >&6
 if test "$with_libtool" != "no"; then
 	# libtool thinks it can make c++ shared libraries (perhaps only g++)
@@ -28530,7 +28540,7 @@ else
 	fi
 
 fi
-echo "$as_me:28533: result: $CXX_LIB_SUFFIX" >&5
+echo "$as_me:28543: result: $CXX_LIB_SUFFIX" >&5
 echo "${ECHO_T}$CXX_LIB_SUFFIX" >&6
 
 fi
@@ -28700,19 +28710,19 @@ fi
 
 if test -n "$LDFLAGS_STATIC" && test -n "$LDFLAGS_SHARED"
 then
-	echo "$as_me:28703: checking if linker supports switching between static/dynamic" >&5
+	echo "$as_me:28713: checking if linker supports switching between static/dynamic" >&5
 echo $ECHO_N "checking if linker supports switching between static/dynamic... $ECHO_C" >&6
 
 	rm -f libconftest.a
 	cat >conftest.$ac_ext <<EOF
-#line 28708 "configure"
+#line 28718 "configure"
 #include <stdio.h>
 int cf_ldflags_static(FILE *fp) { return fflush(fp); }
 EOF
-	if { (eval echo "$as_me:28712: \"$ac_compile\"") >&5
+	if { (eval echo "$as_me:28722: \"$ac_compile\"") >&5
   (eval $ac_compile) 2>&5
   ac_status=$?
-  echo "$as_me:28715: \$? = $ac_status" >&5
+  echo "$as_me:28725: \$? = $ac_status" >&5
   (exit "$ac_status"); } ; then
 		( $AR $ARFLAGS libconftest.a conftest.$OBJEXT ) 2>&5 1>/dev/null
 		( eval $RANLIB libconftest.a ) 2>&5 >/dev/null
@@ -28723,10 +28733,10 @@ EOF
 
 	LIBS="$LDFLAGS_STATIC -L`pwd` -lconftest $LDFLAGS_DYNAMIC $LIBS"
 	cat >"conftest.$ac_ext" <<_ACEOF
-#line 28726 "configure"
+#line 28736 "configure"
 #include "confdefs.h"
 
-#line 28729 "configure"
+#line 28739 "configure"
 #include <stdio.h>
 int cf_ldflags_static(FILE *fp);
 
@@ -28741,16 +28751,16 @@ main (void)
 }
 _ACEOF
 rm -f "conftest.$ac_objext" "conftest$ac_exeext"
-if { (eval echo "$as_me:28744: \"$ac_link\"") >&5
+if { (eval echo "$as_me:28754: \"$ac_link\"") >&5
   (eval $ac_link) 2>&5
   ac_status=$?
-  echo "$as_me:28747: \$? = $ac_status" >&5
+  echo "$as_me:28757: \$? = $ac_status" >&5
   (exit "$ac_status"); } &&
          { ac_try='test -s "conftest$ac_exeext"'
-  { (eval echo "$as_me:28750: \"$ac_try\"") >&5
+  { (eval echo "$as_me:28760: \"$ac_try\"") >&5
   (eval $ac_try) 2>&5
   ac_status=$?
-  echo "$as_me:28753: \$? = $ac_status" >&5
+  echo "$as_me:28763: \$? = $ac_status" >&5
   (exit "$ac_status"); }; }; then
 
 	# some linkers simply ignore the -dynamic
@@ -28773,7 +28783,7 @@ rm -f "conftest.$ac_objext" "conftest$ac_exeext" "conftest.$ac_ext"
 	rm -f libconftest.*
 	LIBS="$cf_save_LIBS"
 
-	echo "$as_me:28776: result: $cf_ldflags_static" >&5
+	echo "$as_me:28786: result: $cf_ldflags_static" >&5
 echo "${ECHO_T}$cf_ldflags_static" >&6
 
 	if test "$cf_ldflags_static" != yes
@@ -28789,7 +28799,7 @@ fi
 	;;
 esac
 
-echo "$as_me:28792: checking where we will install curses.h" >&5
+echo "$as_me:28802: checking where we will install curses.h" >&5
 echo $ECHO_N "checking where we will install curses.h... $ECHO_C" >&6
 
 includesubdir=
@@ -28799,7 +28809,7 @@ if test "$with_overwrite" = no && \
 then
 	includesubdir="/ncurses${ABI_SUFFIX}"
 fi
-echo "$as_me:28802: result: ${includedir}${includesubdir}" >&5
+echo "$as_me:28812: result: ${includedir}${includesubdir}" >&5
 echo "${ECHO_T}${includedir}${includesubdir}" >&6
 
 ### Resolve a conflict between normal and wide-curses by forcing applications
@@ -28807,7 +28817,7 @@ echo "${ECHO_T}${includedir}${includesubdir}" >&6
 if test "$with_overwrite" != no ; then
 if test "$NCURSES_LIBUTF8" = 1 ; then
 	NCURSES_LIBUTF8='defined(HAVE_LIBUTF8_H)'
-	{ echo "$as_me:28810: WARNING: Wide-character applications must define HAVE_LIBUTF8_H to include curses.h" >&5
+	{ echo "$as_me:28820: WARNING: Wide-character applications must define HAVE_LIBUTF8_H to include curses.h" >&5
 echo "$as_me: WARNING: Wide-character applications must define HAVE_LIBUTF8_H to include curses.h" >&2;}
 fi
 fi
@@ -28832,7 +28842,7 @@ EOF
 
 # pkgsrc uses these
 
-echo "$as_me:28835: checking for desired basename for form library" >&5
+echo "$as_me:28845: checking for desired basename for form library" >&5
 echo $ECHO_N "checking for desired basename for form library... $ECHO_C" >&6
 
 # Check whether --with-form-libname or --without-form-libname was given.
@@ -28852,10 +28862,10 @@ case "x$FORM_NAME" in
 	;;
 esac
 
-echo "$as_me:28855: result: $FORM_NAME" >&5
+echo "$as_me:28865: result: $FORM_NAME" >&5
 echo "${ECHO_T}$FORM_NAME" >&6
 
-echo "$as_me:28858: checking for desired basename for menu library" >&5
+echo "$as_me:28868: checking for desired basename for menu library" >&5
 echo $ECHO_N "checking for desired basename for menu library... $ECHO_C" >&6
 
 # Check whether --with-menu-libname or --without-menu-libname was given.
@@ -28875,10 +28885,10 @@ case "x$MENU_NAME" in
 	;;
 esac
 
-echo "$as_me:28878: result: $MENU_NAME" >&5
+echo "$as_me:28888: result: $MENU_NAME" >&5
 echo "${ECHO_T}$MENU_NAME" >&6
 
-echo "$as_me:28881: checking for desired basename for panel library" >&5
+echo "$as_me:28891: checking for desired basename for panel library" >&5
 echo $ECHO_N "checking for desired basename for panel library... $ECHO_C" >&6
 
 # Check whether --with-panel-libname or --without-panel-libname was given.
@@ -28898,10 +28908,10 @@ case "x$PANEL_NAME" in
 	;;
 esac
 
-echo "$as_me:28901: result: $PANEL_NAME" >&5
+echo "$as_me:28911: result: $PANEL_NAME" >&5
 echo "${ECHO_T}$PANEL_NAME" >&6
 
-echo "$as_me:28904: checking for desired basename for cxx library" >&5
+echo "$as_me:28914: checking for desired basename for cxx library" >&5
 echo $ECHO_N "checking for desired basename for cxx library... $ECHO_C" >&6
 
 # Check whether --with-cxx-libname or --without-cxx-libname was given.
@@ -28921,13 +28931,13 @@ case "x$CXX_NAME" in
 	;;
 esac
 
-echo "$as_me:28924: result: $CXX_NAME" >&5
+echo "$as_me:28934: result: $CXX_NAME" >&5
 echo "${ECHO_T}$CXX_NAME" >&6
 
 ### Construct the list of subdirectories for which we'll customize makefiles
 ### with the appropriate compile-rules.
 
-echo "$as_me:28930: checking for src modules" >&5
+echo "$as_me:28940: checking for src modules" >&5
 echo $ECHO_N "checking for src modules... $ECHO_C" >&6
 
 # dependencies and linker-arguments for test-programs
@@ -28986,7 +28996,7 @@ eval TEST_ROOT="\$${cf_map_lib_basename}_NAME"
 		fi
 	fi
 done
-echo "$as_me:28989: result: $cf_cv_src_modules" >&5
+echo "$as_me:28999: result: $cf_cv_src_modules" >&5
 echo "${ECHO_T}$cf_cv_src_modules" >&6
 
 TEST_ARGS="-L${LIB_DIR} $TEST_ARGS"
@@ -29125,7 +29135,7 @@ case "x${ac_cv_header_termios_h}${ac_cv_header_termio_h}${ac_cv_header_sgtty_h}$
 	(*mingw32*|*mingw64*|*-msvc*)
 		;;
 	(*)
-		{ { echo "$as_me:29128: error: No termio/termios/sgtty found" >&5
+		{ { echo "$as_me:29138: error: No termio/termios/sgtty found" >&5
 echo "$as_me: error: No termio/termios/sgtty found" >&2;}
    { (exit 1); exit 1; }; }
 		;;
@@ -29137,7 +29147,7 @@ esac
 
 # Extract the first word of "tbl", so it can be a program name with args.
 set dummy tbl; ac_word=$2
-echo "$as_me:29140: checking for $ac_word" >&5
+echo "$as_me:29150: checking for $ac_word" >&5
 echo $ECHO_N "checking for $ac_word... $ECHO_C" >&6
 if test "${ac_cv_path_NROFF_TBL+set}" = set; then
   echo $ECHO_N "(cached) $ECHO_C" >&6
@@ -29154,7 +29164,7 @@ for ac_dir in $ac_dummy; do
   test -z "$ac_dir" && ac_dir=.
   if $as_executable_p "$ac_dir/$ac_word"; then
    ac_cv_path_NROFF_TBL="$ac_dir/$ac_word"
-   echo "$as_me:29157: found $ac_dir/$ac_word" >&5
+   echo "$as_me:29167: found $ac_dir/$ac_word" >&5
    break
 fi
 done
@@ -29165,14 +29175,14 @@ fi
 NROFF_TBL=$ac_cv_path_NROFF_TBL
 
 if test -n "$NROFF_TBL"; then
-  echo "$as_me:29168: result: $NROFF_TBL" >&5
+  echo "$as_me:29178: result: $NROFF_TBL" >&5
 echo "${ECHO_T}$NROFF_TBL" >&6
 else
-  echo "$as_me:29171: result: no" >&5
+  echo "$as_me:29181: result: no" >&5
 echo "${ECHO_T}no" >&6
 fi
 
-echo "$as_me:29175: checking if $NROFF_TBL supports 'x' column modifier" >&5
+echo "$as_me:29185: checking if $NROFF_TBL supports 'x' column modifier" >&5
 echo $ECHO_N "checking if $NROFF_TBL supports 'x' column modifier... $ECHO_C" >&6
 if test "${cf_cv_tbl_x_option_okay+set}" = set; then
   echo $ECHO_N "(cached) $ECHO_C" >&6
@@ -29201,7 +29211,7 @@ else
 				cf_cv_tbl_x_option_okay=yes
 			fi
 		else
-			{ { echo "$as_me:29204: error: $NROFF_TBL not available." >&5
+			{ { echo "$as_me:29214: error: $NROFF_TBL not available." >&5
 echo "$as_me: error: $NROFF_TBL not available." >&2;}
    { (exit 1); exit 1; }; }
 		fi
@@ -29209,12 +29219,12 @@ echo "$as_me: error: $NROFF_TBL not available." >&2;}
 	fi
 
 fi
-echo "$as_me:29212: result: $cf_cv_tbl_x_option_okay" >&5
+echo "$as_me:29222: result: $cf_cv_tbl_x_option_okay" >&5
 echo "${ECHO_T}$cf_cv_tbl_x_option_okay" >&6
 
 TBL_X_OPTION=$cf_cv_tbl_x_option_okay
 
-echo "$as_me:29217: checking format of man pages" >&5
+echo "$as_me:29227: checking format of man pages" >&5
 echo $ECHO_N "checking format of man pages... $ECHO_C" >&6
 
 # Check whether --with-manpage-format or --without-manpage-format was given.
@@ -29305,10 +29315,10 @@ case "$MANPAGE_FORMAT" in
 	;;
 esac
 
-echo "$as_me:29308: result: $MANPAGE_FORMAT" >&5
+echo "$as_me:29318: result: $MANPAGE_FORMAT" >&5
 echo "${ECHO_T}$MANPAGE_FORMAT" >&6
 if test -n "$cf_unknown" ; then
-	{ echo "$as_me:29311: WARNING: Unexpected man page format $cf_unknown" >&5
+	{ echo "$as_me:29321: WARNING: Unexpected man page format $cf_unknown" >&5
 echo "$as_me: WARNING: Unexpected man page format $cf_unknown" >&2;}
 fi
 
@@ -29349,7 +29359,7 @@ case "$cf_item" in
 esac
 done
 
-echo "$as_me:29352: checking for man page renaming" >&5
+echo "$as_me:29362: checking for man page renaming" >&5
 echo $ECHO_N "checking for man page renaming... $ECHO_C" >&6
 
 # Check whether --with-manpage-renames or --without-manpage-renames was given.
@@ -29378,15 +29388,15 @@ if test "$MANPAGE_RENAMES" = man/man_db.renames ; then
 elif test "$MANPAGE_RENAMES" = no ; then
 	:
 elif test ! -f "$MANPAGE_RENAMES" ; then
-	{ { echo "$as_me:29381: error: not a filename: $MANPAGE_RENAMES" >&5
+	{ { echo "$as_me:29391: error: not a filename: $MANPAGE_RENAMES" >&5
 echo "$as_me: error: not a filename: $MANPAGE_RENAMES" >&2;}
    { (exit 1); exit 1; }; }
 fi
 
-echo "$as_me:29386: result: $MANPAGE_RENAMES" >&5
+echo "$as_me:29396: result: $MANPAGE_RENAMES" >&5
 echo "${ECHO_T}$MANPAGE_RENAMES" >&6
 
-echo "$as_me:29389: checking if man page aliases will be installed" >&5
+echo "$as_me:29399: checking if man page aliases will be installed" >&5
 echo $ECHO_N "checking if man page aliases will be installed... $ECHO_C" >&6
 
 # Check whether --with-manpage-aliases or --without-manpage-aliases was given.
@@ -29397,7 +29407,7 @@ else
   MANPAGE_ALIASES=yes
 fi;
 
-echo "$as_me:29400: result: $MANPAGE_ALIASES" >&5
+echo "$as_me:29410: result: $MANPAGE_ALIASES" >&5
 echo "${ECHO_T}$MANPAGE_ALIASES" >&6
 
 case "x$LN_S" in
@@ -29411,7 +29421,7 @@ esac
 
 MANPAGE_SYMLINKS=no
 if test "$MANPAGE_ALIASES" = yes ; then
-echo "$as_me:29414: checking if man page symlinks should be used" >&5
+echo "$as_me:29424: checking if man page symlinks should be used" >&5
 echo $ECHO_N "checking if man page symlinks should be used... $ECHO_C" >&6
 
 # Check whether --with-manpage-symlinks or --without-manpage-symlinks was given.
@@ -29424,17 +29434,17 @@ fi;
 
 if test "$cf_use_symlinks" = no; then
 if test "$MANPAGE_SYMLINKS" = yes ; then
-	{ echo "$as_me:29427: WARNING: cannot make symlinks" >&5
+	{ echo "$as_me:29437: WARNING: cannot make symlinks" >&5
 echo "$as_me: WARNING: cannot make symlinks" >&2;}
 	MANPAGE_SYMLINKS=no
 fi
 fi
 
-echo "$as_me:29433: result: $MANPAGE_SYMLINKS" >&5
+echo "$as_me:29443: result: $MANPAGE_SYMLINKS" >&5
 echo "${ECHO_T}$MANPAGE_SYMLINKS" >&6
 fi
 
-echo "$as_me:29437: checking for man page tbl" >&5
+echo "$as_me:29447: checking for man page tbl" >&5
 echo $ECHO_N "checking for man page tbl... $ECHO_C" >&6
 
 # Check whether --with-manpage-tbl or --without-manpage-tbl was given.
@@ -29445,7 +29455,7 @@ else
   MANPAGE_TBL=no
 fi;
 
-echo "$as_me:29448: result: $MANPAGE_TBL" >&5
+echo "$as_me:29458: result: $MANPAGE_TBL" >&5
 echo "${ECHO_T}$MANPAGE_TBL" >&6
 
 if test "$prefix" = "NONE" ; then
@@ -29812,7 +29822,7 @@ case "$cf_cv_system_name" in
 	(*-D_XOPEN_SOURCE_EXTENDED*)
 		test -n "$verbose" && echo "	moving _XOPEN_SOURCE_EXTENDED to work around g++ problem" 1>&6
 
-echo "${as_me:-configure}:29815: testing moving _XOPEN_SOURCE_EXTENDED to work around g++ problem ..." 1>&5
+echo "${as_me:-configure}:29825: testing moving _XOPEN_SOURCE_EXTENDED to work around g++ problem ..." 1>&5
 
 		CFLAGS="$CFLAGS -D_XOPEN_SOURCE_EXTENDED"
 		CPPFLAGS=`echo "x$CPPFLAGS" | sed -e  's/^.//' -e 's/-D_XOPEN_SOURCE_EXTENDED//'`
@@ -29823,7 +29833,7 @@ esac
 
 # Help to automatically enable the extended curses features when using either
 # the *-config or the ".pc" files by adding defines.
-echo "$as_me:29826: checking for defines to add to ncurses${USE_CFG_SUFFIX}${cf_config_suffix}-config script" >&5
+echo "$as_me:29836: checking for defines to add to ncurses${USE_CFG_SUFFIX}${cf_config_suffix}-config script" >&5
 echo $ECHO_N "checking for defines to add to ncurses${USE_CFG_SUFFIX}${cf_config_suffix}-config script... $ECHO_C" >&6
 PKG_CFLAGS=
 for cf_loop1 in $CPPFLAGS_after_XOPEN
@@ -29839,7 +29849,7 @@ do
 	done
 	test "$cf_found" = no && PKG_CFLAGS="$PKG_CFLAGS $cf_loop1"
 done
-echo "$as_me:29842: result: $PKG_CFLAGS" >&5
+echo "$as_me:29852: result: $PKG_CFLAGS" >&5
 echo "${ECHO_T}$PKG_CFLAGS" >&6
 
 case "$cf_cv_system_name" in
@@ -29911,7 +29921,7 @@ then
 	cf_filter_syms=$cf_dft_filter_syms
 	test -n "$verbose" && echo "	will map symbols to ABI=$cf_cv_abi_default" 1>&6
 
-echo "${as_me:-configure}:29914: testing will map symbols to ABI=$cf_cv_abi_default ..." 1>&5
+echo "${as_me:-configure}:29924: testing will map symbols to ABI=$cf_cv_abi_default ..." 1>&5
 
 fi
 
@@ -29946,7 +29956,7 @@ fi
 
 # This is used for the *-config script and *.pc data files.
 
-echo "$as_me:29949: checking for linker search path" >&5
+echo "$as_me:29959: checking for linker search path" >&5
 echo $ECHO_N "checking for linker search path... $ECHO_C" >&6
 if test "${cf_cv_ld_searchpath+set}" = set; then
   echo $ECHO_N "(cached) $ECHO_C" >&6
@@ -29994,7 +30004,7 @@ then
 			cf_pathlist="$cf_pathlist /lib /usr/lib"
 			;;
 		(*)
-			{ echo "$as_me:29997: WARNING: problem with Solaris architecture" >&5
+			{ echo "$as_me:30007: WARNING: problem with Solaris architecture" >&5
 echo "$as_me: WARNING: problem with Solaris architecture" >&2;}
 			;;
 		esac
@@ -30035,7 +30045,7 @@ done
 test -z "$cf_cv_ld_searchpath" && cf_cv_ld_searchpath=/usr/lib
 
 fi
-echo "$as_me:30038: result: $cf_cv_ld_searchpath" >&5
+echo "$as_me:30048: result: $cf_cv_ld_searchpath" >&5
 echo "${ECHO_T}$cf_cv_ld_searchpath" >&6
 
 LD_SEARCHPATH=`echo "$cf_cv_ld_searchpath"|sed -e 's/ /|/g'`
@@ -30125,7 +30135,7 @@ DEFS=-DHAVE_CONFIG_H
 : "${CONFIG_STATUS=./config.status}"
 ac_clean_files_save=$ac_clean_files
 ac_clean_files="$ac_clean_files $CONFIG_STATUS"
-{ echo "$as_me:30128: creating $CONFIG_STATUS" >&5
+{ echo "$as_me:30138: creating $CONFIG_STATUS" >&5
 echo "$as_me: creating $CONFIG_STATUS" >&6;}
 cat >"$CONFIG_STATUS" <<_ACEOF
 #! $SHELL
@@ -30306,7 +30316,7 @@ cat >>"$CONFIG_STATUS" <<\EOF
     echo "$ac_cs_version"; exit 0 ;;
   --he | --h)
     # Conflict between --help and --header
-    { { echo "$as_me:30309: error: ambiguous option: $1
+    { { echo "$as_me:30319: error: ambiguous option: $1
 Try \`$0 --help' for more information." >&5
 echo "$as_me: error: ambiguous option: $1
 Try \`$0 --help' for more information." >&2;}
@@ -30325,7 +30335,7 @@ Try \`$0 --help' for more information." >&2;}
     ac_need_defaults=false;;
 
   # This is an error.
-  -*) { { echo "$as_me:30328: error: unrecognized option: $1
+  -*) { { echo "$as_me:30338: error: unrecognized option: $1
 Try \`$0 --help' for more information." >&5
 echo "$as_me: error: unrecognized option: $1
 Try \`$0 --help' for more information." >&2;}
@@ -30458,7 +30468,7 @@ do
   "Makefile" ) CONFIG_FILES="$CONFIG_FILES Makefile" ;;
   "default" ) CONFIG_COMMANDS="$CONFIG_COMMANDS default" ;;
   "include/ncurses_cfg.h" ) CONFIG_HEADERS="$CONFIG_HEADERS include/ncurses_cfg.h:include/ncurses_cfg.hin" ;;
-  *) { { echo "$as_me:30461: error: invalid argument: $ac_config_target" >&5
+  *) { { echo "$as_me:30471: error: invalid argument: $ac_config_target" >&5
 echo "$as_me: error: invalid argument: $ac_config_target" >&2;}
    { (exit 1); exit 1; }; };;
   esac
@@ -30993,7 +31003,7 @@ done; }
   esac
 
   if test x"$ac_file" != x-; then
-    { echo "$as_me:30996: creating $ac_file" >&5
+    { echo "$as_me:31006: creating $ac_file" >&5
 echo "$as_me: creating $ac_file" >&6;}
     rm -f "$ac_file"
   fi
@@ -31011,7 +31021,7 @@ echo "$as_me: creating $ac_file" >&6;}
       -) echo "$tmp"/stdin ;;
       [\\/$]*)
          # Absolute (can't be DOS-style, as IFS=:)
-         test -f "$f" || { { echo "$as_me:31014: error: cannot find input file: $f" >&5
+         test -f "$f" || { { echo "$as_me:31024: error: cannot find input file: $f" >&5
 echo "$as_me: error: cannot find input file: $f" >&2;}
    { (exit 1); exit 1; }; }
          echo "$f";;
@@ -31024,7 +31034,7 @@ echo "$as_me: error: cannot find input file: $f" >&2;}
            echo "$srcdir/$f"
          else
            # /dev/null tree
-           { { echo "$as_me:31027: error: cannot find input file: $f" >&5
+           { { echo "$as_me:31037: error: cannot find input file: $f" >&5
 echo "$as_me: error: cannot find input file: $f" >&2;}
    { (exit 1); exit 1; }; }
          fi;;
@@ -31040,7 +31050,7 @@ cat >>"$CONFIG_STATUS" <<\EOF
       if test -n "$ac_seen"; then
         ac_used=`grep '@datarootdir@' "$ac_item"`
         if test -z "$ac_used"; then
-          { echo "$as_me:31043: WARNING: datarootdir was used implicitly but not set:
+          { echo "$as_me:31053: WARNING: datarootdir was used implicitly but not set:
 $ac_seen" >&5
 echo "$as_me: WARNING: datarootdir was used implicitly but not set:
 $ac_seen" >&2;}
@@ -31049,7 +31059,7 @@ $ac_seen" >&2;}
       fi
       ac_seen=`grep '${datarootdir}' "$ac_item"`
       if test -n "$ac_seen"; then
-        { echo "$as_me:31052: WARNING: datarootdir was used explicitly but not set:
+        { echo "$as_me:31062: WARNING: datarootdir was used explicitly but not set:
 $ac_seen" >&5
 echo "$as_me: WARNING: datarootdir was used explicitly but not set:
 $ac_seen" >&2;}
@@ -31094,7 +31104,7 @@ cat >>"$CONFIG_STATUS" <<\EOF
             ac_init=`$EGREP '[ 	]*'$ac_name'[ 	]*=' "$ac_file"`
             if test -z "$ac_init"; then
               ac_seen=`echo "$ac_seen" |sed -e 's,^,'"$ac_file"':,'`
-              { echo "$as_me:31097: WARNING: Variable $ac_name is used but was not set:
+              { echo "$as_me:31107: WARNING: Variable $ac_name is used but was not set:
 $ac_seen" >&5
 echo "$as_me: WARNING: Variable $ac_name is used but was not set:
 $ac_seen" >&2;}
@@ -31105,7 +31115,7 @@ $ac_seen" >&2;}
     $EGREP -n '@[A-Z_][A-Z_0-9]+@' "$ac_file" >>"$tmp"/out
     if test -s "$tmp"/out; then
       ac_seen=`sed -e 's,^,'"$ac_file"':,' < "$tmp"/out`
-      { echo "$as_me:31108: WARNING: Some variables may not be substituted:
+      { echo "$as_me:31118: WARNING: Some variables may not be substituted:
 $ac_seen" >&5
 echo "$as_me: WARNING: Some variables may not be substituted:
 $ac_seen" >&2;}
@@ -31154,7 +31164,7 @@ for ac_file in : $CONFIG_HEADERS; do test "x$ac_file" = x: && continue
   * )   ac_file_in=$ac_file.in ;;
   esac
 
-  test x"$ac_file" != x- && { echo "$as_me:31157: creating $ac_file" >&5
+  test x"$ac_file" != x- && { echo "$as_me:31167: creating $ac_file" >&5
 echo "$as_me: creating $ac_file" >&6;}
 
   # First look for the input files in the build tree, otherwise in the
@@ -31165,7 +31175,7 @@ echo "$as_me: creating $ac_file" >&6;}
       -) echo "$tmp"/stdin ;;
       [\\/$]*)
          # Absolute (can't be DOS-style, as IFS=:)
-         test -f "$f" || { { echo "$as_me:31168: error: cannot find input file: $f" >&5
+         test -f "$f" || { { echo "$as_me:31178: error: cannot find input file: $f" >&5
 echo "$as_me: error: cannot find input file: $f" >&2;}
    { (exit 1); exit 1; }; }
          echo $f;;
@@ -31178,7 +31188,7 @@ echo "$as_me: error: cannot find input file: $f" >&2;}
            echo "$srcdir/$f"
          else
            # /dev/null tree
-           { { echo "$as_me:31181: error: cannot find input file: $f" >&5
+           { { echo "$as_me:31191: error: cannot find input file: $f" >&5
 echo "$as_me: error: cannot find input file: $f" >&2;}
    { (exit 1); exit 1; }; }
          fi;;
@@ -31236,7 +31246,7 @@ cat >>"$CONFIG_STATUS" <<\EOF
   rm -f "$tmp"/in
   if test x"$ac_file" != x-; then
     if cmp -s "$ac_file" "$tmp/config.h" 2>/dev/null; then
-      { echo "$as_me:31239: $ac_file is unchanged" >&5
+      { echo "$as_me:31249: $ac_file is unchanged" >&5
 echo "$as_me: $ac_file is unchanged" >&6;}
     else
       ac_dir=`$as_expr X"$ac_file" : 'X\(.*[^/]\)//*[^/][^/]*/*$' \| \
@@ -31623,7 +31633,7 @@ cf_ITEM=`echo "$cf_item" | sed y%abcdefghijklmnopqrstuvwxyz./-%ABCDEFGHIJKLMNOPQ
 				(cygdll|msysdll|mingw|msvcdll)
 					test "x$with_shared_cxx" = xno && test -n "$verbose" && echo "	overriding CXX_MODEL to SHARED" 1>&6
 
-echo "${as_me:-configure}:31626: testing overriding CXX_MODEL to SHARED ..." 1>&5
+echo "${as_me:-configure}:31636: testing overriding CXX_MODEL to SHARED ..." 1>&5
 
 					with_shared_cxx=yes
 					;;

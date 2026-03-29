@@ -2568,12 +2568,12 @@ typedef struct _termInfo
     int  numlabels;
     int  labelwidth;
     int  labelheight;
-
-    const color_t* defaultPalette;
 } TerminalInfo;
 
 extern NCURSES_EXPORT_VAR(const color_t*) _nc_cga_palette;
 extern NCURSES_EXPORT_VAR(const color_t*) _nc_hls_palette;
+
+extern NCURSES_EXPORT(int)  _nc_win32con_doupdate (void);
 
 #define CON_NUMPAIRS 64
 
@@ -2608,7 +2608,11 @@ typedef struct {
     int (*read)(int *buf); 		           // Pointer to the read function used by the buffered console.
     int (*twait)(int, int, int* EVENTLIST_2nd(_nc_eventlist*)); 
     int (*mvcur)(int yold, int xold, int y, int x);
-    int (*doupdate)(void);
+#if USE_WIDEC_SUPPORT
+    bool (*writeat)(int y, int x, const cchar_t *str, int limit); // Pointer to the writeat function used by the buffered console.
+#else
+    bool (*writeat)(int y, int x, const chtype *str, int limit); // Pointer to the writeat function used by the buffered console.
+#endif
 } ScreenBufferedConsoleInterface;
 extern NCURSES_EXPORT_VAR(ScreenBufferedConsoleInterface *) _nc_SCREENBUFFEREDCONSOLE;
 #define SCREENBUFFEREDCONSOLE (*_nc_SCREENBUFFEREDCONSOLE)

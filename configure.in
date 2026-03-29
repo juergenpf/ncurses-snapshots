@@ -2091,9 +2091,17 @@ test "x$with_ext_funcs" = xyes && LIB_SUBSETS="${LIB_SUBSETS}+ext_tinfo"
 case "$cf_cv_system_name" in
 (*mingw32*|*mingw64*)
 	if test "x$with_conpty" = xyes; then
-		LIB_SUBSETS="${LIB_SUBSETS}+port_win32"
+	    if test "x$with_windows_console" = xyes; then
+		    LIB_SUBSETS="${LIB_SUBSETS}+port_win32"
+        else
+		    LIB_SUBSETS="${LIB_SUBSETS}+port_win32_conpty"
+	    fi
 	else
-		LIB_SUBSETS="${LIB_SUBSETS}+port_win32con"
+	    if test "x$with_windows_console" = xyes; then
+		    LIB_SUBSETS="${LIB_SUBSETS}+port_win32con"
+		else
+		    AC_MSG_ERROR("On Windows, either --enable-conpty, --enable-win-console or both must be provided.")
+		fi
 	fi
 	;;
 (*msys*|*cygwin*)

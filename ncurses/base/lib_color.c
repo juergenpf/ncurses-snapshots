@@ -53,7 +53,7 @@ MODULE_ID("$Id: lib_color.c,v 1.157 2025/12/27 12:31:03 tom Exp $")
 
 #if USE_SCREENBUFFERED_CONSOLE
 #define CanChange      (IsScreenBufferedConsole() ? SCREENBUFFEREDCONSOLE.info.canchange : can_change)
-#define DefaultPalette (IsScreenBufferedConsole() ? SCREENBUFFEREDCONSOLE.info.defaultPalette : (hue_lightness_saturation ? hls_palette : cga_palette))
+#define DefaultPalette (IsScreenBufferedConsole() ? cga_palette : (hue_lightness_saturation ? hls_palette : cga_palette))
 #define HasColor       (IsScreenBufferedConsole() ? SCREENBUFFEREDCONSOLE.info.hascolor : has_color)
 #define InitColor      (IsScreenBufferedConsole() ? SCREENBUFFEREDCONSOLE.info.initcolor : (initialize_color!=NULL))
 #define MaxColors      (IsScreenBufferedConsole() ? SCREENBUFFEREDCONSOLE.info.maxcolors : max_colors)

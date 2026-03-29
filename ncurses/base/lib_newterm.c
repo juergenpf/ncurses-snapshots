@@ -246,7 +246,7 @@ NCURSES_SP_NAME(newterm) (NCURSES_SP_DCLx
 	    if (!CORECONSOLE.init(fileno(_ofp), fileno(_ifp))) {
 		_nc_set_screen(current);
 		returnSP(NULL);
-	    }		
+	    }
 #endif
 #if !NCURSES_SP_FUNCS
 	    _nc_set_screen(CURRENT_SCREEN);

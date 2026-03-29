@@ -59,7 +59,7 @@ NCURSES_EXPORT_VAR(NCURSES_OSPEED) ospeed = 0;        /* used by termcap library
 
 NCURSES_EXPORT_VAR(int) _nc_nulls_sent = 0;
 
-#if USE_CONSOLE_API
+#if USE_CONPTY
 #define NC_WRITE(fd,buf,len) (IsConPTYProgMode() ? WINCONPTY.write(fd,buf, len) : write(fd, buf, len))
 #else
 #define NC_WRITE(fd,buf,len) write(fd, buf, len)

@@ -201,7 +201,7 @@ flush_input(int fd GCC_UNUSED)
 }
 
 #define CP_UTF8 65001
-
+#if USE_CONPTY
 /* MSVCRT doesn't support UTF-8 locales, but UCRT does. However, even with UCRT we can't rely
  * on the locale being set to UTF-8 by default, so we need to set the code page explicitly for
  * the console to ensure that it uses UTF-8 encoding.
@@ -258,7 +258,7 @@ encoding_init(void)
     SetConsoleCP(cp);
     SetConsoleOutputCP(cp);
 }
-
+#endif /* USE_CONPTY */
 
 NCURSES_EXPORT(bool)
 _nc_console_setup(void) {

@@ -758,6 +758,7 @@ initialize_mousetype(SCREEN *sp)
 	returnVoid;
     } 
 #endif
+#if USE_CONPTY
     /* we know how to recognize mouse events under "xterm" */
     if (NonEmpty(key_mouse)) {
 	init_xterm_mouse(sp);
@@ -765,8 +766,8 @@ initialize_mousetype(SCREEN *sp)
 	        && strstr(SP_TERMTYPE term_names, "xterm") != NULL) {
 	if (_nc_add_to_try(&(sp->_keytry), xterm_kmous, KEY_MOUSE) == OK)
 	    init_xterm_mouse(sp);
-    }
-    
+    }    
+#endif /* USE_CONPTY */
 #endif /* USE_CONSOLE_API */
 
     returnVoid;
