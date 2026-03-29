@@ -2591,9 +2591,9 @@ typedef struct {
     CONSOLE_SCREEN_BUFFER_INFO SBI;
     CONSOLE_CURSOR_INFO save_CI;
 
-    TerminalInfo info;			      // Core capabilities.
+    TerminalInfo info;			           // Core capabilities.
 
-    char* (*termname)(bool longname);	           // Pointer to the name function used by the buffered console.
+    const char* (*termname)(bool longname);	   // Pointer to the name function used by the buffered console.
     bool (*adjust_size)(void);                     // Adjust the console buffer size.
     chtype (*termattrs)(void);                     // Pointer to the termattrs function used by the buffered console.
     int (*keypad)(bool);                           // Pointer to the keypad function used by the buffered console.

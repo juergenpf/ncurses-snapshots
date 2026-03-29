@@ -56,7 +56,7 @@ METHOD(size_changed, bool)(void);
 METHOD(getmode, int)(int fd GCC_UNUSED, TTY *arg);
 METHOD(setmode, int)(int fd GCC_UNUSED, const TTY *arg);
 METHOD(defmode, int)(TTY *arg, short kind);
-METHOD(termname, char *)(bool longname);
+METHOD(termname, const char *)(bool longname);
 METHOD(adjust_size, bool)(void);
 METHOD(termattrs, chtype)(void);
 METHOD(keypad, int)(bool flag);
@@ -344,7 +344,7 @@ _nc_screenbuffered_console_init(void)
 	SCREENBUFFEREDCONSOLE.info.defaultPalette = _nc_cga_palette;
 }
 
-METHOD(termname, char *)(bool longname)
+METHOD(termname, const char *)(bool longname)
 {
 	assert(IsScreenBufferedConsole());
 	return longname ? "Windows Legacy Console" : "#win32console";
@@ -805,7 +805,7 @@ METHOD(read, int)(int *buf)
 	hdl = SCREENBUFFEREDCONSOLE.core.ConsoleHandleIn;
 	memset(&inp_rec, 0, sizeof(inp_rec));
 
-	while ((b = (bool)read_keycode(hdl, &inp_rec, 1, &nRead)))
+	while ((b = (bool)(0 != read_keycode(hdl, &inp_rec, 1, &nRead))))
 	{
 		if (b && nRead > 0)
 		{
@@ -967,9 +967,6 @@ METHOD(twait,int)(int mode, int milliseconds, int *timeleft EVENTLIST_2nd(_nc_ev
 			diff = _nc_timeval_diff_in_ms(fstart, fend);
 			milliseconds = Adjust(milliseconds, diff);
 
-			T(("twait: WaitForSingleObject returned %d, fstart=%llu, fend=%llu, diff=%d msec, remaining=%d msec",
-			   (int)rc, fstart, fend, diff, milliseconds));
-
 			if (rc == WAIT_TIMEOUT) {
 				code = TW_NONE;
 				break;
@@ -1004,7 +1001,7 @@ METHOD(twait,int)(int mode, int milliseconds, int *timeleft EVENTLIST_2nd(_nc_ev
 			DWORD i;
 			bool stop_scan;
 
-			b = (bool)GetNumberOfConsoleInputEvents(hdl, &n);
+			b = (bool)(0 != GetNumberOfConsoleInputEvents(hdl, &n));
 			if (!b)
 			{
 				T(("twait:err GetNumberOfConsoleInputEvents"));
@@ -1220,7 +1217,7 @@ METHOD(setmode, int)(int fd GCC_UNUSED, const TTY *arg)
 			mode &= ~ENABLE_ECHO_INPUT;
 		}
 
-		input_ok = (bool)SetConsoleMode(input_target, mode);
+		input_ok = (bool)(0!=SetConsoleMode(input_target, mode));
 		if (input_ok)
 		{
 			/* Make sure the cached value reflects the real value we set, as the
@@ -1245,7 +1242,7 @@ METHOD(setmode, int)(int fd GCC_UNUSED, const TTY *arg)
 	if (output_target != INVALID_HANDLE_VALUE)
 	{
 		DWORD mode = arg->dwFlagOut;
-		output_ok = (bool)SetConsoleMode(output_target, mode);
+		output_ok = (bool)(0!=SetConsoleMode(output_target, mode));
 		if (output_ok)
 		{
 			/* Make sure the cached value reflects the real value we set,
@@ -1648,7 +1645,7 @@ con_write16(int y, int x, cchar_t *str, int limit)
 	rec.Right = (SHORT)(x + limit - 1);
 	rec.Bottom = rec.Top;
 
-	return (bool)write_screen(SCREENBUFFEREDCONSOLE.core.ConsoleHandleOut, ci, siz, loc, &rec);
+	return (bool)(0 != write_screen(SCREENBUFFEREDCONSOLE.core.ConsoleHandleOut, ci, siz, loc, &rec));
 }
 
 
@@ -1688,7 +1685,7 @@ con_write8(int y, int x, chtype *str, int n)
 	rec.Right = (short)(x + n - 1);
 	rec.Bottom = rec.Top;
 
-	return (bool)write_screen(SCREENBUFFEREDCONSOLE.core.ConsoleHandleOut, ci, siz, loc, &rec);
+	return (bool)(0 != write_screen(SCREENBUFFEREDCONSOLE.core.ConsoleHandleOut, ci, siz, loc, &rec));
 }
 #define con_write(y, x, str, n) con_write8(y, x, str, n)
 #endif

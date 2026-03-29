@@ -469,9 +469,12 @@ _nc_get_screensize(SCREEN *sp,
 /* Obtain lines/columns values from the environment and/or terminfo entry */
 {
     int my_tabsize;
+    TERMINAL *termp = cur_term;
+    bool useEnv = _nc_prescreen.use_env;
+    bool useTioctl = _nc_prescreen.use_tioctl;
 
-#if USE_CONSOLE_API
     assert(linep != NULL && colp != NULL);
+#if USE_SCREENBUFFERED_CONSOLE    
     if (IsScreenBufferedConsole()) {
 	my_tabsize = SCREENBUFFEREDCONSOLE.info.tabsize;
 #if USE_REENTRANT
@@ -483,14 +486,10 @@ _nc_get_screensize(SCREEN *sp,
         TABSIZE = my_tabsize;
 #endif
         T(("TABSIZE = %d", my_tabsize));
+        CORECONSOLE.size(linep, colp);
+        returnVoid
     }
-    CORECONSOLE.size(linep, colp);
-    returnVoid
 #endif /* !USE_SCREENBUFFERED_CONSOLE */
-
-    TERMINAL *termp = cur_term;
-    bool useEnv = _nc_prescreen.use_env;
-    bool useTioctl = _nc_prescreen.use_tioctl;
 
     T((T_CALLED("_nc_get_screensize (%p)"), (void *) sp));
 #if USE_CONPTY

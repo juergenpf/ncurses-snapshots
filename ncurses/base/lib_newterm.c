@@ -224,12 +224,6 @@ NCURSES_SP_NAME(newterm) (NCURSES_SP_DCLx
 	filter_mode = _nc_prescreen.filter_mode;
 #endif
 
-#if USE_CONSOLE_API
-	    if (!CORECONSOLE.init(fileno(_ofp), fileno(_ifp))) {
-		_nc_set_screen(current);
-		returnSP(NULL);
-	    }		
-#endif
 	/*
 	 * This actually allocates the screen structure, and saves the original
 	 * terminal settings.
@@ -248,7 +242,12 @@ NCURSES_SP_NAME(newterm) (NCURSES_SP_DCLx
 	} else {
 	    int value;
 	    int cols;
-
+#if USE_CONSOLE_API
+	    if (!CORECONSOLE.init(fileno(_ofp), fileno(_ifp))) {
+		_nc_set_screen(current);
+		returnSP(NULL);
+	    }		
+#endif
 #if !NCURSES_SP_FUNCS
 	    _nc_set_screen(CURRENT_SCREEN);
 #endif

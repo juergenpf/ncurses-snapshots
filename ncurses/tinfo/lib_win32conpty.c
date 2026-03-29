@@ -750,7 +750,7 @@ METHOD(setmode, int) (int fd GCC_UNUSED, const TTY * arg)
 	    mode &= ~ENABLE_ECHO_INPUT;
 	}
 
-	input_ok = (bool)SetConsoleMode(input_target, mode);
+	input_ok = (bool)(0 != SetConsoleMode(input_target, mode));
 	if (input_ok) {
 	    /* Make sure the cached value reflects the real value we set, as the
 	     * caller may not have provided all necessary flags (e.g.
@@ -768,7 +768,7 @@ METHOD(setmode, int) (int fd GCC_UNUSED, const TTY * arg)
 
     if (output_target != INVALID_HANDLE_VALUE) {
 	DWORD mode = ENABLE_VIRTUAL_TERMINAL_PROCESSING | arg->dwFlagOut;
-	output_ok = (bool)SetConsoleMode(output_target, mode);
+	output_ok = (bool)(0 != SetConsoleMode(output_target, mode));
 	if (output_ok) {
 	    /* Make sure the cached value reflects the real value we set,
 	     * as the caller may not have provided all necessary flags

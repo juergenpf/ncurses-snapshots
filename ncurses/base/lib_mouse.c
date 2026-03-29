@@ -928,6 +928,7 @@ _nc_mouse_event(SCREEN *sp)
 #endif
 
     case M_NONE:
+	(void)eventp;
 	break;
     }
 
@@ -1417,9 +1418,10 @@ _nc_mouse_inline(SCREEN *sp)
 	 * called: _mouse_write == _mouse_read means no new event was placed
 	 * in the ring, and accessing _mouse_write-1 would be an underflow.
 	 */
+	MEVENT *ep;
 	if (sp->_mouse_write <= sp->_mouse_read)
 	    returnCode(FALSE);
-	MEVENT *ep = EventAt(sp, sp->_mouse_write - 1);
+	ep = EventAt(sp, sp->_mouse_write - 1);
 
 	TR(MY_TRACE,
 	   ("_nc_mouse_inline: slot %ld %s",
