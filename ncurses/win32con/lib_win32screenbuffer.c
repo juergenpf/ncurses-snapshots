@@ -343,7 +343,9 @@ _nc_screenbuffered_console_init(void)
 	SCREENBUFFEREDCONSOLE.info.nocolorvideo = 1;
 	SCREENBUFFEREDCONSOLE.info.tabsize = 8;
 	SCREENBUFFEREDCONSOLE.info.numbuttons = 1;
+#if USE_WIDEC_SUPPORT
 	SCREENBUFFEREDCONSOLE.info.wacs_map = NULL;
+#endif
 }
 
 METHOD(termname, const char *)(bool longname)
@@ -579,14 +581,13 @@ METHOD(init_acs, void)(chtype *real_map)
 	SCREEN *sp;
 
 	assert(IsScreenBufferedConsole());
-
 	sp = ConsoleScreen();
-	assert(sp);
 
 	for (n = 0; n < SIZEOF(table); ++n)
 	{
 		real_map[table[n].acs_code] =
 			(chtype)table[n].use_code | A_ALTCHARSET;
+		if (sp)
 		sp->_screen_acs_map[table[n].acs_code] = TRUE;
 	}
 }

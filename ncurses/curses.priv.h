@@ -441,6 +441,10 @@ typedef TRIES {
 # define USE_CONSOLE_API 0
 #endif
 
+#if defined(NC_WINDOWS_NATIVE) && !USE_CONSOLE_API
+# error Unsupported configuration: native Windows builds must use either ConPTY or Windows Console API
+#endif
+
 #ifndef FixupPathname
 #define FixupPathname(path) /* nothing */
 #define FixupPathname2(path,buffer) /* nothing */

@@ -88,7 +88,7 @@ _nc_initscr(NCURSES_SP_DCL0)
 	buf.c_oflag &= (unsigned) ~(ONLCR);
 #elif HAVE_SGTTY_H
 	buf.sg_flags &= ~(ECHO | CRMOD);
-#elif USE_CONPTY
+#elif USE_CONSOLE_API
 	buf.dwFlagIn  = ENABLE_PROCESSED_INPUT;
         buf.dwFlagOut = ENABLE_PROCESSED_OUTPUT 
 			| ENABLE_WRAP_AT_EOL_OUTPUT;
