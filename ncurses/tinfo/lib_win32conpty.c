@@ -85,6 +85,7 @@ static ConPtyInterface defaultCONPTY =
     Dispatch(stop_input_subsystem),
     Dispatch(poll)
 };
+#define MYSELF defaultCONPTY
 
 /* Poor man's dependency injection - we maintain a pointer to the current console information,
  * which is initialized to point to our default implementation. If in the future we want to
@@ -261,7 +262,7 @@ METHOD(init, bool) (int fdOut, int fdIn)
 
     if (Lines != NULL && Cols != NULL) {
 	CONSOLE_SCREEN_BUFFER_INFO csbi;
-	if (CORECONSOLE.getSBI(&csbi)) {
+	if (MYSELF.core.getSBI(&csbi)) {
 	    *Lines = (int) (csbi.srWindow.Bottom + 1 - csbi.srWindow.Top);
 	    *Cols = (int) (csbi.srWindow.Right + 1 - csbi.srWindow.Left);
 	    returnVoid;
@@ -269,8 +270,8 @@ METHOD(init, bool) (int fdOut, int fdIn)
 	/* Fallback to cached values or defaults if we can't get the console size.
 	 * Windows Terminal default size is 120 columns x 30 rows.
 	 * If cached values are set we use those instead to reflect the actual size. */
-	*Lines = CORECONSOLE.sbi_lines != -1 ? CORECONSOLE.sbi_lines : DEFAULT_CONSOLE_LINES;
-	*Cols = CORECONSOLE.sbi_cols != -1 ? CORECONSOLE.sbi_cols : DEFAULT_CONSOLE_COLS;
+	*Lines = MYSELF.core.sbi_lines != -1 ? MYSELF.core.sbi_lines : DEFAULT_CONSOLE_LINES;
+	*Cols = MYSELF.core.sbi_cols != -1 ? MYSELF.core.sbi_cols : DEFAULT_CONSOLE_COLS;
     }
     returnVoid;
 }
@@ -301,13 +302,13 @@ METHOD(size_changed, bool) (void)
 
     DispatchMethod(size) (&current_lines, &current_cols);
 
-    if (CORECONSOLE.sbi_lines == -1 || CORECONSOLE.sbi_cols == -1) {
-	CORECONSOLE.sbi_lines = current_lines;
-	CORECONSOLE.sbi_cols  = current_cols;
+    if (MYSELF.core.sbi_lines == -1 || MYSELF.core.sbi_cols == -1) {
+	MYSELF.core.sbi_lines = current_lines;
+	MYSELF.core.sbi_cols  = current_cols;
     } else {
-	if (current_lines != CORECONSOLE.sbi_lines || current_cols != CORECONSOLE.sbi_cols) {
-	    CORECONSOLE.sbi_lines = current_lines;
-	    CORECONSOLE.sbi_cols  = current_cols;
+	if (current_lines != MYSELF.core.sbi_lines || current_cols != MYSELF.core.sbi_cols) {
+	    MYSELF.core.sbi_lines = current_lines;
+	    MYSELF.core.sbi_cols  = current_cols;
 
 	    _nc_globals.have_sigwinch = 1;
 

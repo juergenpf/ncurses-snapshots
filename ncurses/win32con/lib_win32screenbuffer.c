@@ -114,6 +114,7 @@ static ScreenBufferedConsoleInterface legacyCONSOLE =
 };
 NCURSES_EXPORT_VAR(ScreenBufferedConsoleInterface *)
 _nc_SCREENBUFFEREDCONSOLE = &legacyCONSOLE;
+#define MYSELF legacyCONSOLE
 
 #define RevAttr(attr) (WORD)(((attr) & 0xff00) |       \
 							 ((((attr) & 0x07) << 4) | \
@@ -242,23 +243,23 @@ static bool
 get_SBI(void)
 {
 	bool rc = false;
-	if (CORECONSOLE.getSBI(&(SCREENBUFFEREDCONSOLE.SBI)))
+	if (MYSELF.core.getSBI(&(MYSELF.SBI)))
 	{
 		T(("GetConsoleScreenBufferInfo"));
 		T(("... buffer(X:%d Y:%d)",
-		   SCREENBUFFEREDCONSOLE.SBI.dwSize.X,
-		   SCREENBUFFEREDCONSOLE.SBI.dwSize.Y));
+		   MYSELF.SBI.dwSize.X,
+		   MYSELF.SBI.dwSize.Y));
 		T(("... window(X:%d Y:%d)",
-		   SCREENBUFFEREDCONSOLE.SBI.dwMaximumWindowSize.X,
-		   SCREENBUFFEREDCONSOLE.SBI.dwMaximumWindowSize.Y));
+		   MYSELF.SBI.dwMaximumWindowSize.X,
+		   MYSELF.SBI.dwMaximumWindowSize.Y));
 		T(("... cursor(X:%d Y:%d)",
-		   SCREENBUFFEREDCONSOLE.SBI.dwCursorPosition.X,
-		   SCREENBUFFEREDCONSOLE.SBI.dwCursorPosition.Y));
+		   MYSELF.SBI.dwCursorPosition.X,
+		   MYSELF.SBI.dwCursorPosition.Y));
 		T(("... display(Top:%d Bottom:%d Left:%d Right:%d)",
-		   SCREENBUFFEREDCONSOLE.SBI.srWindow.Top,
-		   SCREENBUFFEREDCONSOLE.SBI.srWindow.Bottom,
-		   SCREENBUFFEREDCONSOLE.SBI.srWindow.Left,
-		   SCREENBUFFEREDCONSOLE.SBI.srWindow.Right));
+		   MYSELF.SBI.srWindow.Top,
+		   MYSELF.SBI.srWindow.Bottom,
+		   MYSELF.SBI.srWindow.Left,
+		   MYSELF.SBI.srWindow.Right));
 		rc = true;
 	}
 	else
@@ -280,71 +281,71 @@ _nc_screenbuffered_console_init(void)
 	int i;
 	DWORD num_buttons;
 
-	SCREENBUFFEREDCONSOLE.map = (LPDWORD)malloc(sizeof(DWORD) * MAPSIZE);
-	SCREENBUFFEREDCONSOLE.rmap = (LPDWORD)malloc(sizeof(DWORD) * MAPSIZE);
-	SCREENBUFFEREDCONSOLE.ansi_map = (LPDWORD)malloc(sizeof(DWORD) * MAPSIZE);
+	MYSELF.map = (LPDWORD)malloc(sizeof(DWORD) * MAPSIZE);
+	MYSELF.rmap = (LPDWORD)malloc(sizeof(DWORD) * MAPSIZE);
+	MYSELF.ansi_map = (LPDWORD)malloc(sizeof(DWORD) * MAPSIZE);
 
 	for (i = 0; i < (N_INI + FKEYS); i++)
 	{
 		if (i < N_INI)
 		{
-			SCREENBUFFEREDCONSOLE.rmap[i] = SCREENBUFFEREDCONSOLE.map[i] =
+			MYSELF.rmap[i] = MYSELF.map[i] =
 				(DWORD)keylist[i];
-			SCREENBUFFEREDCONSOLE.ansi_map[i] = (DWORD)ansi_keys[i];
+			MYSELF.ansi_map[i] = (DWORD)ansi_keys[i];
 		}
 		else
 		{
-			SCREENBUFFEREDCONSOLE.rmap[i] = SCREENBUFFEREDCONSOLE.map[i] =
+			MYSELF.rmap[i] = MYSELF.map[i] =
 				(DWORD)GenMap((VK_F1 + (i - N_INI)),
 							  (KEY_F(1) + (i - N_INI)));
-			SCREENBUFFEREDCONSOLE.ansi_map[i] =
+			MYSELF.ansi_map[i] =
 				(DWORD)GenMap((VK_F1 + (i - N_INI)),
 							  (';' + (i - N_INI)));
 		}
 	}
-	qsort(SCREENBUFFEREDCONSOLE.ansi_map,
+	qsort(MYSELF.ansi_map,
 		  (size_t)(MAPSIZE),
 		  sizeof(keylist[0]),
 		  keycompare);
-	qsort(SCREENBUFFEREDCONSOLE.map,
+	qsort(MYSELF.map,
 		  (size_t)(MAPSIZE),
 		  sizeof(keylist[0]),
 		  keycompare);
-	qsort(SCREENBUFFEREDCONSOLE.rmap,
+	qsort(MYSELF.rmap,
 		  (size_t)(MAPSIZE),
 		  sizeof(keylist[0]),
 		  rkeycompare);
 
 	if (GetNumberOfConsoleMouseButtons(&num_buttons))
-		SCREENBUFFEREDCONSOLE.numButtons = (int)num_buttons;
+		MYSELF.numButtons = (int)num_buttons;
 	else
-		SCREENBUFFEREDCONSOLE.numButtons = 1;
+		MYSELF.numButtons = 1;
 
 	a = console_MapColor(TRUE, COLOR_WHITE) |
 		console_MapColor(FALSE, COLOR_BLACK);
 	for (i = 0; i < CON_NUMPAIRS; i++)
-		SCREENBUFFEREDCONSOLE.pairs[i] = a;
+		MYSELF.pairs[i] = a;
 
 	get_SBI();
-	GetConsoleCursorInfo(SCREENBUFFEREDCONSOLE.core.ConsoleHandleOut, &SCREENBUFFEREDCONSOLE.save_CI);
+	GetConsoleCursorInfo(MYSELF.core.ConsoleHandleOut, &MYSELF.save_CI);
 	T(("... initial cursor is %svisible, %d%%",
-	   (SCREENBUFFEREDCONSOLE.save_CI.bVisible ? "" : "not-"),
-	   (int)SCREENBUFFEREDCONSOLE.save_CI.dwSize));
+	   (MYSELF.save_CI.bVisible ? "" : "not-"),
+	   (int)MYSELF.save_CI.dwSize));
 
-	SCREENBUFFEREDCONSOLE.info.initcolor = TRUE;
-	SCREENBUFFEREDCONSOLE.info.canchange = FALSE;
-	SCREENBUFFEREDCONSOLE.info.hascolor = TRUE;
-	SCREENBUFFEREDCONSOLE.info.caninit = TRUE;
-	SCREENBUFFEREDCONSOLE.info.maxpairs = CON_NUMPAIRS;
-	SCREENBUFFEREDCONSOLE.info.maxcolors = 8;
-	SCREENBUFFEREDCONSOLE.info.numlabels = 0;
-	SCREENBUFFEREDCONSOLE.info.labelwidth = 0;
-	SCREENBUFFEREDCONSOLE.info.labelheight = 0;
-	SCREENBUFFEREDCONSOLE.info.nocolorvideo = 1;
-	SCREENBUFFEREDCONSOLE.info.tabsize = 8;
-	SCREENBUFFEREDCONSOLE.info.numbuttons = 1;
+	MYSELF.info.initcolor = TRUE;
+	MYSELF.info.canchange = FALSE;
+	MYSELF.info.hascolor = TRUE;
+	MYSELF.info.caninit = TRUE;
+	MYSELF.info.maxpairs = CON_NUMPAIRS;
+	MYSELF.info.maxcolors = 8;
+	MYSELF.info.numlabels = 0;
+	MYSELF.info.labelwidth = 0;
+	MYSELF.info.labelheight = 0;
+	MYSELF.info.nocolorvideo = 1;
+	MYSELF.info.tabsize = 8;
+	MYSELF.info.numbuttons = 1;
 #if USE_WIDEC_SUPPORT
-	SCREENBUFFEREDCONSOLE.info.wacs_map = NULL;
+	MYSELF.info.wacs_map = NULL;
 #endif
 }
 
@@ -375,7 +376,7 @@ METHOD(adjust_size, bool)(void)
 	 * In older Versions of Windows (before Windows 10), the conhost behaves differently
 	 * when resizing the console window.
 	 */
-	if (!GetConsoleScreenBufferInfo(SCREENBUFFEREDCONSOLE.core.ConsoleHandleOut, &csbi))
+	if (!GetConsoleScreenBufferInfo(MYSELF.core.ConsoleHandleOut, &csbi))
 	{
 		T(("GetConsoleScreenBufferInfo failed"));
 		returnBool(res);
@@ -385,11 +386,11 @@ METHOD(adjust_size, bool)(void)
 	newSize.Y = (short)(csbi.srWindow.Bottom - csbi.srWindow.Top + 1);
 
 	T(("New console size: %d x %d", newSize.X, newSize.Y));
-	SetConsoleScreenBufferSize(SCREENBUFFEREDCONSOLE.core.ConsoleHandleOut, newSize);
+	SetConsoleScreenBufferSize(MYSELF.core.ConsoleHandleOut, newSize);
 
-	SCREENBUFFEREDCONSOLE.core.getSBI(&(SCREENBUFFEREDCONSOLE.SBI));
-	SCREENBUFFEREDCONSOLE.core.sbi_lines = newSize.Y;
-	SCREENBUFFEREDCONSOLE.core.sbi_cols = newSize.X;
+	MYSELF.core.getSBI(&(MYSELF.SBI));
+	MYSELF.core.sbi_lines = newSize.Y;
+	MYSELF.core.sbi_cols = newSize.X;
 	res = TRUE;
 
 	returnBool(res);
@@ -432,10 +433,10 @@ METHOD(beeporflash, int)(bool beepFlag)
 
 	assert(IsScreenBufferedConsole());
 
-	high = (SCREENBUFFEREDCONSOLE.SBI.srWindow.Bottom -
-				SCREENBUFFEREDCONSOLE.SBI.srWindow.Top + 1);
-	wide = (SCREENBUFFEREDCONSOLE.SBI.srWindow.Right -
-				SCREENBUFFEREDCONSOLE.SBI.srWindow.Left + 1);
+	high = (MYSELF.SBI.srWindow.Bottom -
+				MYSELF.SBI.srWindow.Top + 1);
+	wide = (MYSELF.SBI.srWindow.Right -
+				MYSELF.SBI.srWindow.Left + 1);
 	max_cells = (high * wide);
 
 	MakeArray(this_screen, CHAR_INFO, max_cells);
@@ -444,10 +445,10 @@ METHOD(beeporflash, int)(bool beepFlag)
 	SMALL_RECT this_region;
 	COORD bufferCoord;
 
-	this_region.Top = SCREENBUFFEREDCONSOLE.SBI.srWindow.Top;
-	this_region.Left = SCREENBUFFEREDCONSOLE.SBI.srWindow.Left;
-	this_region.Bottom = SCREENBUFFEREDCONSOLE.SBI.srWindow.Bottom;
-	this_region.Right = SCREENBUFFEREDCONSOLE.SBI.srWindow.Right;
+	this_region.Top = MYSELF.SBI.srWindow.Top;
+	this_region.Left = MYSELF.SBI.srWindow.Left;
+	this_region.Bottom = MYSELF.SBI.srWindow.Bottom;
+	this_region.Right = MYSELF.SBI.srWindow.Right;
 
 	this_size.X = (SHORT)wide;
 	this_size.Y = (SHORT)high;
@@ -456,7 +457,7 @@ METHOD(beeporflash, int)(bool beepFlag)
 	bufferCoord.Y = this_region.Top;
 
 	if (!beepFlag &&
-		read_screen(SCREENBUFFEREDCONSOLE.core.ConsoleHandleOut,
+		read_screen(MYSELF.core.ConsoleHandleOut,
 					this_screen,
 					this_size,
 					bufferCoord,
@@ -473,10 +474,10 @@ METHOD(beeporflash, int)(bool beepFlag)
 				RevAttr(that_screen[i].Attributes);
 		}
 
-		write_screen(SCREENBUFFEREDCONSOLE.core.ConsoleHandleOut, that_screen, this_size,
+		write_screen(MYSELF.core.ConsoleHandleOut, that_screen, this_size,
 					 bufferCoord, &this_region);
 		Sleep(200);
-		write_screen(SCREENBUFFEREDCONSOLE.core.ConsoleHandleOut, this_screen, this_size,
+		write_screen(MYSELF.core.ConsoleHandleOut, this_screen, this_size,
 					 bufferCoord, &this_region);
 	}
 	else
@@ -500,7 +501,7 @@ METHOD(keyok, int)(int keycode, int flag)
 	assert(IsScreenBufferedConsole());
 
 	res = bsearch(&key,
-				  SCREENBUFFEREDCONSOLE.rmap,
+				  MYSELF.rmap,
 				  (size_t)(N_INI + FKEYS),
 				  sizeof(keylist[0]),
 				  rkeycompare);
@@ -528,7 +529,7 @@ METHOD(has_key, int)(int keycode)
 	assert(IsScreenBufferedConsole());
 
 	res = bsearch(&key,
-				  SCREENBUFFEREDCONSOLE.rmap,
+				  MYSELF.rmap,
 				  (size_t)(N_INI + FKEYS),
 				  sizeof(keylist[0]),
 				  rkeycompare);
@@ -599,7 +600,7 @@ METHOD(reset_color_pair, bool)(void)
 
 	assert(IsScreenBufferedConsole());
 
-	SetConsoleTextAttribute(SCREENBUFFEREDCONSOLE.core.ConsoleHandleOut, a);
+	SetConsoleTextAttribute(MYSELF.core.ConsoleHandleOut, a);
 	get_SBI();
 	res = true;
 	return res;
@@ -612,10 +613,10 @@ METHOD(init_pair, int)(int pair, int f, int b)
 
 	assert(IsScreenBufferedConsole());
 
-	num_colors = SCREENBUFFEREDCONSOLE.info.maxcolors;
+	num_colors = MYSELF.info.maxcolors;
 	if ((pair > 0) && (pair < CON_NUMPAIRS) && (f >= 0) && (f < num_colors) && (b >= 0) && (b < num_colors))
 	{
-		SCREENBUFFEREDCONSOLE.pairs[pair] =
+		MYSELF.pairs[pair] =
 			console_MapColor(TRUE, f) |
 			console_MapColor(FALSE, b);
 		T(("... legacy_init_pair: pair %d: fg=%d, bg=%d", pair, f, b));
@@ -630,8 +631,8 @@ METHOD(setcolor, void)(bool fore, int color)
 
 	assert(IsScreenBufferedConsole());
 
-	a |= (WORD)((SCREENBUFFEREDCONSOLE.SBI.wAttributes) & ((fore) ? 0xfff8 : 0xff8f));
-	SetConsoleTextAttribute(SCREENBUFFEREDCONSOLE.core.ConsoleHandleOut, a);
+	a |= (WORD)((MYSELF.SBI.wAttributes) & ((fore) ? 0xfff8 : 0xff8f));
+	SetConsoleTextAttribute(MYSELF.core.ConsoleHandleOut, a);
 	get_SBI();
 }
 
@@ -644,7 +645,7 @@ METHOD(curs_set, int)(int visibility)
 
 	assert(IsScreenBufferedConsole());
 
-	this_CI = SCREENBUFFEREDCONSOLE.save_CI;
+	this_CI = MYSELF.save_CI;
 	switch (visibility)
 	{
 	case 0:
@@ -656,7 +657,7 @@ METHOD(curs_set, int)(int visibility)
 		this_CI.dwSize = 100;
 		break;
 	}
-	SetConsoleCursorInfo(SCREENBUFFEREDCONSOLE.core.ConsoleHandleOut, &this_CI);
+	SetConsoleCursorInfo(MYSELF.core.ConsoleHandleOut, &this_CI);
 	returnCode(res);
 }
 
@@ -689,7 +690,7 @@ filter_button_events(const SCREEN *sp, int mask)
 
 	if (mask & RIGHTMOST_BUTTON_PRESSED)
 	{
-		switch (SCREENBUFFEREDCONSOLE.numButtons)
+		switch (MYSELF.numButtons)
 		{
 		case 1:
 			result |= BUTTON1_PRESSED;
@@ -806,7 +807,7 @@ METHOD(read, int)(int *buf)
 	assert(buf);
 	assert(sp);
 
-	hdl = SCREENBUFFEREDCONSOLE.core.ConsoleHandleIn;
+	hdl = MYSELF.core.ConsoleHandleIn;
 	memset(&inp_rec, 0, sizeof(inp_rec));
 
 	while ((b = (bool)(0 != read_keycode(hdl, &inp_rec, 1, &nRead))))
@@ -923,7 +924,7 @@ METHOD(twait,int)(int mode, int milliseconds, int *timeleft EVENTLIST_2nd(_nc_ev
 	assert(IsScreenBufferedConsole());
 
 	sp = ConsoleScreen();
-	hdl = SCREENBUFFEREDCONSOLE.core.ConsoleHandleIn;
+	hdl = MYSELF.core.ConsoleHandleIn;
 	assert(sp);
 
 #ifdef NCURSES_WGETCH_EVENTS
@@ -1189,8 +1190,8 @@ METHOD(setmode, int)(int fd GCC_UNUSED, const TTY *arg)
 
 	assert(IsScreenBufferedConsole());
 
-	input_target = SCREENBUFFEREDCONSOLE.core.ConsoleHandleIn;
-	output_target = SCREENBUFFEREDCONSOLE.core.ConsoleHandleOut;
+	input_target = MYSELF.core.ConsoleHandleIn;
+	output_target = MYSELF.core.ConsoleHandleOut;
 	sp = ConsoleScreen();
 
 	if (!arg)
@@ -1230,11 +1231,11 @@ METHOD(setmode, int)(int fd GCC_UNUSED, const TTY *arg)
 			DWORD realMode;
 			if (GetConsoleMode(input_target, &realMode))
 			{
-				SCREENBUFFEREDCONSOLE.core.ttyflags.dwFlagIn = realMode;
+				MYSELF.core.ttyflags.dwFlagIn = realMode;
 			}
 			else
 			{
-				SCREENBUFFEREDCONSOLE.core.ttyflags.dwFlagIn = mode;
+				MYSELF.core.ttyflags.dwFlagIn = mode;
 			}
 		}
 		else
@@ -1255,11 +1256,11 @@ METHOD(setmode, int)(int fd GCC_UNUSED, const TTY *arg)
 			DWORD realMode;
 			if (GetConsoleMode(output_target, &realMode))
 			{
-				SCREENBUFFEREDCONSOLE.core.ttyflags.dwFlagOut = realMode;
+				MYSELF.core.ttyflags.dwFlagOut = realMode;
 			}
 			else
 			{
-				SCREENBUFFEREDCONSOLE.core.ttyflags.dwFlagOut = mode;
+				MYSELF.core.ttyflags.dwFlagOut = mode;
 			}
 		}
 		else
@@ -1277,24 +1278,24 @@ METHOD(setmode, int)(int fd GCC_UNUSED, const TTY *arg)
 			if (sp)
 			{
 				_nc_keypad(sp, FALSE);
-				SCREENBUFFEREDCONSOLE.core.flush(sp->_ifd);
+				MYSELF.core.flush(sp->_ifd);
 			}
 
-			if (SCREENBUFFEREDCONSOLE.hShellMode != INVALID_HANDLE_VALUE)
+			if (MYSELF.hShellMode != INVALID_HANDLE_VALUE)
 			{
-				T(("... SCREENBUFFEREDCONSOLE: switching to shell mode buffer"));
-				SCREENBUFFEREDCONSOLE.core.ConsoleHandleOut = SCREENBUFFEREDCONSOLE.hShellMode;
-				SetConsoleActiveScreenBuffer(SCREENBUFFEREDCONSOLE.core.ConsoleHandleOut);
-				SetConsoleCursorInfo(SCREENBUFFEREDCONSOLE.core.ConsoleHandleOut, &SCREENBUFFEREDCONSOLE.save_CI);
+				T(("... MYSELF: switching to shell mode buffer"));
+				MYSELF.core.ConsoleHandleOut = MYSELF.hShellMode;
+				SetConsoleActiveScreenBuffer(MYSELF.core.ConsoleHandleOut);
+				SetConsoleCursorInfo(MYSELF.core.ConsoleHandleOut, &MYSELF.save_CI);
 			}
 			else
 			{
-				T(("... SCREENBUFFEREDCONSOLE: no valid shell mode buffer"));
+				T(("... MYSELF: no valid shell mode buffer"));
 			}
 		}
 		else
 		{
-			T(("... SCREENBUFFEREDCONSOLE: Already in shell mode"));
+			T(("... MYSELF: Already in shell mode"));
 		}
 	}
 	else if (arg->kind == TTY_MODE_PROGRAM)
@@ -1309,21 +1310,21 @@ METHOD(setmode, int)(int fd GCC_UNUSED, const TTY *arg)
 					_nc_keypad(sp, TRUE);
 			}
 
-			if (SCREENBUFFEREDCONSOLE.hProgMode != INVALID_HANDLE_VALUE)
+			if (MYSELF.hProgMode != INVALID_HANDLE_VALUE)
 			{
-				T(("... SCREENBUFFEREDCONSOLE: switching to program mode buffer"));
-				SCREENBUFFEREDCONSOLE.core.ConsoleHandleOut = SCREENBUFFEREDCONSOLE.hProgMode;
-				SetConsoleActiveScreenBuffer(SCREENBUFFEREDCONSOLE.core.ConsoleHandleOut);
-				SetConsoleCursorInfo(SCREENBUFFEREDCONSOLE.core.ConsoleHandleOut, &SCREENBUFFEREDCONSOLE.save_CI);
+				T(("... MYSELF: switching to program mode buffer"));
+				MYSELF.core.ConsoleHandleOut = MYSELF.hProgMode;
+				SetConsoleActiveScreenBuffer(MYSELF.core.ConsoleHandleOut);
+				SetConsoleCursorInfo(MYSELF.core.ConsoleHandleOut, &MYSELF.save_CI);
 			}
 			else
 			{
-				T(("... SCREENBUFFEREDCONSOLE: no valid program mode buffer"));
+				T(("... MYSELF: no valid program mode buffer"));
 			}
 		}
 		else
 		{
-			T(("... SCREENBUFFEREDCONSOLE: Already in program mode"));
+			T(("... MYSELF: Already in program mode"));
 		}
 	}
 
@@ -1355,7 +1356,7 @@ METHOD(getmode, int)(int fd GCC_UNUSED, TTY *arg)
 	if (NULL == arg)
 		returnCode(ERR);
 
-	*arg = SCREENBUFFEREDCONSOLE.core.ttyflags;
+	*arg = MYSELF.core.ttyflags;
 	arg->kind = TTY_MODE_UNSPECIFIED;
 	returnCode(OK);
 }
@@ -1399,10 +1400,10 @@ METHOD(size, void)(int *Lines, int *Cols)
 
 	if (Lines != NULL && Cols != NULL)
 	{
-		*Lines = (int)(SCREENBUFFEREDCONSOLE.SBI.srWindow.Bottom + 1 -
-					   SCREENBUFFEREDCONSOLE.SBI.srWindow.Top);
-		*Cols = (int)(SCREENBUFFEREDCONSOLE.SBI.srWindow.Right + 1 -
-					  SCREENBUFFEREDCONSOLE.SBI.srWindow.Left);
+		*Lines = (int)(MYSELF.SBI.srWindow.Bottom + 1 -
+					   MYSELF.SBI.srWindow.Top);
+		*Cols = (int)(MYSELF.SBI.srWindow.Right + 1 -
+					  MYSELF.SBI.srWindow.Left);
 		T(("win32_driver::legacy_size() returns %d lines, %d cols", *Lines, *Cols));
 	}
 }
@@ -1468,7 +1469,7 @@ METHOD(init, bool)(int fdOut, int fdIn)
 			FILE_SHARE_WRITE,
 			NULL, OPEN_EXISTING, 0, NULL);
 
-		SCREENBUFFEREDCONSOLE.hShellMode = stdout_handle;
+		MYSELF.hShellMode = stdout_handle;
 
 		// JPF FIXME - In theory there can be scenarios, where ConPTY is not supported, but UCRT is availabe. We need to think through how to deal with that.
 		// encoding_init();
@@ -1479,7 +1480,7 @@ METHOD(init, bool)(int fdOut, int fdIn)
 			T(("Output handle is not a console"));
 			returnBool(false);
 		}
-		SCREENBUFFEREDCONSOLE.core.ConsoleHandleOut = stdout_handle;
+		MYSELF.core.ConsoleHandleOut = stdout_handle;
 
 		if (stdin_handle == INVALID_HANDLE_VALUE || GetConsoleMode(stdin_handle,
 																   &dwFlag) == 0)
@@ -1487,7 +1488,7 @@ METHOD(init, bool)(int fdOut, int fdIn)
 			T(("StdIn handle is not a console"));
 			returnBool(false);
 		}
-		SCREENBUFFEREDCONSOLE.core.ConsoleHandleIn = stdin_handle;
+		MYSELF.core.ConsoleHandleIn = stdin_handle;
 
 		SetConsoleMode(stdout_handle, dwFlagOut);
 		/* We immediately read the console mode back to reflect any changes the
@@ -1498,7 +1499,7 @@ METHOD(init, bool)(int fdOut, int fdIn)
 			T(("GetConsoleMode() failed for stdout"));
 			returnBool(false);
 		}
-		SCREENBUFFEREDCONSOLE.core.ttyflags.dwFlagOut = dwFlagOut;
+		MYSELF.core.ttyflags.dwFlagOut = dwFlagOut;
 
 		dwFlagIn &= ~(ENABLE_QUICK_EDIT_MODE);
 		SetConsoleMode(stdin_handle, dwFlagIn);
@@ -1510,24 +1511,24 @@ METHOD(init, bool)(int fdOut, int fdIn)
 			T(("GetConsoleMode() failed for stdin"));
 			returnBool(false);
 		}
-		SCREENBUFFEREDCONSOLE.core.ttyflags.dwFlagIn = dwFlagIn;
+		MYSELF.core.ttyflags.dwFlagIn = dwFlagIn;
 
 		_nc_screenbuffered_console_init();
 
-		SCREENBUFFEREDCONSOLE.core.ConsoleHandleIn = stdin_handle;
-		SCREENBUFFEREDCONSOLE.core.ConsoleHandleOut = stdout_handle;
+		MYSELF.core.ConsoleHandleIn = stdin_handle;
+		MYSELF.core.ConsoleHandleOut = stdout_handle;
 
-		if (SCREENBUFFEREDCONSOLE.hProgMode == INVALID_HANDLE_VALUE)
+		if (MYSELF.hProgMode == INVALID_HANDLE_VALUE)
 		{
 			T(("... creating console buffer"));
-			SCREENBUFFEREDCONSOLE.hProgMode =
+			MYSELF.hProgMode =
 				CreateConsoleScreenBuffer(GENERIC_READ | GENERIC_WRITE,
 										  FILE_SHARE_READ | FILE_SHARE_WRITE,
 										  NULL,
 										  CONSOLE_TEXTMODE_BUFFER,
 										  NULL);
 		}
-		if (SCREENBUFFEREDCONSOLE.hProgMode == INVALID_HANDLE_VALUE || GetConsoleMode(SCREENBUFFEREDCONSOLE.hProgMode, &dwFlagOut) == 0)
+		if (MYSELF.hProgMode == INVALID_HANDLE_VALUE || GetConsoleMode(MYSELF.hProgMode, &dwFlagOut) == 0)
 		{
 			T(("Output handle is not a console"));
 			returnBool(false);
@@ -1552,7 +1553,7 @@ METHOD(mvcur,int)(int oldrow GCC_UNUSED, int oldcol GCC_UNUSED, int newrow, int 
 
 	pos.X = (SHORT)newcol;
 	pos.Y = (SHORT)newrow;
-	if (SetConsoleCursorPosition(SCREENBUFFEREDCONSOLE.core.ConsoleHandleOut, pos))
+	if (SetConsoleCursorPosition(MYSELF.core.ConsoleHandleOut, pos))
 	{
 		result = OK;
 	}
@@ -1570,7 +1571,7 @@ MapAttr(WORD res, attr_t ch)
 		if (p >= 0 && p < CON_NUMPAIRS)
 		{
 			WORD a;
-			a = SCREENBUFFEREDCONSOLE.pairs[p];
+			a = MYSELF.pairs[p];
 			res = (WORD)((res & 0xff00) | a);
 		}
 	}
@@ -1618,16 +1619,16 @@ METHOD(writeat,bool)(int y, int x, const cchar_t *str, int limit)
 		if (isWidecExt(ch))
 			continue;
 		ci[actual].CharInfoChar = CharOf(ch);
-		ci[actual].Attributes = MapAttr(SCREENBUFFEREDCONSOLE.SBI.wAttributes,
+		ci[actual].Attributes = MapAttr(MYSELF.SBI.wAttributes,
 										AttrOf(ch));
 		if (AttrOf(ch) & A_ALTCHARSET)
 		{
-			if (SCREENBUFFEREDCONSOLE.info.wacs_map)
+			if (MYSELF.info.wacs_map)
 			{
 				int which = CharOf(ch);
-				if (which > 0 && which < ACS_LEN && CharOf(SCREENBUFFEREDCONSOLE.info.wacs_map[which]) != 0)
+				if (which > 0 && which < ACS_LEN && CharOf(MYSELF.info.wacs_map[which]) != 0)
 				{
-					ci[actual].CharInfoChar = CharOf(SCREENBUFFEREDCONSOLE.info.wacs_map[which]);
+					ci[actual].CharInfoChar = CharOf(MYSELF.info.wacs_map[which]);
 				}
 				else
 				{
@@ -1648,7 +1649,7 @@ METHOD(writeat,bool)(int y, int x, const cchar_t *str, int limit)
 	rec.Right = (SHORT)(x + limit - 1);
 	rec.Bottom = rec.Top;
 
-	return (bool)(0 != write_screen(SCREENBUFFEREDCONSOLE.core.ConsoleHandleOut, ci, siz, loc, &rec));
+	return (bool)(0 != write_screen(MYSELF.core.ConsoleHandleOut, ci, siz, loc, &rec));
 }
 
 
@@ -1668,7 +1669,7 @@ METHOD(writeat,bool)(int y, int x, const chtype *str, int limit)
 	{
 		ch = str[i];
 		ci[i].CharInfoChar = ChCharOf(ch);
-		ci[i].Attributes = MapAttr(SCREENBUFFEREDCONSOLE.SBI.wAttributes,
+		ci[i].Attributes = MapAttr(MYSELF.SBI.wAttributes,
 								   ChAttrOf(ch));
 		if (ChAttrOf(ch) & A_ALTCHARSET)
 		{
@@ -1688,7 +1689,7 @@ METHOD(writeat,bool)(int y, int x, const chtype *str, int limit)
 	rec.Right = (short)(x + limit - 1);
 	rec.Bottom = rec.Top;
 
-	return (bool)(0 != write_screen(SCREENBUFFEREDCONSOLE.core.ConsoleHandleOut, ci, siz, loc, &rec));
+	return (bool)(0 != write_screen(MYSELF.core.ConsoleHandleOut, ci, siz, loc, &rec));
 }
 #endif
 

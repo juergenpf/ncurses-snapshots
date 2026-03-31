@@ -277,6 +277,19 @@ _nc_console_setup(void) {
 	 	 * correctly, because we handle UTF-8 encoding and decoding ourselves and we don't
 	 	 * rely on the C runtime for that. */
 		encoding_init();
+#else
+		/* This is intentional. We want to assert best possible support for ncurses functionality
+		 * on Windows is available, so this message should motivate people to use appropriate builds
+		 * of ncurses. When the application is built against a DLL version of ncurses, a simple install
+		 * of a new ncurses set of DLLS with ConPTY support should be sufficient to get ConPTY support 
+		 * without recompiling the application. When the application is statically linked against ncurses, 
+		 * then the application itself needs to be recompiled with a version of ncurses that has ConPTY 
+		 * support enabled, otherwise it will not be able to use ConPTY even if it is available on the 
+		 * system. In this case, we print an error message and exit, because running without ConPTY support 
+		 * on a modern Windows system would lead to a degraded experience. */
+		T(("lib_win32concore::_nc_console_setup - ConPTY supported, but not enabled. Exiting Program"));
+		fprintf(stderr, "ERROR: ConPTY is supported on this system, but not compiled into ncurses.\n");
+		fprintf(stderr, "This configuration is NOT supported.\n");
 #endif
 	} else {
 #if USE_SCREENBUFFERED_CONSOLE

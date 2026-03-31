@@ -2548,7 +2548,7 @@ extern NCURSES_EXPORT(bool) _nc_console_setup(void);
 #define AssertConsoleSetup() \
     if (!CoreConsoleInitialized()) { \
 	if (!_nc_console_setup()) { \
-	    fprintf(stderr, "Failed to initialize console interface\n"); \
+	    fprintf(stderr, "Failed to initialize console interface.\n"); \
 	    ExitProgram(EXIT_FAILURE); \
 	} \
     }
