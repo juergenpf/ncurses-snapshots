@@ -340,6 +340,7 @@ NCURSES_SP_NAME(newterm) (NCURSES_SP_DCLx
 #if USE_CONSOLE_API
 	    CORECONSOLE.sp = SP_PARM;
 	    assert(CORECONSOLE.sp != 0);
+	    SP_PARM->_console = &CORECONSOLE; // 1-1 relationship between screen and console interface
 #endif
 	}
     }

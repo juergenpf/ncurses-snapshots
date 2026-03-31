@@ -1034,6 +1034,8 @@ _nc_setupterm(const char *tname,
     }
 #if USE_CONSOLE_API
     CORECONSOLE.sp = sp;
+    if (sp)
+	sp->_console = &CORECONSOLE; // 1-1 relationship between console and screen
 #endif
     free(myname);
     returnCode(code);

@@ -144,7 +144,7 @@ check_mouse_activity(SCREEN *sp, int delay EVENTLIST_2nd(_nc_eventlist * evl))
 
 #if USE_SCREENBUFFERED_CONSOLE
     if (IsScreenBufferedConsole()) {
-	SCREEN *spc = ConsoleScreen();
+	SCREEN *spc = ConsoleScreen(DefaultConsole());
 	assert(spc);
 	assert(sp==spc);
 	return(MouseFifoHasEvent(spc) 

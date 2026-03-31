@@ -75,6 +75,20 @@ METHOD(writeat, bool)(int y, int x, const cchar_t *str, int limit);
 METHOD(writeat, bool)(int y, int x, const chtype *str, int limit);
 #endif
 
+#if USE_WIDEC_SUPPORT
+#define write_screen WriteConsoleOutputW
+#define read_screen  ReadConsoleOutputW
+#define read_keycode ReadConsoleInputW
+#define KeyEventChar KeyEvent.uChar.UnicodeChar
+#define CharInfoChar Char.UnicodeChar
+#else
+#define write_screen WriteConsoleOutput
+#define read_screen  ReadConsoleOutput
+#define read_keycode ReadConsoleInput
+#define KeyEventChar KeyEvent.uChar.AsciiChar
+#define CharInfoChar Char.AsciiChar
+#endif /* USE_WIDEC_SUPPORT */
+
 static ScreenBufferedConsoleInterface legacyCONSOLE =
 	{
 		.core =
@@ -415,7 +429,7 @@ METHOD(keypad, int)(bool flag)
 
 	assert(IsScreenBufferedConsole());
 
-	sp = ConsoleScreen();
+	sp = ConsoleScreen(DefaultConsole());
 	if (sp)
 	{
 		sp->_keypad_on = flag;
@@ -582,7 +596,7 @@ METHOD(init_acs, void)(chtype *real_map)
 	SCREEN *sp;
 
 	assert(IsScreenBufferedConsole());
-	sp = ConsoleScreen();
+	sp = ConsoleScreen(DefaultConsole());
 
 	for (n = 0; n < SIZEOF(table); ++n)
 	{
@@ -803,7 +817,7 @@ METHOD(read, int)(int *buf)
 
 	assert(IsScreenBufferedConsole());
 
-	sp = ConsoleScreen();
+	sp = ConsoleScreen(DefaultConsole());
 	assert(buf);
 	assert(sp);
 
@@ -923,7 +937,7 @@ METHOD(twait,int)(int mode, int milliseconds, int *timeleft EVENTLIST_2nd(_nc_ev
 
 	assert(IsScreenBufferedConsole());
 
-	sp = ConsoleScreen();
+	sp = ConsoleScreen(DefaultConsole());
 	hdl = MYSELF.core.ConsoleHandleIn;
 	assert(sp);
 
@@ -1192,7 +1206,7 @@ METHOD(setmode, int)(int fd GCC_UNUSED, const TTY *arg)
 
 	input_target = MYSELF.core.ConsoleHandleIn;
 	output_target = MYSELF.core.ConsoleHandleOut;
-	sp = ConsoleScreen();
+	sp = ConsoleScreen(DefaultConsole());
 
 	if (!arg)
 		returnCode(ERR);
@@ -1663,7 +1677,7 @@ METHOD(writeat,bool)(int y, int x, const chtype *str, int limit)
 	SMALL_RECT rec;
 	int i;
 	chtype ch;
-	SCREEN *sp = ConsoleScreen();
+	SCREEN *sp = ConsoleScreen(DefaultConsole());
 
 	for (i = 0; i < limit; i++)
 	{

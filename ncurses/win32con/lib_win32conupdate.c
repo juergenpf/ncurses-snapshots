@@ -146,7 +146,7 @@ _nc_win32con_doupdate (void)
 
 	assert(IsScreenBufferedConsole());
 
-	sp = ConsoleScreen();
+	sp = ConsoleScreen(DefaultConsole());
 
 	Width = screen_columns(sp);
 	Height = screen_lines(sp);

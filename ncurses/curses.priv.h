@@ -1036,6 +1036,10 @@ typedef struct {
 #define IsCbreak(sp)    (sp)->_tty_flags._cbreak
 #define IsEcho(sp)      (sp)->_tty_flags._echo
 
+#if USE_CONSOLE_API
+// Forward declaration so we can use it in SCREEN.
+typedef struct consoleCoreInterface ConsoleCoreInterface;
+#endif
 /*
  * The SCREEN structure.
  */
@@ -1310,6 +1314,10 @@ typedef struct screen {
 	void		*_ordered_pairs; /* index used by alloc_pair()	     */
 	int		_pairs_used;	/* actual number of color-pairs used */
 	int		_recent_pair;	/* number for most recent free-pair  */
+#endif
+
+#if USE_CONSOLE_API
+	ConsoleCoreInterface *_console;	/* console API interface */
 #endif
 
 #ifdef TRACE
@@ -2495,7 +2503,7 @@ extern NCURSES_EXPORT(int) _nc_timeval_diff_in_ms(struct timeval start, struct t
                                         | CONSOLE_STATUS_IS_CONPTY       \
                                         | CONSOLE_STATUS_LIMITED_RESIZE  \
                                         | CONSOLE_STATUS_RESIZE_PENDING)
-typedef struct {
+typedef struct consoleCoreInterface {
     // Properties
     DWORD status;                    /* Certain status flags defined above */
 
@@ -2522,7 +2530,15 @@ typedef struct {
 
 extern NCURSES_EXPORT_VAR(ConsoleCoreInterface*) _nc_CORECONSOLE;
 #define CORECONSOLE (*_nc_CORECONSOLE)
-#define ConsoleScreen() ((SCREEN*)(intptr_t)CORECONSOLE.sp)
+#define DefaultConsole() _nc_CORECONSOLE
+
+/* At the moment - if at all - we only have exactly one static console per process.
+ * So, if we end up with a NULL pointer, we refer to this static console pointer, 
+ * which may or may not have been initialized yet.
+*/
+#define ScreenConsole(sp) ((sp) ? ((sp)->_console ? (sp)->_console : DefaultConsole()) : DefaultConsole())
+
+#define ConsoleScreen(console) (console->sp)
 #define CoreConsoleInitialized() (_nc_CORECONSOLE != NULL)
 
 #define IsConPTY() (CORECONSOLE.status & CONSOLE_STATUS_IS_CONPTY)
@@ -2623,20 +2639,7 @@ typedef struct {
 } ScreenBufferedConsoleInterface;
 extern NCURSES_EXPORT_VAR(ScreenBufferedConsoleInterface *) _nc_SCREENBUFFEREDCONSOLE;
 #define SCREENBUFFEREDCONSOLE (*_nc_SCREENBUFFEREDCONSOLE)
-
-#if USE_WIDEC_SUPPORT
-#define write_screen WriteConsoleOutputW
-#define read_screen  ReadConsoleOutputW
-#define read_keycode ReadConsoleInputW
-#define KeyEventChar KeyEvent.uChar.UnicodeChar
-#define CharInfoChar Char.UnicodeChar
-#else
-#define write_screen WriteConsoleOutput
-#define read_screen  ReadConsoleOutput
-#define read_keycode ReadConsoleInput
-#define KeyEventChar KeyEvent.uChar.AsciiChar
-#define CharInfoChar Char.AsciiChar
-#endif /* USE_WIDEC_SUPPORT */
+#define AsScreenBufferedConsole(sp) ((ScreenBufferedConsoleInterface*)(sp)->_console)
 
 #define MouseFifoHasEvent(sp) (sp->_console_mouse_head < sp->_console_mouse_tail)
 #define IsMouseActive(sp) (sp->_mouse_active == true)
@@ -2675,6 +2678,7 @@ typedef struct {
 // Guaranteed to be statically initialzed.
 extern NCURSES_EXPORT_VAR(ConPtyInterface*) _nc_currentCONPTY;
 #define WINCONPTY (*_nc_currentCONPTY)
+#define AsConPTY(sp) ((ConPtyInterface*)(sp)->_console)
 #endif /* USE_CONPTY */
 
 #endif /* USE_CONSOLE_API */
