@@ -54,8 +54,8 @@ NCURSES_SP_NAME(keyok) (NCURSES_SP_DCLx int c, bool flag)
     if (HasTerminal(SP_PARM)) {
 	T((T_CALLED("keyok(%p, %d,%d)"), (void *) SP_PARM, c, flag));
 #if USE_SCREENBUFFERED_CONSOLE
-	if (IsScreenBufferedConsole())
-	    returnCode(SCREENBUFFEREDCONSOLE.keyok(c,flag));
+	if (ScreenIsBufferedConsole(SP_PARM))
+	    returnCode(AsScreenBufferedConsole(SP_PARM)->keyok(c,flag));
 #endif
 	if (c >= 0) {
 	    int count = 0;

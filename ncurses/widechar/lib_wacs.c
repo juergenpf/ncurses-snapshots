@@ -145,8 +145,8 @@ _nc_init_wacs(void)
 	       _tracecchar_t(&_nc_wacs[m])));
 	}
 #if USE_SCREENBUFFERED_CONSOLE
-	if (IsScreenBufferedConsole()) {
-	    SCREENBUFFEREDCONSOLE.info.wacs_map = _nc_wacs;
+	if (IsScreenBufferedConsole(DefaultConsole())) {
+	    DefaultScreenBufferedConsole()->info.wacs_map = _nc_wacs;
 	}
 #endif
     }

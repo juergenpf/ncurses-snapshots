@@ -143,14 +143,14 @@ check_mouse_activity(SCREEN *sp, int delay EVENTLIST_2nd(_nc_eventlist * evl))
     int rc;
 
 #if USE_SCREENBUFFERED_CONSOLE
-    if (IsScreenBufferedConsole()) {
+    if (ScreenIsBufferedConsole(sp)) {
 	SCREEN *spc = ConsoleScreen(DefaultConsole());
 	assert(spc);
 	assert(sp==spc);
 	return(MouseFifoHasEvent(spc) 
 		? 
 		TW_MOUSE : 
-		SCREENBUFFEREDCONSOLE.twait(TWAIT_MASK, delay, (int*)0 EVENTLIST_2nd(evl)));
+		AsScreenBufferedConsole(sp)->twait(TWAIT_MASK, delay, (int*)0 EVENTLIST_2nd(evl)));
     }
 #endif /* !USE_SCREENBUFFERED_CONSOLE */
 # if USE_SYSMOUSE
@@ -279,10 +279,10 @@ fifo_push(SCREEN *sp EVENTLIST_2nd(_nc_eventlist * evl))
 #endif
     {				/* Can block... */
 #if USE_SCREENBUFFERED_CONSOLE
-	if (IsScreenBufferedConsole()) {
+	if (ScreenIsBufferedConsole(sp)) {
 	    int buf;
 	    _nc_set_read_thread(TRUE);
-	    n = SCREENBUFFEREDCONSOLE.read(&buf);
+	    n = AsScreenBufferedConsole(sp)->read(&buf);
 	    _nc_set_read_thread(FALSE);
 	    ch = buf;
 	    /*

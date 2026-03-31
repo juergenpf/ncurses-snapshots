@@ -381,8 +381,8 @@ NCURSES_SP_NAME(termattrs) (NCURSES_SP_DCL0)
 
     if (HasTerminal(SP_PARM)) {
 #if USE_SCREENBUFFERED_CONSOLE
-	if (IsScreenBufferedConsole())
-	    returnChtype(SCREENBUFFEREDCONSOLE.termattrs());
+	if (ScreenIsBufferedConsole(SP_PARM))
+	    returnChtype(AsScreenBufferedConsole(SP_PARM)->termattrs());
 #endif
 	if (enter_alt_charset_mode)
 	    attrs |= A_ALTCHARSET;

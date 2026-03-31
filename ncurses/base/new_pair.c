@@ -44,7 +44,7 @@
 #endif
 
 #if USE_SCREENBUFFERED_CONSOLE
-#define MaxColors      (IsScreenBufferedConsole() ? SCREENBUFFEREDCONSOLE.info.maxcolors : max_colors)
+#define MaxColors      (ScreenIsBufferedConsole(SP_PARM) ? AsScreenBufferedConsole(SP_PARM)->info.maxcolors : max_colors)
 #else
 #define MaxColors      max_colors
 #endif

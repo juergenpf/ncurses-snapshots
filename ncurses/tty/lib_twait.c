@@ -150,7 +150,7 @@ _nc_eventlist_timeout(_nc_eventlist * evl)
 
 #if USE_CONPTY
 #define pollfd pty_pollfd
-#define poll WINCONPTY.poll
+#define poll AsConPTY(sp)->poll
 #endif
 
 /*

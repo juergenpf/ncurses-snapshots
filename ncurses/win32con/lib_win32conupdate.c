@@ -136,17 +136,14 @@ find_next_change(SCREEN *sp, int row, int col)
 	win->_line[row].lastchar = _NOCHANGE
 
 NCURSES_EXPORT(int)
-_nc_win32con_doupdate (void)
+_nc_win32con_doupdate (SCREEN *sp)
 {
 	int result = ERR;
 	int y, nonempty, n, x0, x1, Width, Height;
-	SCREEN *sp;
 
-	T((T_CALLED("_nc_win32con_doupdate()")));
+	T((T_CALLED("_nc_win32con_doupdate(%p)"), (void *) sp));
 
-	assert(IsScreenBufferedConsole());
-
-	sp = ConsoleScreen(DefaultConsole());
+	assert(ScreenIsBufferedConsole(sp));
 
 	Width = screen_columns(sp);
 	Height = screen_lines(sp);

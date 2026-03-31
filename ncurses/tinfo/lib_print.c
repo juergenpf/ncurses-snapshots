@@ -53,7 +53,7 @@ NCURSES_SP_NAME(mcprint) (NCURSES_SP_DCLx char *data, int len)
     size_t need;
 
 #if USE_SCREENBUFFERED_CONSOLE
-    if (IsScreenBufferedConsole()) {
+    if (ScreenIsBufferedConsole(SP_PARM)) {
         return (ERR);           
     }
 #endif

@@ -60,8 +60,8 @@
 MODULE_ID("$Id: lib_set_term.c,v 1.200 2026/03/28 20:22:11 tom Exp $")
 
 #if USE_SCREENBUFFERED_CONSOLE
-#define MaxColors      (IsScreenBufferedConsole() ? SCREENBUFFEREDCONSOLE.info.maxcolors : max_colors)
-#define NumLabels      (IsScreenBufferedConsole() ? SCREENBUFFEREDCONSOLE.info.numlabels : num_labels)
+#define MaxColors      (ScreenIsBufferedConsole(SP_PARM) ? AsScreenBufferedConsole(SP_PARM)->info.maxcolors : max_colors)
+#define NumLabels      (ScreenIsBufferedConsole(SP_PARM) ? AsScreenBufferedConsole(SP_PARM)->info.numlabels : num_labels)
 #else
 #define MaxColors      max_colors
 #define NumLabels      num_labels

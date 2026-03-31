@@ -60,7 +60,7 @@ NCURSES_EXPORT_VAR(NCURSES_OSPEED) ospeed = 0;        /* used by termcap library
 NCURSES_EXPORT_VAR(int) _nc_nulls_sent = 0;
 
 #if USE_CONPTY
-#define NC_WRITE(fd,buf,len) (IsConPTY() ? WINCONPTY.write(fd,buf, len) : write(fd, buf, len))
+#define NC_WRITE(fd,buf,len) (ScreenIsConPTYInProgMode(SP_PARM) ? AsConPTY(SP_PARM)->write(fd,buf, len) : write(fd, buf, len))
 #else
 #define NC_WRITE(fd,buf,len) write(fd, buf, len)
 #endif /* USE_CONSOLE_API */
@@ -144,7 +144,7 @@ NCURSES_SP_NAME(_nc_flush) (NCURSES_SP_DCL0)
 	    while (amount) {
 		ssize_t res = NC_WRITE(SP_PARM->_ofd, buf, amount);
 		if (res > 0) {
-		    if (res > amount) // weird, but can happen with strange C runtimes.
+		    if ((size_t)res > amount) // weird, but can happen with strange C runtimes.
 			break;
 		    /* if the write was incomplete, try again */
 		    amount -= (size_t) res;

@@ -149,8 +149,8 @@ NCURSES_SP_NAME(_nc_init_acs) (NCURSES_SP_DCL0)
     real_map['E'] = '+';	/* large plus or crossover */
 
 #if USE_SCREENBUFFERED_CONSOLE
-    if (IsScreenBufferedConsole()) {
-        SCREENBUFFEREDCONSOLE.init_acs(real_map);
+    if (ScreenIsBufferedConsole(SP_PARM)) {
+        AsScreenBufferedConsole(SP_PARM)->init_acs(real_map);
         return;
     }
 #endif

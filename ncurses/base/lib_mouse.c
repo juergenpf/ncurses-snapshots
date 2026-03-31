@@ -753,7 +753,7 @@ initialize_mousetype(SCREEN *sp)
 
 #if USE_CONSOLE_API
 #if USE_SCREENBUFFERED_CONSOLE
-    if (IsScreenBufferedConsole()) {
+    if (ScreenIsBufferedConsole(sp)) {
 	sp->_mouse_type = M_WINDOWS_CONSOLE;
 	returnVoid;
     } 

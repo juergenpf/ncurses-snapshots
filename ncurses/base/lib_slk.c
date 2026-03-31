@@ -51,10 +51,10 @@
 MODULE_ID("$Id: lib_slk.c,v 1.52 2025/12/27 12:41:23 tom Exp $")
 
 #if USE_SCREENBUFFERED_CONSOLE
-#define NumLabels      (IsScreenBufferedConsole() ? SCREENBUFFEREDCONSOLE.info.numlabels : num_labels)
-#define NoColorVideo   (IsScreenBufferedConsole() ? SCREENBUFFEREDCONSOLE.info.nocolorvideo : no_color_video)
-#define LabelWidth     (IsScreenBufferedConsole() ? SCREENBUFFEREDCONSOLE.info.labelwidth : label_width)
-#define LabelHeight    (IsScreenBufferedConsole() ? SCREENBUFFEREDCONSOLE.info.labelheight : label_height)
+#define NumLabels      (ScreenIsBufferedConsole(SP_PARM) ? AsScreenBufferedConsole(SP_PARM)->info.numlabels : num_labels)
+#define NoColorVideo   (ScreenIsBufferedConsole(SP_PARM) ? AsScreenBufferedConsole(SP_PARM)->info.nocolorvideo : no_color_video)
+#define LabelWidth     (ScreenIsBufferedConsole(SP_PARM) ? AsScreenBufferedConsole(SP_PARM)->info.labelwidth : label_width)
+#define LabelHeight    (ScreenIsBufferedConsole(SP_PARM) ? AsScreenBufferedConsole(SP_PARM)->info.labelheight : label_height)
 #else
 #define NumLabels    num_labels
 #define NoColorVideo no_color_video

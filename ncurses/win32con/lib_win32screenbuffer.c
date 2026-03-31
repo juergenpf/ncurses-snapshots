@@ -54,7 +54,6 @@ METHOD(size_changed, bool)(void);
 METHOD(getmode, int)(int fd GCC_UNUSED, TTY *arg);
 METHOD(setmode, int)(int fd GCC_UNUSED, const TTY *arg);
 METHOD(defmode, int)(TTY *arg, short kind);
-METHOD(termname, const char *)(bool longname);
 METHOD(adjust_size, bool)(void);
 METHOD(termattrs, chtype)(void);
 METHOD(keypad, int)(bool flag);
@@ -111,7 +110,6 @@ static ScreenBufferedConsoleInterface legacyCONSOLE =
 		.SBI = {},
 		.save_CI = {0},
 
-		Dispatch(termname),
 		Dispatch(adjust_size),
 		Dispatch(termattrs),
 		Dispatch(keypad),
@@ -138,7 +136,7 @@ _nc_SCREENBUFFEREDCONSOLE = &legacyCONSOLE;
 
 #define GenMap(vKey, key) MAKELONG(key, vKey)
 #define AdjustY() 0
-#define console_initialized (IsConsoleInitialized())
+#define console_initialized (IsConsoleInitialized(&MYSELF.core))
 
 static const LONG keylist[] =
 	{
@@ -365,12 +363,6 @@ _nc_screenbuffered_console_init(void)
 #endif
 }
 
-METHOD(termname, const char *)(bool longname)
-{
-	AssertScreenBufferedConsole();
-	return longname ? "Windows Legacy Console" : "#win32console";
-}
-
 METHOD(adjust_size, bool)(void)
 {
 	bool res = false;
@@ -380,7 +372,7 @@ METHOD(adjust_size, bool)(void)
 	T((T_METHOD(adjust_size," ")));
 	AssertScreenBufferedConsole();
 
-	if (HasConsoleResizeLimitations())
+	if (HasConsoleResizeLimitations(&MYSELF.core))
 	{
 		T(("Console has resize limitations, skipping AdjustSize"));
 		returnBool(res);
@@ -899,7 +891,7 @@ METHOD(read, int)(int *buf)
 			}
 			else if (inp_rec.EventType == WINDOW_BUFFER_SIZE_EVENT)
 			{
-				SetConsolePendingResize();
+				SetConsolePendingResize(&MYSELF.core);
 			}
 			continue;
 		}
@@ -1156,7 +1148,7 @@ METHOD(twait,int)(int mode, int milliseconds, int *timeleft EVENTLIST_2nd(_nc_ev
 					case WINDOW_BUFFER_SIZE_EVENT:
 						T(("twait:event WINDOW_BUFFER_SIZE_EVENT"));
 						CONSUME();
-						SetConsolePendingResize();
+						SetConsolePendingResize(&MYSELF.core);
 						break;
 
 					default:
@@ -1286,9 +1278,9 @@ METHOD(setmode, int)(int fd GCC_UNUSED, const TTY *arg)
 	if (arg->kind == TTY_MODE_SHELL)
 	{
 		T(("Shell mode set"));
-		if (IsConsoleProgMode())
+		if (IsConsoleProgMode(&MYSELF.core))
 		{
-			ClearConsoleProgMode();
+			ClearConsoleProgMode(&MYSELF.core);
 			if (sp)
 			{
 				_nc_keypad(sp, FALSE);
@@ -1315,9 +1307,9 @@ METHOD(setmode, int)(int fd GCC_UNUSED, const TTY *arg)
 	else if (arg->kind == TTY_MODE_PROGRAM)
 	{
 		T(("Program mode set"));
-		if (!IsConsoleProgMode())
+		if (!IsConsoleProgMode(&MYSELF.core))
 		{
-			SetConsoleProgMode();
+			SetConsoleProgMode(&MYSELF.core);
 			if (sp)
 			{
 				if (sp->_keypad_on)
@@ -1400,7 +1392,7 @@ METHOD(defmode, int)(TTY *arg, short kind)
 
 	if (realMode == TTY_MODE_AUTO)
 	{
-		realMode = IsConsoleProgMode() ? TTY_MODE_PROGRAM : TTY_MODE_SHELL;
+		realMode = IsConsoleProgMode(&MYSELF.core) ? TTY_MODE_PROGRAM : TTY_MODE_SHELL;
 	}
 
 	arg->kind = realMode;
@@ -1429,11 +1421,11 @@ METHOD(size_changed, bool)(void)
 
 	AssertScreenBufferedConsole();
 
-	if (HasConsolePendingResize())
+	if (HasConsolePendingResize(&MYSELF.core))
 	{
 		T(("Resize event pending, returning TRUE"));
 		resized = true;
-		ClearConsoleResizeLimitations();
+		ClearConsoleResizeLimitations(&MYSELF.core);
 		_nc_globals.have_sigwinch = 1;
 	}
 	returnBool(resized);
@@ -1459,7 +1451,7 @@ METHOD(init, bool)(int fdOut, int fdIn)
 	AssertScreenBufferedConsole();
 
 	/* initialize once, or not at all */
-	if (!IsConsoleInitialized())
+	if (!IsConsoleInitialized(&MYSELF.core))
 	{
 		/*
 		 * We set the console mode flags to the most basic ones that are required for ConPTY
@@ -1548,7 +1540,7 @@ METHOD(init, bool)(int fdOut, int fdIn)
 			returnBool(false);
 		}
 
-		MarkConsoleInitialized();
+		MarkConsoleInitialized(&MYSELF.core);
 		result = true;
 	} else
 	{

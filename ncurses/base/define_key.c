@@ -48,7 +48,7 @@ NCURSES_SP_NAME(define_key) (NCURSES_SP_DCLx const char *str, int keycode)
 	unsigned ukey = (unsigned) keycode;
 
 #if USE_SCREENBUFFERED_CONSOLE
-#define CallHasKey(keycode) (IsScreenBufferedConsole() ? SCREENBUFFEREDCONSOLE.has_key(keycode) : NCURSES_SP_NAME(has_key)(NCURSES_SP_ARGx keycode))
+#define CallHasKey(keycode) (ScreenIsBufferedConsole(SP_PARM) ? AsScreenBufferedConsole(SP_PARM)->has_key(keycode) : NCURSES_SP_NAME(has_key)(NCURSES_SP_ARGx keycode))
 #else
 #define CallHasKey(keycode) NCURSES_SP_NAME(has_key)(NCURSES_SP_ARGx keycode)
 #endif

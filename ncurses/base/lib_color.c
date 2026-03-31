@@ -52,12 +52,12 @@
 MODULE_ID("$Id: lib_color.c,v 1.157 2025/12/27 12:31:03 tom Exp $")
 
 #if USE_SCREENBUFFERED_CONSOLE
-#define CanChange      (IsScreenBufferedConsole() ? SCREENBUFFEREDCONSOLE.info.canchange : can_change)
-#define DefaultPalette (IsScreenBufferedConsole() ? cga_palette : (hue_lightness_saturation ? hls_palette : cga_palette))
-#define HasColor       (IsScreenBufferedConsole() ? SCREENBUFFEREDCONSOLE.info.hascolor : has_color)
-#define InitColor      (IsScreenBufferedConsole() ? SCREENBUFFEREDCONSOLE.info.initcolor : (initialize_color!=NULL))
-#define MaxColors      (IsScreenBufferedConsole() ? SCREENBUFFEREDCONSOLE.info.maxcolors : max_colors)
-#define MaxPairs       (IsScreenBufferedConsole() ? SCREENBUFFEREDCONSOLE.info.maxpairs : max_pairs)
+#define CanChange      (ScreenIsBufferedConsole(SP_PARM) ? AsScreenBufferedConsole(SP_PARM)->info.canchange : can_change)
+#define DefaultPalette (ScreenIsBufferedConsole(SP_PARM) ? cga_palette : (hue_lightness_saturation ? hls_palette : cga_palette))
+#define HasColor       (ScreenIsBufferedConsole(SP_PARM) ? AsScreenBufferedConsole(SP_PARM)->info.hascolor : has_color)
+#define InitColor      (ScreenIsBufferedConsole(SP_PARM) ? AsScreenBufferedConsole(SP_PARM)->info.initcolor : (initialize_color!=NULL))
+#define MaxColors      (ScreenIsBufferedConsole(SP_PARM) ? AsScreenBufferedConsole(SP_PARM)->info.maxcolors : max_colors)
+#define MaxPairs       (ScreenIsBufferedConsole(SP_PARM) ? AsScreenBufferedConsole(SP_PARM)->info.maxpairs : max_pairs)
 #define UseHlsPalette  (DefaultPalette == _nc_hls_palette)
 #else
 #define CanChange      can_change
@@ -179,8 +179,8 @@ static void
 set_background_color(NCURSES_SP_DCLx int bg, NCURSES_SP_OUTC outc)
 {
 #if USE_SCREENBUFFERED_CONSOLE
-    if (IsScreenBufferedConsole()) {
-	SCREENBUFFEREDCONSOLE.setcolor(FALSE, bg);
+    if (ScreenIsBufferedConsole(SP_PARM)) {
+	AsScreenBufferedConsole(SP_PARM)->setcolor(FALSE, bg);
 	return;
     }
 #endif
@@ -201,8 +201,8 @@ static void
 set_foreground_color(NCURSES_SP_DCLx int fg, NCURSES_SP_OUTC outc)
 {
 #if USE_SCREENBUFFERED_CONSOLE
-    if (IsScreenBufferedConsole()) {
-	SCREENBUFFEREDCONSOLE.setcolor(TRUE, fg);
+    if (ScreenIsBufferedConsole(SP_PARM)) {
+	AsScreenBufferedConsole(SP_PARM)->setcolor(TRUE, fg);
 	return;
     }
 #endif
@@ -309,8 +309,8 @@ reset_color_pair(NCURSES_SP_DCL0)
 {
     bool result = false;
 #if USE_SCREENBUFFERED_CONSOLE
-    if (IsScreenBufferedConsole()) {
-	return SCREENBUFFEREDCONSOLE.reset_color_pair();
+    if (ScreenIsBufferedConsole(SP_PARM)) {
+	return AsScreenBufferedConsole(SP_PARM)->reset_color_pair();
     }
 #endif
 
@@ -338,7 +338,7 @@ NCURSES_SP_NAME(_nc_reset_colors) (NCURSES_SP_DCL0)
     if (reset_color_pair(NCURSES_SP_ARG))
 	result = TRUE;
 #if USE_SCREENBUFFERED_CONSOLE
-    if (IsScreenBufferedConsole()) {
+    if (ScreenIsBufferedConsole(SP_PARM)) {
 	returnBool(FALSE);
     }
 #endif
@@ -661,8 +661,8 @@ _nc_init_pair(SCREEN *sp, int pair, int f, int b)
 	SET_SCREEN_PAIR(sp, (int) (~0));	/* force attribute update */
 
 #if USE_SCREENBUFFERED_CONSOLE
-    if (IsScreenBufferedConsole()) {
-	returnCode(SCREENBUFFEREDCONSOLE.init_pair(pair, f, b));
+    if (ScreenIsBufferedConsole(sp)) {
+	returnCode(AsScreenBufferedConsole(sp)->init_pair(pair, f, b));
     }
 #endif
     if (initialize_pair && InPalette(f) && InPalette(b)) {
@@ -805,8 +805,8 @@ NCURSES_SP_NAME(has_colors) (NCURSES_SP_DCL0)
     T((T_CALLED("has_colors(%p)"), (void *) SP_PARM));
     if (HasTerminal(SP_PARM)) {
 #if USE_SCREENBUFFERED_CONSOLE
-	if (IsScreenBufferedConsole()) {
-	    code = SCREENBUFFEREDCONSOLE.info.hascolor;
+	if (ScreenIsBufferedConsole(SP_PARM)) {
+	    code = AsScreenBufferedConsole(SP_PARM)->info.hascolor;
 	    returnBool(code);
 	}
 #endif

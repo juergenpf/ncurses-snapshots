@@ -751,8 +751,8 @@ NCURSES_SP_NAME(doupdate)(NCURSES_SP_DCL0)
 
     T((T_CALLED("_nc_tinfo:doupdate(%p)"), (void *) SP_PARM));
 #if USE_SCREENBUFFERED_CONSOLE
-    if (IsScreenBufferedConsole()) {
-	returnCode(_nc_win32con_doupdate());
+    if (ScreenIsBufferedConsole(SP_PARM)) {
+	returnCode(_nc_win32con_doupdate(SP_PARM));
     }
 #endif
     _nc_lock_global(update);

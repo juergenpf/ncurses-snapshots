@@ -168,7 +168,7 @@ METHOD(init, bool) (int fdOut, int fdIn)
     AssertIsConPTY();
 
     /* initialize once, or not at all */
-    if (!IsConsoleInitialized()) {
+    if (!IsConsoleInitialized(&MYSELF.core)) {
 	/*
 	 * We set the console mode flags to the most basic ones that are required for ConPTY
 	 * to function properly. */
@@ -238,7 +238,7 @@ METHOD(init, bool) (int fdOut, int fdIn)
 	    returnBool(false);
 	}
 	defaultCONPTY.core.ttyflags.dwFlagIn = dwFlagIn;
-	MarkConsoleInitialized();
+	MarkConsoleInitialized(&MYSELF.core);
 	result = true;
     } else {
 	T(("Console already initialized, skipping initialization"));

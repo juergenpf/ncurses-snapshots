@@ -2540,42 +2540,33 @@ extern NCURSES_EXPORT_VAR(ConsoleCoreInterface*) _nc_CORECONSOLE;
 #define ScreenConsole(sp) ((sp) ? ((sp)->_console ? (sp)->_console : DefaultConsole()) : DefaultConsole())
 #define ConsoleScreen(console) ((console)->sp)
 
-#define _IsScreenBufferedConsole(console) (!((console)->status & CONSOLE_STATUS_IS_CONPTY))
-#define _IsConPTY(console) ((console)->status & CONSOLE_STATUS_IS_CONPTY)
-#define IsConPTY() (_IsConPTY(DefaultConsole()))
-#define IsScreenBufferedConsole() (_IsScreenBufferedConsole(DefaultConsole()))
+#define IsConPTY(console) ((console)->status & CONSOLE_STATUS_IS_CONPTY)
+#define IsScreenBufferedConsole(console) (!((console)->status & CONSOLE_STATUS_IS_CONPTY))
 
 // The following two Macros work even if sp is NULL. In that case, the DefaultConsole() is used.
-#define ScreenIsConPTY(sp) (_IsConPTY(ScreenConsole(sp)))
-#define ScreenIsBufferedConsole(sp) (_IsScreenBufferedConsole(ScreenConsole(sp)))
+#define ScreenIsConPTY(sp) (IsConPTY(ScreenConsole(sp)))
+#define ScreenIsBufferedConsole(sp) (IsScreenBufferedConsole(ScreenConsole(sp)))
 
-#define _IsConsoleInitialized(console) ((console)->status & CONSOLE_STATUS_INITIALIZED)
-#define _MarkConsoleInitialized(console) ((console)->status |= CONSOLE_STATUS_INITIALIZED)
-#define IsConsoleInitialized() (_IsConsoleInitialized(DefaultConsole()))
-#define MarkConsoleInitialized() (_MarkConsoleInitialized(DefaultConsole()))
+#define IsConsoleInitialized(console) ((console)->status & CONSOLE_STATUS_INITIALIZED)
+#define MarkConsoleInitialized(console) ((console)->status |= CONSOLE_STATUS_INITIALIZED)
 
-#define _IsConsoleProgMode(console) ((console)->status & CONSOLE_STATUS_PROG_MODE)
-#define _SetConsoleProgMode(console) ((console)->status |= CONSOLE_STATUS_PROG_MODE)
-#define _ClearConsoleProgMode(console) ((console)->status &= ~CONSOLE_STATUS_PROG_MODE)
-#define _IsConPTYProgMode(console) (_IsConPTY(console) && _IsConsoleProgMode(console))
-#define IsConsoleProgMode() (_IsConsoleProgMode(DefaultConsole()))
-#define SetConsoleProgMode() (_SetConsoleProgMode(DefaultConsole()))
-#define ClearConsoleProgMode() (_ClearConsoleProgMode(DefaultConsole()))
-#define IsConPTYProgMode() (_IsConPTYProgMode(DefaultConsole()))
+#define IsConsoleProgMode(console) ((console)->status & CONSOLE_STATUS_PROG_MODE)
+#define SetConsoleProgMode(console) ((console)->status |= CONSOLE_STATUS_PROG_MODE)
+#define ClearConsoleProgMode(console) ((console)->status &= ~CONSOLE_STATUS_PROG_MODE)
+#define IsConPTYProgMode(console) (IsConPTY(console) && IsConsoleProgMode(console))
 
-#define _HasConsolePendingResize(console) ((console)->status & CONSOLE_STATUS_RESIZE_PENDING)
-#define _SetConsolePendingResize(console) ((console)->status |= CONSOLE_STATUS_RESIZE_PENDING)
-#define _ClearConsolePendingResize(console) ((console)->status &= ~CONSOLE_STATUS_RESIZE_PENDING)
-#define HasConsolePendingResize() (_HasConsolePendingResize(DefaultConsole()))
-#define SetConsolePendingResize() (_SetConsolePendingResize(DefaultConsole()))
-#define ClearConsolePendingResize() (_ClearConsolePendingResize(DefaultConsole()))
+#define HasConsolePendingResize(console) ((console)->status & CONSOLE_STATUS_RESIZE_PENDING)
+#define SetConsolePendingResize(console) ((console)->status |= CONSOLE_STATUS_RESIZE_PENDING)
+#define ClearConsolePendingResize(console) ((console)->status &= ~CONSOLE_STATUS_RESIZE_PENDING)
 
-#define _HasConsoleResizeLimitations(console) ((console)->status & CONSOLE_STATUS_LIMITED_RESIZE)
-#define _SetConsoleResizeLimitations(console) ((console)->status |= CONSOLE_STATUS_LIMITED_RESIZE)
-#define _ClearConsoleResizeLimitations(console) ((console)->status &= ~CONSOLE_STATUS_LIMITED_RESIZE)
-#define HasConsoleResizeLimitations() (_HasConsoleResizeLimitations(DefaultConsole()))
-#define SetConsoleResizeLimitations() (_SetConsoleResizeLimitations(DefaultConsole()))
-#define ClearConsoleResizeLimitations() (_ClearConsoleResizeLimitations(DefaultConsole()))
+#define HasConsoleResizeLimitations(console) ((console)->status & CONSOLE_STATUS_LIMITED_RESIZE)
+#define SetConsoleResizeLimitations(console) ((console)->status |= CONSOLE_STATUS_LIMITED_RESIZE)
+#define ClearConsoleResizeLimitations(console) ((console)->status &= ~CONSOLE_STATUS_LIMITED_RESIZE)
+
+#define IsConPTYInProgMode(console) (IsConPTY(console) && IsConsoleProgMode(console))
+#define IsScreenBufferedConsoleInProgMode(console) (IsScreenBufferedConsole(console) && IsConsoleProgMode(console))
+#define ScreenIsConPTYInProgMode(sp) (IsConPTYInProgMode(ScreenConsole(sp)))
+#define ScreenIsBufferedConsoleInProgMode(sp) (IsScreenBufferedConsoleInProgMode(ScreenConsole(sp)))
 
 #define CONSOLE_INIT_FAILURE_MSG "Failed to initialize console interface.\n"
 
@@ -2615,7 +2606,7 @@ typedef struct _termInfo
 extern NCURSES_EXPORT_VAR(const color_t*) _nc_cga_palette;
 extern NCURSES_EXPORT_VAR(const color_t*) _nc_hls_palette;
 
-extern NCURSES_EXPORT(int)  _nc_win32con_doupdate (void);
+extern NCURSES_EXPORT(int)  _nc_win32con_doupdate (SCREEN *sp);
 
 #define CON_NUMPAIRS 64
 
@@ -2635,7 +2626,6 @@ typedef struct {
 
     TerminalInfo info;			           // Core capabilities.
 
-    const char* (*termname)(bool longname);	   // Pointer to the name function used by the buffered console.
     bool (*adjust_size)(void);                     // Adjust the console buffer size.
     chtype (*termattrs)(void);                     // Pointer to the termattrs function used by the buffered console.
     int (*keypad)(bool);                           // Pointer to the keypad function used by the buffered console.
@@ -2658,11 +2648,12 @@ typedef struct {
 } ScreenBufferedConsoleInterface;
 extern NCURSES_EXPORT_VAR(ScreenBufferedConsoleInterface *) _nc_SCREENBUFFEREDCONSOLE;
 #define SCREENBUFFEREDCONSOLE (*_nc_SCREENBUFFEREDCONSOLE)
-#define AsScreenBufferedConsole(sp) ((ScreenBufferedConsoleInterface*)(sp)->_console)
+#define AsScreenBufferedConsole(sp) ((ScreenBufferedConsoleInterface*)(ScreenConsole(sp)))
+#define DefaultScreenBufferedConsole() ((ScreenBufferedConsoleInterface*)(DefaultConsole()))
 
 #define MouseFifoHasEvent(sp) (sp->_console_mouse_head < sp->_console_mouse_tail)
 #define IsMouseActive(sp) (sp->_mouse_active == true)
-
+#define CONSOLE_TERM_NAME "#win32_console"
 #endif /* USE_SCREENBUFFERED_CONSOLE */
 
 #if USE_CONPTY
@@ -2697,7 +2688,8 @@ typedef struct {
 // Guaranteed to be statically initialzed.
 extern NCURSES_EXPORT_VAR(ConPtyInterface*) _nc_currentCONPTY;
 #define WINCONPTY (*_nc_currentCONPTY)
-#define AsConPTY(sp) ((ConPtyInterface*)(sp)->_console)
+#define AsConPTY(sp) ((ConPtyInterface*)(ScreenConsole(sp)))
+#define DefaultConPTY() ((ConPtyInterface*)(DefaultConsole()))
 #endif /* USE_CONPTY */
 
 #endif /* USE_CONSOLE_API */

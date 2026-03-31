@@ -70,8 +70,8 @@ initscr(void)
 	(void) VALID_TERM_ENV(env, "unknown");
 #if USE_SCREENBUFFERED_CONSOLE
 	AssertConsoleSetup();
-	if (IsScreenBufferedConsole()) {
-	    env = SCREENBUFFEREDCONSOLE.termname(FALSE);
+	if (IsScreenBufferedConsole(DefaultConsole())) {
+	    env = CONSOLE_TERM_NAME;
 	} 
 #endif
 	if ((name = strdup(env)) == NULL) {

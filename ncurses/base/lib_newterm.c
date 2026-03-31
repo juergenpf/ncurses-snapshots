@@ -52,7 +52,7 @@
 MODULE_ID("$Id: lib_newterm.c,v 1.111 2026/03/28 20:22:11 tom Exp $")
 
 #if USE_SCREENBUFFERED_CONSOLE
-#define NumLabels      (IsScreenBufferedConsole() ? SCREENBUFFEREDCONSOLE.info.numlabels : num_labels)
+#define NumLabels      (ScreenIsBufferedConsole(SP_PARM) ? AsScreenBufferedConsole(SP_PARM)->info.numlabels : num_labels)
 #else
 #define NumLabels      num_labels
 #endif
@@ -92,7 +92,7 @@ _nc_initscr(NCURSES_SP_DCL0)
 	buf.dwFlagIn  = ENABLE_PROCESSED_INPUT;
         buf.dwFlagOut = ENABLE_PROCESSED_OUTPUT 
 			| ENABLE_WRAP_AT_EOL_OUTPUT;
-	if (IsConPTY()) {
+	if (ScreenIsConPTY(SP_PARM)) {
 		buf.dwFlagIn |= ENABLE_VIRTUAL_TERMINAL_INPUT 
 				| ENABLE_QUICK_EDIT_MODE 
 				| ENABLE_EXTENDED_FLAGS;

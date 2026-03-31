@@ -475,8 +475,8 @@ _nc_get_screensize(SCREEN *sp,
 
     assert(linep != NULL && colp != NULL);
 #if USE_SCREENBUFFERED_CONSOLE    
-    if (IsScreenBufferedConsole()) {
-	my_tabsize = SCREENBUFFEREDCONSOLE.info.tabsize;
+    if (ScreenIsBufferedConsole(sp)) {
+	my_tabsize = AsScreenBufferedConsole(sp)->info.tabsize;
 #if USE_REENTRANT
         if (sp != NULL) {
 	    sp->_TABSIZE = my_tabsize;
@@ -629,10 +629,10 @@ _nc_update_screensize(SCREEN *sp)
 
 #if USE_SCREENBUFFERED_CONSOLE
     assert(sp != NULL);
-    if (IsScreenBufferedConsole()) {
-	old_lines = CORECONSOLE.sbi_lines;
-	old_cols = CORECONSOLE.sbi_cols;
-	SCREENBUFFEREDCONSOLE.adjust_size();
+    if (ScreenIsBufferedConsole(sp)) {
+	old_lines = AsScreenBufferedConsole(sp)->core.sbi_lines;
+	old_cols = AsScreenBufferedConsole(sp)->core.sbi_cols;
+	AsScreenBufferedConsole(sp)->adjust_size();
 	// JPF TODO FIXME : Not sure we can let run that through for legacy console... need to check.
     } else {
 #endif
@@ -849,8 +849,8 @@ _nc_setupterm(const char *tname,
     if (tname == NULL) {
 	tname = getenv("TERM");
 #if USE_SCREENBUFFERED_CONSOLE
-    if (IsScreenBufferedConsole()) {
-	tname = SCREENBUFFEREDCONSOLE.termname(FALSE);
+    if (ScreenIsBufferedConsole(sp)) {
+	tname = CONSOLE_TERM_NAME;
     } else {
 	if (!VALID_TERM_ENV(tname, NO_TERMINAL)) {
 	    T(("Failure with TERM=%s", NonNull(tname)));
@@ -954,7 +954,7 @@ _nc_setupterm(const char *tname,
 
 	if (status != TGETENT_YES) {
 #if USE_SCREENBUFFERED_CONSOLE
-	    if (IsScreenBufferedConsole()) {
+	    if (ScreenIsBufferedConsole(sp)) {
 		/* Legacy console has no terminfo entry; initialize with defaults */
 		_nc_init_termtype(&TerminalType(termp));
 		status = TGETENT_YES;
