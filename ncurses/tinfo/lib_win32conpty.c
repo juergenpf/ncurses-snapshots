@@ -66,6 +66,8 @@ METHOD(start_input_subsystem, int) (void);
 METHOD(stop_input_subsystem, int) (void);
 METHOD(poll, int) (struct pty_pollfd * fds, nfds_t nfds, int timeout_ms);
 
+#define AssertIsConPTY() assert((defaultCONPTY.core.status & CONSOLE_STATUS_IS_CONPTY))
+
 /* A process can only have a single console, so it is safe
  * to maintain all the information about it in a single
  * static structure. */
@@ -163,7 +165,7 @@ METHOD(init, bool) (int fdOut, int fdIn)
 
     T((T_METHOD(init,"(fdOut=%d, fdIn=%d)"), fdOut, fdIn));
 
-    assert(IsConPTY());
+    AssertIsConPTY();
 
     /* initialize once, or not at all */
     if (!IsConsoleInitialized()) {
@@ -258,7 +260,7 @@ METHOD(init, bool) (int fdOut, int fdIn)
 {
     T((T_METHOD(size,"(lines=%p, cols=%p)"), Lines, Cols));
 
-    assert(IsConPTY());
+    AssertIsConPTY();
 
     if (Lines != NULL && Cols != NULL) {
 	CONSOLE_SCREEN_BUFFER_INFO csbi;
@@ -293,7 +295,7 @@ METHOD(size_changed, bool) (void)
 
     T((T_METHOD(size_changed,"()")));
 
-    assert(IsConPTY());
+    AssertIsConPTY();
 
     gettimeofday(&now, NULL);
 
@@ -329,7 +331,7 @@ METHOD(start_input_subsystem, int) (void)
 {
     T((T_METHOD(start_input_subsystem,"()")));
 
-    assert(IsConPTY());
+    AssertIsConPTY();
 
     if (g_input_thread != NULL)
 	returnCode(OK);		// Already running
@@ -379,7 +381,7 @@ METHOD(stop_input_subsystem, int) (void)
 {
     T((T_METHOD(stop_input_subsystem,"()")));
 
-    assert(IsConPTY());
+    AssertIsConPTY();
 
     if (g_input_thread == NULL)
 	returnCode(OK); // not running, nothing to do
@@ -614,7 +616,7 @@ METHOD(poll, int) (struct pty_pollfd * fds, nfds_t nfds, int timeout_ms)
     T((T_METHOD(poll,"(fds=%p, nfds=%u, timeout_ms=%d)"),
        fds, (unsigned) nfds, timeout_ms));
 
-    assert(IsConPTY());
+    AssertIsConPTY();
 
     if (nfds==0) {
 	// pure wait, o we don't actually poll and don't need to assert the input system is up.
@@ -653,7 +655,7 @@ METHOD(read, int) (int fd GCC_UNUSED, void *result, size_t count)
 
     T((T_METHOD(read,"(fd=%d, result=%p)"), fd, result));
 
-    assert(IsConPTY());
+    AssertIsConPTY();
     assert(g_input_thread != NULL && g_stdin_handle != INVALID_HANDLE_VALUE);
 
     if (!result || g_input_thread == NULL || g_stdin_handle == INVALID_HANDLE_VALUE)
@@ -687,7 +689,7 @@ METHOD(write, int) (int fd GCC_UNUSED, const void *buf, size_t count)
 
     T((T_METHOD(write,"(fd=%d, buf=%p, count=%u)"), fd, buf, (unsigned) count));
 
-    assert(IsConPTY());
+    AssertIsConPTY();
 
     if (hOut == INVALID_HANDLE_VALUE)
 	returnCode(-1);
@@ -717,7 +719,7 @@ METHOD(setmode, int) (int fd GCC_UNUSED, const TTY * arg)
 
     T((T_METHOD(setmode,"(fd=%d, TTY*=%p)"), fd, arg));
 
-    assert(IsConPTY());
+    AssertIsConPTY();
 
     if (!arg)
 	returnCode(ERR);
@@ -818,8 +820,7 @@ METHOD(defmode, int) (TTY * arg, short kind)
     short realMode = kind;
 
     T((T_METHOD(defmode,"(TTY*=%p, kind=%d)"), arg, kind));
-
-    assert(IsConPTY());
+    AssertIsConPTY();
 
     if (NULL == arg)
 	returnCode(ERR);
@@ -855,7 +856,7 @@ METHOD(getmode, int) (int fd GCC_UNUSED, TTY * arg)
     if (NULL == arg)
 	returnCode(ERR);
 
-    assert(IsConPTY());
+    AssertIsConPTY();
 
     *arg = defaultCONPTY.core.ttyflags;
     arg->kind = TTY_MODE_UNSPECIFIED;

@@ -89,6 +89,8 @@ METHOD(writeat, bool)(int y, int x, const chtype *str, int limit);
 #define CharInfoChar Char.AsciiChar
 #endif /* USE_WIDEC_SUPPORT */
 
+#define AssertScreenBufferedConsole() assert((!(legacyCONSOLE.core.status & CONSOLE_STATUS_IS_CONPTY)))
+
 static ScreenBufferedConsoleInterface legacyCONSOLE =
 	{
 		.core =
@@ -365,7 +367,7 @@ _nc_screenbuffered_console_init(void)
 
 METHOD(termname, const char *)(bool longname)
 {
-	assert(IsScreenBufferedConsole());
+	AssertScreenBufferedConsole();
 	return longname ? "Windows Legacy Console" : "#win32console";
 }
 
@@ -376,8 +378,7 @@ METHOD(adjust_size, bool)(void)
 	CONSOLE_SCREEN_BUFFER_INFO csbi;
 
 	T((T_METHOD(adjust_size," ")));
-
-	assert(IsScreenBufferedConsole());
+	AssertScreenBufferedConsole();
 
 	if (HasConsoleResizeLimitations())
 	{
@@ -414,7 +415,7 @@ METHOD(termattrs, chtype)(void)
 {
 	chtype res = A_NORMAL;
 
-	assert(IsScreenBufferedConsole());
+	AssertScreenBufferedConsole();
 
 	res |= (A_BOLD | A_DIM | A_REVERSE | A_STANDOUT | A_COLOR);
 	return res;
@@ -427,9 +428,9 @@ METHOD(keypad, int)(bool flag)
 
 	T((T_METHOD(keypad,"(%d)"), flag));
 
-	assert(IsScreenBufferedConsole());
+	AssertScreenBufferedConsole();
 
-	sp = ConsoleScreen(DefaultConsole());
+	sp = ConsoleScreen(&legacyCONSOLE.core);
 	if (sp)
 	{
 		sp->_keypad_on = flag;
@@ -445,7 +446,7 @@ METHOD(beeporflash, int)(bool beepFlag)
 	int high, wide, max_cells;
 	int i;
 
-	assert(IsScreenBufferedConsole());
+	AssertScreenBufferedConsole();
 
 	high = (MYSELF.SBI.srWindow.Bottom -
 				MYSELF.SBI.srWindow.Top + 1);
@@ -512,7 +513,7 @@ METHOD(keyok, int)(int keycode, int flag)
 
 	T((T_METHOD(keyok,"(%d, %d)"), keycode, flag));
 
-	assert(IsScreenBufferedConsole());
+	AssertScreenBufferedConsole();
 
 	res = bsearch(&key,
 				  MYSELF.rmap,
@@ -540,7 +541,7 @@ METHOD(has_key, int)(int keycode)
 
 	T((T_METHOD(has_key,"(%d)"), keycode));
 
-	assert(IsScreenBufferedConsole());
+	AssertScreenBufferedConsole();
 
 	res = bsearch(&key,
 				  MYSELF.rmap,
@@ -595,8 +596,8 @@ METHOD(init_acs, void)(chtype *real_map)
 	unsigned n;
 	SCREEN *sp;
 
-	assert(IsScreenBufferedConsole());
-	sp = ConsoleScreen(DefaultConsole());
+	AssertScreenBufferedConsole();
+	sp = ConsoleScreen(&legacyCONSOLE.core);
 
 	for (n = 0; n < SIZEOF(table); ++n)
 	{
@@ -612,7 +613,7 @@ METHOD(reset_color_pair, bool)(void)
 	bool res = false;
 	WORD a = FOREGROUND_BLUE | FOREGROUND_RED | FOREGROUND_GREEN;
 
-	assert(IsScreenBufferedConsole());
+	AssertScreenBufferedConsole();
 
 	SetConsoleTextAttribute(MYSELF.core.ConsoleHandleOut, a);
 	get_SBI();
@@ -625,7 +626,7 @@ METHOD(init_pair, int)(int pair, int f, int b)
 	int code = ERR;
 	int num_colors;
 
-	assert(IsScreenBufferedConsole());
+	AssertScreenBufferedConsole();
 
 	num_colors = MYSELF.info.maxcolors;
 	if ((pair > 0) && (pair < CON_NUMPAIRS) && (f >= 0) && (f < num_colors) && (b >= 0) && (b < num_colors))
@@ -643,7 +644,7 @@ METHOD(setcolor, void)(bool fore, int color)
 {
 	WORD a = console_MapColor(fore, color);
 
-	assert(IsScreenBufferedConsole());
+	AssertScreenBufferedConsole();
 
 	a |= (WORD)((MYSELF.SBI.wAttributes) & ((fore) ? 0xfff8 : 0xff8f));
 	SetConsoleTextAttribute(MYSELF.core.ConsoleHandleOut, a);
@@ -657,7 +658,7 @@ METHOD(curs_set, int)(int visibility)
 
 	T((T_METHOD(curs_set,"(%d)"), visibility));
 
-	assert(IsScreenBufferedConsole());
+	AssertScreenBufferedConsole();
 
 	this_CI = MYSELF.save_CI;
 	switch (visibility)
@@ -814,10 +815,9 @@ METHOD(read, int)(int *buf)
 	SCREEN *sp;
 
 	T((T_METHOD(read,"(%p)"), buf));
+	AssertScreenBufferedConsole();
 
-	assert(IsScreenBufferedConsole());
-
-	sp = ConsoleScreen(DefaultConsole());
+	sp = ConsoleScreen(&legacyCONSOLE.core);
 	assert(buf);
 	assert(sp);
 
@@ -935,9 +935,9 @@ METHOD(twait,int)(int mode, int milliseconds, int *timeleft EVENTLIST_2nd(_nc_ev
 	TR(TRACE_IEVENT, ("start twait: %d milliseconds, mode: %d",
 				  milliseconds, mode));
 
-	assert(IsScreenBufferedConsole());
+	AssertScreenBufferedConsole();
 
-	sp = ConsoleScreen(DefaultConsole());
+	sp = ConsoleScreen(&legacyCONSOLE.core);
 	hdl = MYSELF.core.ConsoleHandleIn;
 	assert(sp);
 
@@ -1202,11 +1202,11 @@ METHOD(setmode, int)(int fd GCC_UNUSED, const TTY *arg)
 
 	T((T_METHOD(setmode,"(fd=%d, TTY*=%p)"), fd, arg));
 
-	assert(IsScreenBufferedConsole());
+	AssertScreenBufferedConsole();
 
 	input_target = MYSELF.core.ConsoleHandleIn;
 	output_target = MYSELF.core.ConsoleHandleOut;
-	sp = ConsoleScreen(DefaultConsole());
+	sp = ConsoleScreen(&legacyCONSOLE.core);
 
 	if (!arg)
 		returnCode(ERR);
@@ -1365,7 +1365,7 @@ METHOD(getmode, int)(int fd GCC_UNUSED, TTY *arg)
 {
 	T((T_METHOD(getmode,"(fd=%d, TTY*=%p)"), fd, arg));
 
-	assert(IsScreenBufferedConsole());
+	AssertScreenBufferedConsole();
 
 	if (NULL == arg)
 		returnCode(ERR);
@@ -1393,7 +1393,7 @@ METHOD(defmode, int)(TTY *arg, short kind)
 
 	T((T_METHOD(defmode,"(TTY*=%p, kind=%d)"), arg, kind));
 
-	assert(IsScreenBufferedConsole());
+	AssertScreenBufferedConsole();
 
 	if (NULL == arg)
 		returnCode(ERR);
@@ -1410,7 +1410,7 @@ METHOD(defmode, int)(TTY *arg, short kind)
 METHOD(size, void)(int *Lines, int *Cols)
 {
 
-	assert(IsScreenBufferedConsole());
+	AssertScreenBufferedConsole();
 
 	if (Lines != NULL && Cols != NULL)
 	{
@@ -1427,7 +1427,7 @@ METHOD(size_changed, bool)(void)
 	bool resized = false;
 	T((T_METHOD(size_changed,"()")));
 
-	assert(IsScreenBufferedConsole());
+	AssertScreenBufferedConsole();
 
 	if (HasConsolePendingResize())
 	{
@@ -1456,7 +1456,7 @@ METHOD(init, bool)(int fdOut, int fdIn)
 
 	T((T_METHOD(init,"(fdOut=%d, fdIn=%d)"), fdOut, fdIn));
 
-	assert(IsScreenBufferedConsole());
+	AssertScreenBufferedConsole();
 
 	/* initialize once, or not at all */
 	if (!IsConsoleInitialized())
@@ -1563,7 +1563,7 @@ METHOD(mvcur,int)(int oldrow GCC_UNUSED, int oldcol GCC_UNUSED, int newrow, int 
 	int result = ERR;
 	COORD pos;
 
-	assert(IsScreenBufferedConsole());
+	AssertScreenBufferedConsole();
 
 	pos.X = (SHORT)newcol;
 	pos.Y = (SHORT)newrow;
@@ -1624,7 +1624,7 @@ METHOD(writeat,bool)(int y, int x, const cchar_t *str, int limit)
 	SMALL_RECT rec;
 	int i;
 	cchar_t ch;
-	// JPF unused: SCREEN *sp = ConsoleScreen();
+	// JPF unused: SCREEN *sp = ConsoleScreen(&legacyCONSOLE.core);
 
 
 	for (i = actual = 0; i < limit; i++)

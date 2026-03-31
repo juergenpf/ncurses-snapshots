@@ -2531,15 +2531,20 @@ typedef struct consoleCoreInterface {
 extern NCURSES_EXPORT_VAR(ConsoleCoreInterface*) _nc_CORECONSOLE;
 #define CORECONSOLE (*_nc_CORECONSOLE)
 #define DefaultConsole() _nc_CORECONSOLE
+#define CoreConsoleInitialized() (_nc_CORECONSOLE != NULL)
 
 /* At the moment - if at all - we only have exactly one static console per process.
  * So, if we end up with a NULL pointer, we refer to this static console pointer, 
  * which may or may not have been initialized yet.
 */
 #define ScreenConsole(sp) ((sp) ? ((sp)->_console ? (sp)->_console : DefaultConsole()) : DefaultConsole())
+#define ConsoleScreen(console) ((console)->sp)
 
-#define ConsoleScreen(console) (console->sp)
-#define CoreConsoleInitialized() (_nc_CORECONSOLE != NULL)
+/* The following two Macros work even if sp is NULL. In that case, the DefaultConsole() 
+* is used.
+*/
+#define ScreenIsConPTY(sp) (ScreenConsole(sp)->status & CONSOLE_STATUS_IS_CONPTY)
+#define ScreenIsBufferedConsole(sp) (!(ScreenConsole(sp)->status & CONSOLE_STATUS_IS_CONPTY) )
 
 #define IsConPTY() (CORECONSOLE.status & CONSOLE_STATUS_IS_CONPTY)
 #define IsScreenBufferedConsole() (!(CORECONSOLE.status & CONSOLE_STATUS_IS_CONPTY) )
