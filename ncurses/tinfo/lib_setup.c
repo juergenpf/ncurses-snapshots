@@ -842,7 +842,7 @@ _nc_setupterm(const char *tname,
     if (!_nc_console_setup() || !CORECONSOLE.init(Filedes, -1)) {
 	code = ERR;
 	ret_error0(TGETENT_ERR,
-	    "Unable to initialize console API.\n");
+	    CONSOLE_INIT_FAILURE_MSG);
     }
 #endif
 

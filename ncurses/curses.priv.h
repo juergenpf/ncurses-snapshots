@@ -2540,36 +2540,50 @@ extern NCURSES_EXPORT_VAR(ConsoleCoreInterface*) _nc_CORECONSOLE;
 #define ScreenConsole(sp) ((sp) ? ((sp)->_console ? (sp)->_console : DefaultConsole()) : DefaultConsole())
 #define ConsoleScreen(console) ((console)->sp)
 
-/* The following two Macros work even if sp is NULL. In that case, the DefaultConsole() 
-* is used.
-*/
-#define ScreenIsConPTY(sp) (ScreenConsole(sp)->status & CONSOLE_STATUS_IS_CONPTY)
-#define ScreenIsBufferedConsole(sp) (!(ScreenConsole(sp)->status & CONSOLE_STATUS_IS_CONPTY) )
+#define _IsScreenBufferedConsole(console) (!((console)->status & CONSOLE_STATUS_IS_CONPTY))
+#define _IsConPTY(console) ((console)->status & CONSOLE_STATUS_IS_CONPTY)
+#define IsConPTY() (_IsConPTY(DefaultConsole()))
+#define IsScreenBufferedConsole() (_IsScreenBufferedConsole(DefaultConsole()))
 
-#define IsConPTY() (CORECONSOLE.status & CONSOLE_STATUS_IS_CONPTY)
-#define IsScreenBufferedConsole() (!(CORECONSOLE.status & CONSOLE_STATUS_IS_CONPTY) )
+// The following two Macros work even if sp is NULL. In that case, the DefaultConsole() is used.
+#define ScreenIsConPTY(sp) (_IsConPTY(ScreenConsole(sp)))
+#define ScreenIsBufferedConsole(sp) (_IsScreenBufferedConsole(ScreenConsole(sp)))
 
-#define IsConsoleInitialized() (CORECONSOLE.status & CONSOLE_STATUS_INITIALIZED)
-#define MarkConsoleInitialized() (CORECONSOLE.status |= CONSOLE_STATUS_INITIALIZED)
+#define _IsConsoleInitialized(console) ((console)->status & CONSOLE_STATUS_INITIALIZED)
+#define _MarkConsoleInitialized(console) ((console)->status |= CONSOLE_STATUS_INITIALIZED)
+#define IsConsoleInitialized() (_IsConsoleInitialized(DefaultConsole()))
+#define MarkConsoleInitialized() (_MarkConsoleInitialized(DefaultConsole()))
 
-#define IsConsoleProgMode() (CORECONSOLE.status & CONSOLE_STATUS_PROG_MODE)
-#define SetConsoleProgMode() (CORECONSOLE.status |= CONSOLE_STATUS_PROG_MODE)
-#define ClearConsoleProgMode() (CORECONSOLE.status &= ~CONSOLE_STATUS_PROG_MODE)
-#define IsConPTYProgMode() (IsConPTY() && IsConsoleProgMode())
+#define _IsConsoleProgMode(console) ((console)->status & CONSOLE_STATUS_PROG_MODE)
+#define _SetConsoleProgMode(console) ((console)->status |= CONSOLE_STATUS_PROG_MODE)
+#define _ClearConsoleProgMode(console) ((console)->status &= ~CONSOLE_STATUS_PROG_MODE)
+#define _IsConPTYProgMode(console) (_IsConPTY(console) && _IsConsoleProgMode(console))
+#define IsConsoleProgMode() (_IsConsoleProgMode(DefaultConsole()))
+#define SetConsoleProgMode() (_SetConsoleProgMode(DefaultConsole()))
+#define ClearConsoleProgMode() (_ClearConsoleProgMode(DefaultConsole()))
+#define IsConPTYProgMode() (_IsConPTYProgMode(DefaultConsole()))
 
-#define HasConsolePendingResize() (CORECONSOLE.status & CONSOLE_STATUS_RESIZE_PENDING)
-#define SetConsolePendingResize() (CORECONSOLE.status |= CONSOLE_STATUS_RESIZE_PENDING)
-#define ClearConsolePendingResize() (CORECONSOLE.status &= ~CONSOLE_STATUS_RESIZE_PENDING)
+#define _HasConsolePendingResize(console) ((console)->status & CONSOLE_STATUS_RESIZE_PENDING)
+#define _SetConsolePendingResize(console) ((console)->status |= CONSOLE_STATUS_RESIZE_PENDING)
+#define _ClearConsolePendingResize(console) ((console)->status &= ~CONSOLE_STATUS_RESIZE_PENDING)
+#define HasConsolePendingResize() (_HasConsolePendingResize(DefaultConsole()))
+#define SetConsolePendingResize() (_SetConsolePendingResize(DefaultConsole()))
+#define ClearConsolePendingResize() (_ClearConsolePendingResize(DefaultConsole()))
 
-#define HasConsoleResizeLimitations() (CORECONSOLE.status & CONSOLE_STATUS_LIMITED_RESIZE)
-#define SetConsoleResizeLimitations() (CORECONSOLE.status |= CONSOLE_STATUS_LIMITED_RESIZE)
-#define ClearConsoleResizeLimitations() (CORECONSOLE.status &= ~CONSOLE_STATUS_LIMITED_RESIZE)
+#define _HasConsoleResizeLimitations(console) ((console)->status & CONSOLE_STATUS_LIMITED_RESIZE)
+#define _SetConsoleResizeLimitations(console) ((console)->status |= CONSOLE_STATUS_LIMITED_RESIZE)
+#define _ClearConsoleResizeLimitations(console) ((console)->status &= ~CONSOLE_STATUS_LIMITED_RESIZE)
+#define HasConsoleResizeLimitations() (_HasConsoleResizeLimitations(DefaultConsole()))
+#define SetConsoleResizeLimitations() (_SetConsoleResizeLimitations(DefaultConsole()))
+#define ClearConsoleResizeLimitations() (_ClearConsoleResizeLimitations(DefaultConsole()))
+
+#define CONSOLE_INIT_FAILURE_MSG "Failed to initialize console interface.\n"
 
 extern NCURSES_EXPORT(bool) _nc_console_setup(void);
 #define AssertConsoleSetup() \
     if (!CoreConsoleInitialized()) { \
 	if (!_nc_console_setup()) { \
-	    fprintf(stderr, "Failed to initialize console interface.\n"); \
+	    fprintf(stderr, CONSOLE_INIT_FAILURE_MSG); \
 	    ExitProgram(EXIT_FAILURE); \
 	} \
     }
