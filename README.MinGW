@@ -35,15 +35,15 @@ works at least on the Windows Console.
 
 Before I dive into the details how to build and test ncurses for Windows, let
 me set expectations. The current MinGW based port to Windows has been started
-at a time, where virtual terminal processing and pseudo console wasn't
+at a time (2009), where virtual terminal processing and pseudo console wasn't
 available in Windows. Therefore I developed an alternative driver concept
 that could use other mechanisms than traditional terminfo to manipulate the
-display. For Windows we used the classical console API to directly manipulate
+display. For Windows I used the classical console API to directly manipulate
 the console screen buffer. 
 
 When virtual terminal became available (Windows 10, Version 1809 in October 2018), 
 I decided to keep support for older Windows in the code and built support for 
-virtual terminal support into that already exisitng codebase. This led to a mixture 
+virtual terminals into that already exisitng codebase. This led to a mixture 
 of code for the new and the old world that suffers when it comes to readability, 
 clarity of concept and correctness. In early 2026 I made the decision to reimplement 
 the Windows port and now favour a clear separation of the new pseudo console approach 
@@ -62,6 +62,7 @@ But now let's talk about building and testing the libraries.
 I recommend using one of the Linux distributions that support the MinGW
 cross-build packages. Because we develop for Windows, it's nice to be able
 to develop on Windows using WSL2 to host a Linux subsystem.
+
 I myself use Ubuntu under WSL2, not because it's a preference but it is the 
 most common WSL2 distribution, well supported by the partners Canonical and 
 Microsoft and most tips and tricks you'll find are using Ubuntu as an example.
@@ -100,9 +101,7 @@ Ubuntu is your WSL2 distribution name) and you are on the root of your Linux
 subsystem and can navigate to your test directory.
 
 The "Windows Terminal" is an ideal environment to run and test console programs
-on the Windows commandline - with one caveat: don't mix Unicode tests with tests
-for 8-bit codepages in the same Windows Terminal session. Your sessions should be
-either pure Unicode in all tabs, or pure 8-bit.
+on the Windows commandline.
 
 If you not yet have Windows Terminal installed, you can get it from the store:
 
@@ -142,15 +141,15 @@ The two relevant configure options for Windows are:
   available since Windows 10 Version 1809 (released October 2018). In this configuration
   ncurses on Windows fully supports terminfo and behaves identical to the implementation
   on UNIX based systems. If you target the universal C runtime (UCRT) - which has full
-  support for UTF-8 locales - you also get a fully functional wide character version of
-  ncurses on Windows.
+  support for UTF-8 locales - you can also get a fully functional wide character version 
+  of ncurses on Windows.
 
 --enable-win-console
   This option compiles ncurses with support for older Windows versions (before Windows 10 1809).
   It uses a console screen buffer of the Windows console API to render display content. It
   supports the upper layers of the ncurses library (curses,panel,menu,form), but NOT terminfo.
   The reason is simply, that the classicaö console is not a character device terminal, but A
-  buffer oriented display device.
+  buffer oriented display device. You must have at least NT Version 5 (Windows 2000 or newer).
 
 You can use both of these options together to compile a ncurses library that automatically uses
 the best implementation on the detected Windows platform. On modern Windows, it will automatically
@@ -165,7 +164,13 @@ approach is, that there are issues when using the classical screen buffered cons
 The newer Windows systems were built with ConPTY in mind to have better support for terminal based tools
 in the Windows console (ssh, WSL2, docker etc.). Certain aspects of the traditional API may not work as
 expected in that context, and the way how the traditional API is supported varies between the Windows
-versions and the different console hosts (e.g. Windows Terminal, conhost, VS Code etc.)
+versions and the different console hosts (e.g. Windows Terminal, conhost, VS Code etc.).
+
+Please note, that if you compile ncurses only with --enable-win-console but WITHOUT --enable-conpty, your
+code will ONLY run on older Windows systems. If thr runtime detects a Widows version that has ConPTY
+support, it will abort execution with an error message. The reason is - as decribed above - that the
+side-effects of running the old console API on ConPTY enabled systems would result in a degraded user
+experience.
 
 So my clear recommendation is: compile with --enable-win-console only if you have to support older windows
 versions, but always also compile with --enable-conpty to ensure you use the pseudo console interface on
@@ -216,7 +221,7 @@ $ ../configure \
 	--without-shared \
 	--without-manpages \
 	--without-libtool \
-	--disable-win-console \
+	--enable-win-console \
 	--enable-conpty \
 	--without-pkg-config \
 	--with-fallbacks=ms-terminal \
@@ -241,6 +246,14 @@ $ popd
 
 Of course you can replace --enable-widec with --disable-widec if you want a
 traditional 8-bit only build.
+
+If you target msvcrt, I do not recommend to use --enable-widec, but to stay with
+the ASCII codepages provided by Windows (various 8-Bit OEM codepages based on your
+locale). The reason is, that msvcrt doesn't have suport for UTF-8 locales and the
+ncurses wide-character implementation is built which such support in mind. The 
+opposite recommendation holds if you target UCRT: there, I strongly recommend to
+use --enable-widec and use ncurses with UTF-8 whenever possible, because that's the
+native environment of the system (which is also true for most modern UNIXes). 
 
 When it comes to development, I suggest vscode. I've described above how to set it
 up. Then just do this:
