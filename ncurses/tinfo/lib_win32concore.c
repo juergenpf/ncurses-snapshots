@@ -49,44 +49,49 @@ MODULE_ID("$Id$")
 #define REQUIRED_MINOR_V (DWORD)0
 #define REQUIRED_BUILD (DWORD)17763
 
-typedef NTSTATUS(WINAPI * RtlGetVersionPtr) (PRTL_OSVERSIONINFOW);
+typedef NTSTATUS(WINAPI *RtlGetVersionPtr)(PRTL_OSVERSIONINFOW);
 
 static bool
-get_real_windows_version(DWORD * major, DWORD * minor, DWORD * build)
+get_real_windows_version(DWORD *major, DWORD *minor, DWORD *build)
 {
-    HMODULE ntdll = GetModuleHandle(TEXT("ntdll.dll"));
-    if (ntdll) {
-	FARPROC proc = GetProcAddress(ntdll, "RtlGetVersion");
-	union {
-	    FARPROC proc;
-	    RtlGetVersionPtr func;
-	} cast;
-	RtlGetVersionPtr RtlGetVersion = NULL;
-	cast.proc = proc;
-	RtlGetVersion = cast.func;
-	if (RtlGetVersion) {
-	    RTL_OSVERSIONINFOW osvi =
-	    {0};
-	    osvi.dwOSVersionInfoSize = sizeof(osvi);
-	    if (RtlGetVersion(&osvi) == 0) {
-		*major = osvi.dwMajorVersion;
-		*minor = osvi.dwMinorVersion;
-		*build = osvi.dwBuildNumber;
-		return true;
-	    }
+	HMODULE ntdll = GetModuleHandle(TEXT("ntdll.dll"));
+	if (ntdll)
+	{
+		FARPROC proc = GetProcAddress(ntdll, "RtlGetVersion");
+		union
+		{
+			FARPROC proc;
+			RtlGetVersionPtr func;
+		} cast;
+		RtlGetVersionPtr RtlGetVersion = NULL;
+		cast.proc = proc;
+		RtlGetVersion = cast.func;
+		if (RtlGetVersion)
+		{
+			RTL_OSVERSIONINFOW osvi =
+				{0};
+			osvi.dwOSVersionInfoSize = sizeof(osvi);
+			if (RtlGetVersion(&osvi) == 0)
+			{
+				*major = osvi.dwMajorVersion;
+				*minor = osvi.dwMinorVersion;
+				*build = osvi.dwBuildNumber;
+				return true;
+			}
+		}
 	}
-    }
-    return false;
+	return false;
 }
 
 static bool isNT10OrBetter(void)
 {
-    DWORD major, minor, build;
-    if (!get_real_windows_version(&major, &minor, &build)) {
-	T(("RtlGetVersion failed"));
-	return false;
-    }
-    return (major >= 10);
+	DWORD major, minor, build;
+	if (!get_real_windows_version(&major, &minor, &build))
+	{
+		T(("RtlGetVersion failed"));
+		return false;
+	}
+	return (major >= 10);
 }
 
 /* Check if the current Windows version supports ConPTY.
@@ -95,83 +100,101 @@ static bool isNT10OrBetter(void)
  * it supports virtual terminal processing, which is necessary for ncurses to function properly on
  * the Windows Console backend. If any of these checks fail, we return false to indicate that
  * ConPTY is not supported in the current environment.
- * Even if the Windows version supports conpty, the environment may have disabled it, for example by 
- * setting the registry key HKCU\Console\VirtualTerminalLevel to 0. In this case, we also return false 
+ * Even if the Windows version supports conpty, the environment may have disabled it, for example by
+ * setting the registry key HKCU\Console\VirtualTerminalLevel to 0. In this case, we also return false
  * to indicate that ConPTY is not supported.
  */
 static bool
 conpty_supported(void)
 {
-    bool result = false;
-    DWORD major, minor, build;
+	bool result = false;
+	DWORD major, minor, build;
 
-    T((T_CALLED("lib_win32concore::conpty_supported")));
+	T((T_CALLED("lib_win32concore::conpty_supported")));
 
-    if (!get_real_windows_version(&major, &minor, &build)) {
-	T(("RtlGetVersion failed"));
-	returnBool(false);
-    } else {
-	T(("Windows version detected: %d.%d (build %d)", (int) major, (int) minor, (int) build));
-    }
-    if (major >= REQUIRED_MAJOR_V) {
-	if (major == REQUIRED_MAJOR_V) {
-	    if (((minor == REQUIRED_MINOR_V) &&
-		 (build >= REQUIRED_BUILD)) ||
-		((minor > REQUIRED_MINOR_V)))
-		result = true;
-	} else
-	    result = true;
-    }
-    if (result == true) {
+	if (!get_real_windows_version(&major, &minor, &build))
+	{
+		T(("RtlGetVersion failed"));
+		returnBool(false);
+	}
+	else
+	{
+		T(("Windows version detected: %d.%d (build %d)", (int)major, (int)minor, (int)build));
+	}
+	if (major >= REQUIRED_MAJOR_V)
+	{
+		if (major == REQUIRED_MAJOR_V)
+		{
+			if (((minor == REQUIRED_MINOR_V) &&
+				 (build >= REQUIRED_BUILD)) ||
+				((minor > REQUIRED_MINOR_V)))
+				result = true;
+		}
+		else
+			result = true;
+	}
+	if (result == true)
+	{
 		HANDLE hOut = GetStdHandle(STD_OUTPUT_HANDLE);
-		if (hOut == INVALID_HANDLE_VALUE) {
-	    	T(("GetStdHandle failed with error %lu", GetLastError()));
-	    	result = false;
-		} else {
-	    	DWORD dwFlag;
-	    	if (GetConsoleMode(hOut, &dwFlag) == 0) {
+		if (hOut == INVALID_HANDLE_VALUE)
+		{
+			T(("GetStdHandle failed with error %lu", GetLastError()));
+			result = false;
+		}
+		else
+		{
+			DWORD dwFlag;
+			if (GetConsoleMode(hOut, &dwFlag) == 0)
+			{
 				T(("Output handle is not a pseudo-console"));
 				result = false;
-	    	} else {
-	    		if ((dwFlag & ENABLE_VIRTUAL_TERMINAL_PROCESSING) == 0) {
+			}
+			else
+			{
+				if ((dwFlag & ENABLE_VIRTUAL_TERMINAL_PROCESSING) == 0)
+				{
 					dwFlag |= ENABLE_VIRTUAL_TERMINAL_PROCESSING;
-					if (SetConsoleMode(hOut, dwFlag) == 0) {
-		    			T(("SetConsoleMode failed with error %lu", GetLastError()));
-		    			result = false;
+					if (SetConsoleMode(hOut, dwFlag) == 0)
+					{
+						T(("SetConsoleMode failed with error %lu", GetLastError()));
+						result = false;
 					}
 				}
-	    	}
+			}
 		}
 	}
-    returnBool(result);
+	returnBool(result);
 }
 
 #if USE_SCREENBUFFERED_CONSOLE
-/* Windows version prior to version 10 have mixed behaviour when it comes to console resizing. 
- * In some versions, the console can be resized freely, but the application is not notified of 
- * the resize events, which means that ncurses cannot update its internal state to reflect the 
+/* Windows version prior to version 10 have mixed behaviour when it comes to console resizing.
+ * In some versions, the console can be resized freely, but the application is not notified of
+ * the resize events, which means that ncurses cannot update its internal state to reflect the
  * new console size. In other versions, resizing the console is not possible at all, which
- * means that ncurses cannot function properly because it relies on being able to query the 
- * console size and receive notifications of resize events. To work around these issues, we 
- * disable resizing of the console window when running on legacy consoles, and we also check for 
- * the Windows version to determine if there are any limitations on resizing that we need to be 
+ * means that ncurses cannot function properly because it relies on being able to query the
+ * console size and receive notifications of resize events. To work around these issues, we
+ * disable resizing of the console window when running on legacy consoles, and we also check for
+ * the Windows version to determine if there are any limitations on resizing that we need to be
  * aware of. */
 static bool
 has_limiuted_resize(void)
 {
-    bool result = true;
-    DWORD major, minor, build;
+	bool result = true;
+	DWORD major, minor, build;
 
-    if (!get_real_windows_version(&major, &minor, &build)) {
-	T(("RtlGetVersion failed"));
-    } else {
-	result = (major >= 10) ? false : true; 
-    }
-    return result;
+	if (!get_real_windows_version(&major, &minor, &build))
+	{
+		T(("RtlGetVersion failed"));
+	}
+	else
+	{
+		result = (major >= 10) ? false : true;
+	}
+	return result;
 }
 #endif /* USE_SCREENBUFFERED_CONSOLE */
 
-NCURSES_EXPORT_VAR(ConsoleCoreInterface*) 
+NCURSES_EXPORT_VAR(ConsoleCoreInterface *)
 _nc_CORECONSOLE = NULL;
 
 /* Helper routine for getting the console size. We try to get the console size from
@@ -181,22 +204,23 @@ _nc_CORECONSOLE = NULL;
  * size from the main output handle, and if that fails, it tries the standard output
  * and standard error handles as well. If all attempts fail, it returns FALSE. */
 static bool
-get_sbi(CONSOLE_SCREEN_BUFFER_INFO * csbi)
+get_sbi(CONSOLE_SCREEN_BUFFER_INFO *csbi)
 {
-    HANDLE test_handles[] = {
-		DefaultConsole()->ConsoleHandleOut, 
+	HANDLE test_handles[] = {
+		DefaultConsole()->ConsoleHandleOut,
 		GetStdHandle(STD_OUTPUT_HANDLE),
-     		GetStdHandle(STD_ERROR_HANDLE)
-	};
-    HANDLE hdl;
+		GetStdHandle(STD_ERROR_HANDLE)};
+	HANDLE hdl;
 
-    for (size_t i = 0; i < sizeof(test_handles) / sizeof(test_handles[0]); ++i) {
-	hdl = test_handles[i];
-	if (hdl != INVALID_HANDLE_VALUE && GetConsoleScreenBufferInfo(hdl, csbi)) {
-	    return true;
+	for (size_t i = 0; i < sizeof(test_handles) / sizeof(test_handles[0]); ++i)
+	{
+		hdl = test_handles[i];
+		if (hdl != INVALID_HANDLE_VALUE && GetConsoleScreenBufferInfo(hdl, csbi))
+		{
+			return true;
+		}
 	}
-    }
-    return false;
+	return false;
 }
 
 /* This function flushes the console input buffer. It is called by the main thread when it
@@ -220,132 +244,134 @@ flush_input(int fd GCC_UNUSED)
 static void
 encoding_init(void)
 {
-    char *newlocale = NULL;
-    char *cur_loc = NULL;
-    char localebuf[16];
-    UINT cp;
+	char *newlocale = NULL;
+	char *cur_loc = NULL;
+	char localebuf[16];
+	UINT cp;
 	UINT incp;
 #if USE_WIDEC_SUPPORT
-    cp = CP_UTF8;
+	cp = CP_UTF8;
 #else
-#  if WINVER < 0x0600
-    cp = GetOEMCP();
-#else
-    WCHAR buf[16];
-    /* We query the system for the default ANSI code page */
-    int len = GetLocaleInfoEx(
-				 LOCALE_NAME_SYSTEM_DEFAULT,
-				 LOCALE_IDEFAULTANSICODEPAGE,
-				 buf,
-				 16);
-    if (len > 0)
-	cp = (UINT) _wtoi(buf);
-    else
-	cp = 1252;		/* last line of defense if GetLocaleInfoEx fails is to assume a
-				 * reasonable default code page, which is the most common ANSI code
-				 * page on Western systems. This is not ideal, but there isn't much
-				 * else we can do in this case, and it at least allows the console
-				 * to function with a reasonable character set in most cases. */
-#endif /* WINVER < 0x0600 */
+	if (!isNT10OrBetter())
+	{
+		cp = GetOEMCP();
+	}
+	else
+	{
+		WCHAR buf[16];
+		/* We query the system for the default ANSI code page */
+		int len = GetLocaleInfoEx(
+			LOCALE_NAME_SYSTEM_DEFAULT,
+			LOCALE_IDEFAULTANSICODEPAGE,
+			buf,
+			16);
+		if (len > 0)
+			cp = (UINT)_wtoi(buf);
+		else
+			cp = 1252; /* last line of defense if GetLocaleInfoEx fails is to assume a
+						* reasonable default code page, which is the most common ANSI code
+						* page on Western systems. This is not ideal, but there isn't much
+						* else we can do in this case, and it at least allows the console
+						* to function with a reasonable character set in most cases. */
+	}
 #endif
-    incp = cp;
-    snprintf(localebuf, sizeof(localebuf), ".%u", cp);
-    cur_loc = setlocale(LC_CTYPE, NULL);
+	incp = cp;
+	snprintf(localebuf, sizeof(localebuf), ".%u", cp);
+	cur_loc = setlocale(LC_CTYPE, NULL);
 
-    T((T_CALLED("lib_win32concore::encoding_init() - code page will be set to %u"), cp));
-    T(("conpty Current locale: %s", cur_loc ? cur_loc : "NULL"));
+	T((T_CALLED("lib_win32concore::encoding_init() - code page will be set to %u"), cp));
+	T(("Console: current locale: %s", cur_loc ? cur_loc : "NULL"));
 #if USE_WIDEC_SUPPORT
-#  if defined(_UCRT)
-    // only UCRT allows to set UTF-8 locales.
-    T(("Console using UCRT"));
+#if defined(_UCRT)
+	// only UCRT allows to set UTF-8 locales.
+	T(("Console using UCRT"));
 
-    T(("Console: Try setting locale according to desired codepage %s", localebuf));
-    newlocale = setlocale(LC_CTYPE, localebuf);
-    T(("Console: setlocale() result locale is %s", newlocale ? newlocale : "NULL"));
+	T(("Console: Try setting locale according to desired codepage %s", localebuf));
+	newlocale = setlocale(LC_CTYPE, localebuf);
+	T(("Console: setlocale() result locale is %s", newlocale ? newlocale : "NULL"));
 
-    cur_loc = setlocale(LC_CTYPE, NULL);
-    T(("Console: Current locale now %s, code page %u", cur_loc ? cur_loc : "NULL", cp));
-#else /* Not UCRT */
-    if (!isNT10OrBetter())
-    {
-	    snprintf(localebuf, sizeof(localebuf), ".%u", GetOEMCP());
-	    T(("Console: Try setting locale according to desired codepage %s", localebuf));
-	    newlocale = setlocale(LC_CTYPE, localebuf);
-	    T(("Console: setlocale() result locale is %s", newlocale ? newlocale : "NULL"));
-	    cur_loc = setlocale(LC_CTYPE, NULL);
-	    T(("Console: Current locale now %s", cur_loc ? cur_loc : "NULL"));
-    } else {
-        T(("Console API: Not using UCRT - relying on current locale for code page handling"));
-        cur_loc = setlocale(LC_CTYPE, NULL);
-        T(("Console: Current locale now %s, code page %u", cur_loc ? cur_loc : "NULL", cp));
-    }
+	cur_loc = setlocale(LC_CTYPE, NULL);
+	T(("Console: Current locale now %s, code page %u", cur_loc ? cur_loc : "NULL", cp));
+#else  /* Not UCRT */
+	T(("Console API: Not using UCRT - relying on current locale for code page handling"));
+	cur_loc = setlocale(LC_CTYPE, NULL);
+	T(("Console: Current locale now %s, code page %u", cur_loc ? cur_loc : "NULL", cp));
 #endif /* defined(_UCRT ) */
-#else /* !USE_WIDEC_SUPPORT */
-    T(("Console: Try setting locale according to desired codepage %s", localebuf));
-    newlocale = setlocale(LC_CTYPE, localebuf);
-    T(("Console: setlocale() result locale is %s", newlocale ? newlocale : "NULL"));
+#else  /* !USE_WIDEC_SUPPORT */
+	T(("Console: Try setting locale according to desired codepage %s", localebuf));
+	newlocale = setlocale(LC_CTYPE, localebuf);
+	T(("Console: setlocale() result locale is %s", newlocale ? newlocale : "NULL"));
 
-    cur_loc = setlocale(LC_CTYPE, NULL);
-    T(("Console: Current locale now %s, code page %u", cur_loc ? cur_loc : "NULL", cp));
+	cur_loc = setlocale(LC_CTYPE, NULL);
+	T(("Console: Current locale now %s, code page %u", cur_loc ? cur_loc : "NULL", cp));
 #endif /* USE_WIDEC_SUPPORT */
 
-    SetConsoleCP(incp);
-    SetConsoleOutputCP(cp);
+	SetConsoleCP(incp);
+	SetConsoleOutputCP(cp);
 }
 
 NCURSES_EXPORT(bool)
-_nc_console_setup(void) {
+_nc_console_setup(void)
+{
 	bool res = false;
 	DWORD status = 0;
 
 	T((T_CALLED("lib_win32concore::_nc_console_setup()")));
-	if (conpty_supported()) {
+	if (conpty_supported())
+	{
 #if USE_CONPTY
-		_nc_CORECONSOLE = & (_nc_currentCONPTY->core);
+		_nc_CORECONSOLE = &(_nc_currentCONPTY->core);
 		status |= CONSOLE_STATUS_IS_CONPTY;
 #else
 		/* This is intentional. We want to assert best possible support for ncurses functionality
 		 * on Windows is available, so this message should motivate people to use appropriate builds
 		 * of ncurses. When the application is built against a DLL version of ncurses, a simple install
-		 * of a new ncurses set of DLLS with ConPTY support should be sufficient to get ConPTY support 
-		 * without recompiling the application. When the application is statically linked against ncurses, 
-		 * then the application itself needs to be recompiled with a version of ncurses that has ConPTY 
-		 * support enabled, otherwise it will not be able to use ConPTY even if it is available on the 
-		 * system. In this case, we print an error message and exit, because running without ConPTY support 
+		 * of a new ncurses set of DLLS with ConPTY support should be sufficient to get ConPTY support
+		 * without recompiling the application. When the application is statically linked against ncurses,
+		 * then the application itself needs to be recompiled with a version of ncurses that has ConPTY
+		 * support enabled, otherwise it will not be able to use ConPTY even if it is available on the
+		 * system. In this case, we print an error message and exit, because running without ConPTY support
 		 * on a modern Windows system would lead to a degraded experience. */
 		T(("lib_win32concore::_nc_console_setup - ConPTY supported, but not enabled. Exiting Program"));
 		fprintf(stderr, "ERROR: ConPTY is supported on this system, but not compiled into ncurses.\n");
 		fprintf(stderr, "This configuration is NOT supported.\n");
 #endif /* USE_CONPTY */
-	} else {
+	}
+	else
+	{
 #if USE_SCREENBUFFERED_CONSOLE
 		HWND hwnd = GetConsoleWindow();
 		LONG style = GetWindowLong(hwnd, GWL_STYLE);
 		style &= ~(WS_SIZEBOX | WS_MAXIMIZEBOX);
 		T(("lib_win32concore::_nc_console_setup - Legacy console detected, disabling resizing"));
 		SetWindowLong(hwnd, GWL_STYLE, style);
-		_nc_CORECONSOLE = & (_nc_SCREENBUFFEREDCONSOLE->core);
-		if (has_limiuted_resize()) {
+		_nc_CORECONSOLE = &(_nc_SCREENBUFFEREDCONSOLE->core);
+		if (has_limiuted_resize())
+		{
 			T(("lib_win32concore::_nc_console_setup - Legacy console has resize limitations"));
 			status |= CONSOLE_STATUS_LIMITED_RESIZE;
-		} else {
+		}
+		else
+		{
 			CONSOLE_SCREEN_BUFFER_INFO csbi;
-			if (GetConsoleScreenBufferInfo(GetStdHandle(STD_OUTPUT_HANDLE), &csbi)) {
-			    COORD newSize;
-			    newSize.X = (short)(csbi.srWindow.Right - csbi.srWindow.Left + 1);
-			    newSize.Y = (short)(csbi.srWindow.Bottom - csbi.srWindow.Top + 1);
-			    SetConsoleScreenBufferSize(_nc_SCREENBUFFEREDCONSOLE->core.ConsoleHandleOut, newSize);
+			if (GetConsoleScreenBufferInfo(GetStdHandle(STD_OUTPUT_HANDLE), &csbi))
+			{
+				COORD newSize;
+				newSize.X = (short)(csbi.srWindow.Right - csbi.srWindow.Left + 1);
+				newSize.Y = (short)(csbi.srWindow.Bottom - csbi.srWindow.Top + 1);
+				SetConsoleScreenBufferSize(_nc_SCREENBUFFEREDCONSOLE->core.ConsoleHandleOut, newSize);
 			}
 		}
 #endif
 	}
-	if (NULL!=DefaultConsole()) {
+	if (NULL != DefaultConsole())
+	{
 		/* Especially with UCRT and wide mode, make sure we use an UTF-8 capable locale.
-	 	 * At least we set the codepage to a proper value that's either compatible with
-	 	 * ASCII or UTF-8, to ensure that the console can display characters properly.
-	 	 * The actual locale setting is not that important, as long as the code page is set
-	 	 * correctly, because we handle UTF-8 encoding and decoding ourselves and we don't
-	 	 * rely on the C runtime for that. */
+		 * At least we set the codepage to a proper value that's either compatible with
+		 * ASCII or UTF-8, to ensure that the console can display characters properly.
+		 * The actual locale setting is not that important, as long as the code page is set
+		 * correctly, because we handle UTF-8 encoding and decoding ourselves and we don't
+		 * rely on the C runtime for that. */
 		encoding_init();
 
 		DefaultConsole()->status = status;
@@ -361,42 +387,43 @@ _nc_console_setup(void) {
 		DefaultConsole()->getSBI = get_sbi;
 		DefaultConsole()->flush = flush_input;
 
-
 		res = true;
 	}
 	returnBool(res);
 }
 
-/* The central routine to get the TTY state. It dispatches in dependency 
+/* The central routine to get the TTY state. It dispatches in dependency
  * of the console type to the correct implementation. */
 NCURSES_EXPORT(int)
-_nc_console_gettty(int fd, ConsoleMode *buf) {
+_nc_console_gettty(int fd, ConsoleMode *buf)
+{
 	assert(DefaultConsole());
 	return DefaultConsole()->getmode(fd, buf);
 }
 
-/* The central routine to set the TTY state. It dispatches in dependency 
+/* The central routine to set the TTY state. It dispatches in dependency
  * of the console type to the correct implementation. */
 NCURSES_EXPORT(int)
-_nc_console_settty(int fd, ConsoleMode *buf) {
+_nc_console_settty(int fd, ConsoleMode *buf)
+{
 	assert(DefaultConsole());
 	return DefaultConsole()->setmode(fd, buf);
 }
 
-/* Helper routine to compute the difference between two timevals in milliseconds. 
- * We use this to measure the time between console resize events, to determine if 
- * we need to update the console size information in ncurses. The function takes 
- * two timeval structures as input, representing the start and end times, and 
- * returns the difference in milliseconds as an integer. We assume that the time 
- * difference is not large enough to cause an overflow of the int64_t type, which 
+/* Helper routine to compute the difference between two timevals in milliseconds.
+ * We use this to measure the time between console resize events, to determine if
+ * we need to update the console size information in ncurses. The function takes
+ * two timeval structures as input, representing the start and end times, and
+ * returns the difference in milliseconds as an integer. We assume that the time
+ * difference is not large enough to cause an overflow of the int64_t type, which
  * should be safe for differences for slightly more than three weeks..
  */
 NCURSES_EXPORT(int)
-_nc_timeval_diff_in_ms(struct timeval start, struct timeval end) 
+_nc_timeval_diff_in_ms(struct timeval start, struct timeval end)
 {
-    int64_t diff_sec = (int64_t)end.tv_sec - (int64_t)start.tv_sec;
-    int64_t diff_usec = (int64_t)end.tv_usec - (int64_t)start.tv_usec;
-    return (int)((diff_sec * 1000) + (diff_usec / 1000));
+	int64_t diff_sec = (int64_t)end.tv_sec - (int64_t)start.tv_sec;
+	int64_t diff_usec = (int64_t)end.tv_usec - (int64_t)start.tv_usec;
+	return (int)((diff_sec * 1000) + (diff_usec / 1000));
 }
 
 #endif // _NC_WINDOWS_NATIVE
