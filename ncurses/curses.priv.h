@@ -2216,6 +2216,7 @@ extern NCURSES_EXPORT(char *) _nc_trace_bufcat (int, const char *);
 extern NCURSES_EXPORT(char *) _nc_tracechar (SCREEN *, int);
 extern NCURSES_EXPORT(char *) _nc_tracemouse (SCREEN *, MEVENT const *);
 extern NCURSES_EXPORT(char *) _nc_trace_mmask_t (SCREEN *, mmask_t);
+extern NCURSES_EXPORT(char *) _nc_term_select (void);
 extern NCURSES_EXPORT(int) _nc_access (const char *, int);
 extern NCURSES_EXPORT(int) _nc_baudrate (int);
 extern NCURSES_EXPORT(int) _nc_freewin (WINDOW *);
@@ -2460,9 +2461,9 @@ extern NCURSES_EXPORT(int) _nc_get_tty_mode(TTY *);
 #endif
 
 #if USE_CONPTY
-#define NC_READ(fd, buf, count) WINCONPTY.read(fd,buf,count)
+#define NC_READ(sp,fd, buf, count) AsConPTY(sp)->read(fd,buf,count)
 #else
-#define NC_READ(fd, buf, count) read(fd, buf, count)
+#define NC_READ(sp,fd, buf, count) read(fd, buf, count)
 #endif
 
 #if USE_SCREENBUFFERED_CONSOLE
@@ -2525,18 +2526,18 @@ typedef struct consoleCoreInterface {
     SCREEN* sp;                      /* Screen pointer */
 
     // Methods
+    char*(*termname)(void);                           /* Get the name of the terminal type. */
     bool (*init)(int fdOut, int fdIn);                 /* Initialize with I/O file descriptors. fdIn maybe -1 in first call */
     bool (*getSBI)(CONSOLE_SCREEN_BUFFER_INFO *sbi);   /* Get the current console size. Returns FALSE on failure. */
     void (*size)(int *Lines, int *Cols);               /* Query console size. Safe to be called before init */ 
     bool (*size_changed)(void);                        /* Return TRUE if the console has been resized */
-    int (*setmode)(int fd, const ConsoleMode *arg);    /* Our SET_TTY implementation */
-    int (*getmode)(int fd, ConsoleMode *arg);          /* Our GET_TTY implementation */
-    int (*defmode )(ConsoleMode *arg, short kind);     /* Used by shell-/prog-mode handling to manage start/stop of the I/O subsystem of ncurses */
-    int (*flush)(int fd);                              /* flush the console I/O stream denoted by the file descriptor. Actualy, we only flush the input. */
+    int  (*setmode)(int fd, const ConsoleMode *arg);    /* Our SET_TTY implementation */
+    int  (*getmode)(int fd, ConsoleMode *arg);          /* Our GET_TTY implementation */
+    int  (*defmode )(ConsoleMode *arg, short kind);     /* Used by shell-/prog-mode handling to manage start/stop of the I/O subsystem of ncurses */
+    int  (*flush)(int fd);                              /* flush the console I/O stream denoted by the file descriptor. Actualy, we only flush the input. */
 } ConsoleCoreInterface;
 
 extern NCURSES_EXPORT_VAR(ConsoleCoreInterface*) _nc_CORECONSOLE;
-#define CORECONSOLE (*_nc_CORECONSOLE)
 #define DefaultConsole() _nc_CORECONSOLE
 #define CoreConsoleInitialized() (_nc_CORECONSOLE != NULL)
 
@@ -2578,13 +2579,6 @@ extern NCURSES_EXPORT_VAR(ConsoleCoreInterface*) _nc_CORECONSOLE;
 #define CONSOLE_INIT_FAILURE_MSG "Failed to initialize console interface.\n"
 
 extern NCURSES_EXPORT(bool) _nc_console_setup(void);
-#define AssertConsoleSetup() \
-    if (!CoreConsoleInitialized()) { \
-	if (!_nc_console_setup()) { \
-	    fprintf(stderr, CONSOLE_INIT_FAILURE_MSG); \
-	    ExitProgram(EXIT_FAILURE); \
-	} \
-    }
 
 #if USE_SCREENBUFFERED_CONSOLE
 typedef struct _termInfo
@@ -2651,7 +2645,6 @@ typedef struct {
 #endif
 } ScreenBufferedConsoleInterface;
 extern NCURSES_EXPORT_VAR(ScreenBufferedConsoleInterface *) _nc_SCREENBUFFEREDCONSOLE;
-#define SCREENBUFFEREDCONSOLE (*_nc_SCREENBUFFEREDCONSOLE)
 #define AsScreenBufferedConsole(sp) ((ScreenBufferedConsoleInterface*)(ScreenConsole(sp)))
 #define DefaultScreenBufferedConsole() ((ScreenBufferedConsoleInterface*)(DefaultConsole()))
 
@@ -2691,7 +2684,6 @@ typedef struct {
 
 // Guaranteed to be statically initialzed.
 extern NCURSES_EXPORT_VAR(ConPtyInterface*) _nc_currentCONPTY;
-#define WINCONPTY (*_nc_currentCONPTY)
 #define AsConPTY(sp) ((ConPtyInterface*)(ScreenConsole(sp)))
 #define DefaultConPTY() ((ConPtyInterface*)(DefaultConsole()))
 #endif /* USE_CONPTY */

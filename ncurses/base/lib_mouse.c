@@ -820,7 +820,7 @@ _nc_mouse_event(SCREEN *sp)
 	{
 	    char kbuf[3];
 
-	    int i, res = NC_READ(M_FD(sp), &kbuf, 3);	/* Eat the prefix */
+	    int i, res = NC_READ(sp,M_FD(sp), &kbuf, 3);	/* Eat the prefix */
 	    if (res != 3)
 		printf("Got %d chars instead of 3 for prefix.\n", res);
 	    for (i = 0; i < res; i++) {
@@ -1114,15 +1114,14 @@ decode_xterm_X10(SCREEN *sp, MEVENT * eventp)
     for (grabbed = 0; grabbed < MAX_KBUF; grabbed += (size_t) res) {
 
 	/* For VIO mouse we add extra bit 64 to disambiguate button-up. */
-	res = (int) NC_READ(
+	res = (int) NC_READ(sp,
 #if USE_EMX_MOUSE
 	/* For VIO mouse we add extra bit 64 to disambiguate button-up. */
 			    (M_FD(sp) >= 0) ? M_FD(sp) : sp->_ifd,
-			    kbuf + grabbed, (size_t) (MAX_KBUF - (int) grabbed));
 #else
 			    sp->_ifd,
-			    kbuf + grabbed, (size_t) (MAX_KBUF - (int) grabbed));
 #endif
+			    kbuf + grabbed, (size_t) (MAX_KBUF - (int) grabbed));
 	if (res < 0)
 	    break;
     }
@@ -1164,13 +1163,11 @@ decode_xterm_1005(SCREEN *sp, MEVENT * eventp)
     for (grabbed = 0; grabbed < limit;) {
 	int res;
 
-	res = (int) NC_READ(
+	res = (int) NC_READ(sp,
 #if USE_EMX_MOUSE
-	res = (int) NC_READ(
 			    (M_FD(sp) >= 0) ? M_FD(sp) : sp->_ifd,
 			    (kbuf + grabbed), (size_t) 1);
 #else
-	res = (int) NC_READ(
 			    sp->_ifd,
 			    (kbuf + grabbed), (size_t) 1);
 #endif
@@ -1245,14 +1242,13 @@ read_SGR(const SCREEN *sp, SGR_DATA * result)
     do {
 	int res;
 
-	res = (int) NC_READ(
+	res = (int) NC_READ(sp,
 #if USE_EMX_MOUSE
 			    (M_FD(sp) >= 0) ? M_FD(sp) : sp->_ifd,
-			    (kbuf + grabbed), (size_t) 1);
 #else
 			    sp->_ifd,
-			    (kbuf + grabbed), (size_t) 1);
 #endif
+			    (kbuf + grabbed), (size_t) 1);
 	if (res < 0)
 	    break;
 	if ((grabbed + MAX_KBUF) >= (int) sizeof(kbuf)) {

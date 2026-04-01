@@ -174,7 +174,7 @@ static bool
 get_sbi(CONSOLE_SCREEN_BUFFER_INFO * csbi)
 {
     HANDLE test_handles[] = {
-		CORECONSOLE.ConsoleHandleOut, 
+		DefaultConsole()->ConsoleHandleOut, 
 		GetStdHandle(STD_OUTPUT_HANDLE),
      		GetStdHandle(STD_ERROR_HANDLE)
 	};
@@ -268,7 +268,7 @@ _nc_console_setup(void) {
 	T((T_CALLED("lib_win32concore::_nc_console_setup()")));
 	if (conpty_supported()) {
 #if USE_CONPTY
-		_nc_CORECONSOLE = & (WINCONPTY.core);
+		_nc_CORECONSOLE = & (_nc_currentCONPTY->core);
 		status |= CONSOLE_STATUS_IS_CONPTY;
 		/* Especially with UCRT and wide mode, make sure we use an UTF-8 capable locale.
 	 	 * At least we set the codepage to a proper value that's either compatible with
@@ -298,7 +298,7 @@ _nc_console_setup(void) {
 		style &= ~(WS_SIZEBOX | WS_MAXIMIZEBOX);
 		T(("lib_win32concore::_nc_console_setup - Legacy console detected, disabling resizing"));
 		SetWindowLong(hwnd, GWL_STYLE, style);
-		_nc_CORECONSOLE = & (SCREENBUFFEREDCONSOLE.core);
+		_nc_CORECONSOLE = & (_nc_SCREENBUFFEREDCONSOLE->core);
 		if (has_limiuted_resize()) {
 			T(("lib_win32concore::_nc_console_setup - Legacy console has resize limitations"));
 			status |= CONSOLE_STATUS_LIMITED_RESIZE;
@@ -308,24 +308,24 @@ _nc_console_setup(void) {
 			    COORD newSize;
 			    newSize.X = (short)(csbi.srWindow.Right - csbi.srWindow.Left + 1);
 			    newSize.Y = (short)(csbi.srWindow.Bottom - csbi.srWindow.Top + 1);
-			    SetConsoleScreenBufferSize(SCREENBUFFEREDCONSOLE.core.ConsoleHandleOut, newSize);
+			    SetConsoleScreenBufferSize(_nc_SCREENBUFFEREDCONSOLE->core.ConsoleHandleOut, newSize);
 			}
 		}
 #endif
 	}
-	if (NULL!=_nc_CORECONSOLE) {
-		CORECONSOLE.status = status;
-		CORECONSOLE.ConsoleHandleIn = INVALID_HANDLE_VALUE;
-		CORECONSOLE.ConsoleHandleOut = INVALID_HANDLE_VALUE;
-		CORECONSOLE.ttyflags.dwFlagIn = 0;
-		CORECONSOLE.ttyflags.dwFlagOut = 0;
-		CORECONSOLE.ttyflags.kind = TTY_MODE_UNSPECIFIED;
-		CORECONSOLE.sbi_lines = -1;
-		CORECONSOLE.sbi_cols = -1;
-		CORECONSOLE.sp = 0;
+	if (NULL!=DefaultConsole()) {
+		DefaultConsole()->status = status;
+		DefaultConsole()->ConsoleHandleIn = INVALID_HANDLE_VALUE;
+		DefaultConsole()->ConsoleHandleOut = INVALID_HANDLE_VALUE;
+		DefaultConsole()->ttyflags.dwFlagIn = 0;
+		DefaultConsole()->ttyflags.dwFlagOut = 0;
+		DefaultConsole()->ttyflags.kind = TTY_MODE_UNSPECIFIED;
+		DefaultConsole()->sbi_lines = -1;
+		DefaultConsole()->sbi_cols = -1;
+		DefaultConsole()->sp = 0;
 
-		CORECONSOLE.getSBI = get_sbi;
-		CORECONSOLE.flush = flush_input;
+		DefaultConsole()->getSBI = get_sbi;
+		DefaultConsole()->flush = flush_input;
 
 
 		res = true;
@@ -337,16 +337,16 @@ _nc_console_setup(void) {
  * of the console type to the correct implementation. */
 NCURSES_EXPORT(int)
 _nc_console_gettty(int fd, ConsoleMode *buf) {
-	assert(_nc_CORECONSOLE);
-	return CORECONSOLE.getmode(fd, buf);
+	assert(DefaultConsole());
+	return DefaultConsole()->getmode(fd, buf);
 }
 
 /* The central routine to set the TTY state. It dispatches in dependency 
  * of the console type to the correct implementation. */
 NCURSES_EXPORT(int)
 _nc_console_settty(int fd, ConsoleMode *buf) {
-	assert(_nc_CORECONSOLE);
-	return CORECONSOLE.setmode(fd, buf);
+	assert(DefaultConsole());
+	return DefaultConsole()->setmode(fd, buf);
 }
 
 /* Helper routine to compute the difference between two timevals in milliseconds. 

@@ -301,7 +301,7 @@ fifo_push(SCREEN *sp EVENTLIST_2nd(_nc_eventlist * evl))
 	unsigned char c2 = 0;
 
 	_nc_set_read_thread(TRUE);
-	n = (int) NC_READ(sp->_ifd, &c2, (size_t) 1);
+	n = (int) NC_READ(sp,sp->_ifd, &c2, (size_t) 1);
 	_nc_set_read_thread(FALSE);
 	ch = c2;
     }
@@ -566,7 +566,7 @@ _nc_wgetch(WINDOW *win,
     }
 #if USE_CONSOLE_API
     /* Check for console resize events after getting input */
-    if (CORECONSOLE.size_changed()) {
+    if (DefaultConsole()->size_changed()) {
 	/* Resize detected - preserve the triggering character */
 	safe_ungetch(sp, ch);
 	ch = ERR; // Fake an error to trigger the resize handling below

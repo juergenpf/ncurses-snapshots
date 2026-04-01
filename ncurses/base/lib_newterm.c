@@ -243,7 +243,7 @@ NCURSES_SP_NAME(newterm) (NCURSES_SP_DCLx
 	    int value;
 	    int cols;
 #if USE_CONSOLE_API
-	    if (!CORECONSOLE.init(fileno(_ofp), fileno(_ifp))) {
+	    if (!DefaultConsole()->init(fileno(_ofp), fileno(_ifp))) {
 		_nc_set_screen(current);
 		returnSP(NULL);
 	    }
@@ -338,9 +338,9 @@ NCURSES_SP_NAME(newterm) (NCURSES_SP_DCLx
 	    _nc_signal_handler(TRUE);
 	    result = SP_PARM;
 #if USE_CONSOLE_API
-	    CORECONSOLE.sp = SP_PARM;
-	    assert(CORECONSOLE.sp != 0);
-	    SP_PARM->_console = &CORECONSOLE; // 1-1 relationship between screen and console interface
+	    DefaultConsole()->sp = SP_PARM;
+	    assert(DefaultConsole()->sp != 0);
+	    SP_PARM->_console = DefaultConsole(); // 1-1 relationship between screen and console interface
 #endif
 	}
     }

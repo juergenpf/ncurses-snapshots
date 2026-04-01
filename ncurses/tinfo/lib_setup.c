@@ -274,7 +274,7 @@ use_tioctl(bool f)
 
 #if USE_CONSOLE_API 
 /* By design, the CONSOLE always provides a default size */
-#define _nc_default_screensize(termp, linep, colp) CORECONSOLE.size(linep, colp);
+#define _nc_default_screensize(termp, linep, colp) DefaultConsole()->size(linep, colp);
 #endif
 
 #if !USE_CONSOLE_API 
@@ -486,7 +486,7 @@ _nc_get_screensize(SCREEN *sp,
         TABSIZE = my_tabsize;
 #endif
         T(("TABSIZE = %d", my_tabsize));
-        CORECONSOLE.size(linep, colp);
+        DefaultConsole()->size(linep, colp);
         returnVoid
     }
 #endif /* !USE_SCREENBUFFERED_CONSOLE */
@@ -496,7 +496,7 @@ _nc_get_screensize(SCREEN *sp,
     /* If we are here, then Windows console is used in terminfo mode.
        We need to figure out the size using the console API
      */
-    CORECONSOLE.size(linep, colp);
+    DefaultConsole()->size(linep, colp);
     T(("screen size: winconsole lines = %d columns = %d", *linep, *colp));
 #else
     /* figure out the size of the screen */
@@ -839,7 +839,8 @@ _nc_setupterm(const char *tname,
     T((T_CALLED("setupterm(%s,%d,%p)"), _nc_visbuf(tname), Filedes, (void *) errret));
 
 #if USE_CONSOLE_API
-    if (!_nc_console_setup() || !CORECONSOLE.init(Filedes, -1)) {
+    tname = _nc_term_select();
+    if (!DefaultConsole()->init(Filedes, -1)) {
 	code = ERR;
 	ret_error0(TGETENT_ERR,
 	    CONSOLE_INIT_FAILURE_MSG);
@@ -847,7 +848,8 @@ _nc_setupterm(const char *tname,
 #endif
 
     if (tname == NULL) {
-	tname = getenv("TERM");
+	tname = _nc_term_select();
+	
 #if USE_SCREENBUFFERED_CONSOLE
     if (ScreenIsBufferedConsole(sp)) {
 	tname = CONSOLE_TERM_NAME;
@@ -1033,9 +1035,9 @@ _nc_setupterm(const char *tname,
 		   myname, free(myname));
     }
 #if USE_CONSOLE_API
-    CORECONSOLE.sp = sp;
+    DefaultConsole()->sp = sp;
     if (sp)
-	sp->_console = &CORECONSOLE; // 1-1 relationship between console and screen
+	sp->_console = DefaultConsole(); // 1-1 relationship between console and screen
 #endif
     free(myname);
     returnCode(code);

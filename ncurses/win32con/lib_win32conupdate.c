@@ -187,7 +187,7 @@ _nc_win32con_doupdate (SCREEN *sp)
 
 		for (y = 0; y < nonempty; y++)
 		{
-			SCREENBUFFEREDCONSOLE.writeat(y, 0, empty, Width);
+			AsScreenBufferedConsole(sp)->writeat(y, 0, empty, Width);
 			memcpy(empty,
 				   CurScreen(sp)->_line[y].text,
 				   (size_t)Width * sizeof(empty[0]));
@@ -219,7 +219,7 @@ _nc_win32con_doupdate (SCREEN *sp)
 				memcpy(&CurScreen(sp)->_line[y].text[x0],
 					   &NewScreen(sp)->_line[y].text[x0],
 					   n * sizeof(CurScreen(sp)->_line[y].text[x0]));
-				SCREENBUFFEREDCONSOLE.writeat(y,
+				AsScreenBufferedConsole(sp)->writeat(y,
 						  x0,
 						  &CurScreen(sp)->_line[y].text[x0], n);
 				x0 = NextChange(x1);
@@ -243,7 +243,7 @@ _nc_win32con_doupdate (SCREEN *sp)
 					   &NewScreen(sp)->_line[y].text[x0],
 					   (size_t)n *
 						   sizeof(CurScreen(sp)->_line[y].text[x0]));
-				SCREENBUFFEREDCONSOLE.writeat(y,
+				AsScreenBufferedConsole(sp)->writeat(y,
 						  x0,
 						  &CurScreen(sp)->_line[y].text[x0], n);
 
@@ -275,7 +275,7 @@ _nc_win32con_doupdate (SCREEN *sp)
 	{
 		CurScreen(sp)->_curx = NewScreen(sp)->_curx;
 		CurScreen(sp)->_cury = NewScreen(sp)->_cury;
-		SCREENBUFFEREDCONSOLE.mvcur(0, 0, CurScreen(sp)->_cury, CurScreen(sp)->_curx);
+		AsScreenBufferedConsole(sp)->mvcur(0, 0, CurScreen(sp)->_cury, CurScreen(sp)->_curx);
 	}
 	// selectActiveHandle();
 	result = OK;

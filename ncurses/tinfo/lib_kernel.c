@@ -157,7 +157,7 @@ flush_input(int fd)
     errno = 0;
     do {
 #if USE_CONSOLE_API
-	CORECONSOLE.flush(fd);
+	DefaultConsole()->flush(fd);
 #else
 	ioctl(fd, TIOCFLUSH, 0);
 #endif

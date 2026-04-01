@@ -54,6 +54,7 @@ MODULE_ID("$Id$")
 #define T_METHOD(name,fmt) "called {lib_win32conpty::pty_" #name fmt
 
 // Prototypes of static function we want to use in initializers
+METHOD(termname,char*) (void);
 METHOD(init, bool) (int fdOut, int fdIn);
 METHOD(size, void) (int *Lines, int *Cols);
 METHOD(size_changed, bool) (void);
@@ -74,6 +75,7 @@ METHOD(poll, int) (struct pty_pollfd * fds, nfds_t nfds, int timeout_ms);
 static ConPtyInterface defaultCONPTY =
 {
     .core = {
+	    Dispatch(termname),
  	    Dispatch(init),
     	    Dispatch(size),
             Dispatch(size_changed),
@@ -145,6 +147,12 @@ static HANDLE g_shutdown_event = NULL;	// Signal: "Shutdown system"
 
 // Forward declaration of the input reader thread
 static unsigned __stdcall input_thread(LPVOID param);
+
+// ---------------------------------------------------------------------------------------
+METHOD(termname, char*) (void)
+{
+    return CONPTY_TERM_ENV;
+}
 
 // ---------------------------------------------------------------------------------------
 

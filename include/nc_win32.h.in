@@ -105,8 +105,9 @@
 /*
  * Allow for build-override, e.g., MinGW used "cygwin".
  */
+#define CONPTY_TERM_ENV "ms-terminal"
 #ifndef DEFAULT_TERM_ENV
-#define DEFAULT_TERM_ENV "ms-terminal"
+#define DEFAULT_TERM_ENV CONPTY_TERM_ENV
 #endif
 
 #undef VALID_TERM_ENV

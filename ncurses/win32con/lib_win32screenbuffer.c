@@ -48,6 +48,7 @@ MODULE_ID("$Id$")
 #define METHOD(name, type) static type DispatchMethod(name)
 #define T_METHOD(name,fmt) "called {lib_win32screenbuffer::screenbuffer_" #name fmt
 
+METHOD(termname, char*) (void);
 METHOD(init, bool)(int fdOut, int fdIn);
 METHOD(size, void)(int *Lines, int *Cols);
 METHOD(size_changed, bool)(void);
@@ -94,6 +95,7 @@ static ScreenBufferedConsoleInterface legacyCONSOLE =
 	{
 		.core =
 			{
+				Dispatch(termname),
 				Dispatch(init),
 				Dispatch(size),
 				Dispatch(size_changed),
@@ -213,7 +215,7 @@ MapKey(WORD vKey)
 	LONG key = GenMap(vKey, 0);
 
 	res = bsearch(&key,
-				  SCREENBUFFEREDCONSOLE.map,
+				  MYSELF.map,
 				  (size_t)(N_INI + FKEYS),
 				  sizeof(keylist[0]),
 				  keycompare);
@@ -238,7 +240,7 @@ AnsiKey(WORD vKey)
 	LONG key = GenMap(vKey, 0);
 
 	res = bsearch(&key,
-				  SCREENBUFFEREDCONSOLE.ansi_map,
+				  MYSELF.ansi_map,
 				  (size_t)(N_INI + FKEYS),
 				  sizeof(keylist[0]),
 				  keycompare);
@@ -1426,6 +1428,11 @@ METHOD(size_changed, bool)(void)
 		_nc_globals.have_sigwinch = 1;
 	}
 	returnBool(resized);
+}
+
+METHOD(termname, char*)(void)
+{
+	return CONSOLE_TERM_NAME;
 }
 
 /* This initializaton function can be called multiple times, and actually it is called from within

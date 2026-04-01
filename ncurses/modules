@@ -189,6 +189,7 @@ lib_raw 	    lib		$(tinfo)	$(HEADER_DEPS)
 lib_setup	    lib		$(tinfo)	$(HEADER_DEPS)	$(INCDIR)/tic.h
 lib_termcap	    lib		$(tinfo)	$(HEADER_DEPS)	$(INCDIR)/tic.h ../include/termcap.h $(INCDIR)/capdefaults.c
 lib_termname	lib		$(tinfo)	$(HEADER_DEPS)
+lib_termselect	lib		$(tinfo)	$(HEADER_DEPS)
 lib_tgoto	    lib		$(tinfo)	$(HEADER_DEPS)	../include/termcap.h
 lib_ti		    lib		$(tinfo)	$(HEADER_DEPS)	$(INCDIR)/tic.h
 lib_tparm	    lib		$(tinfo)	$(HEADER_DEPS)	$(INCDIR)/tic.h
