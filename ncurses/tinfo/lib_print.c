@@ -54,7 +54,7 @@ NCURSES_SP_NAME(mcprint) (NCURSES_SP_DCLx char *data, int len)
 
 #if USE_SCREENBUFFERED_CONSOLE
     if (ScreenIsBufferedConsole(SP_PARM)) {
-        return (ERR);           
+        return AsScreenBufferedConsole(SP_PARM)->print(data, len);           
     }
 #endif
     errno = 0;

@@ -871,4 +871,4 @@ METHOD(getmode, int) (int fd GCC_UNUSED, TTY * arg)
     returnCode(OK);
 }
 
-#endif /* defined(_NC_WINDOWS_NATIVE) && USE_CONPTY */
+#endif /* USE_CONPTY */

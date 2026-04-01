@@ -72,7 +72,7 @@ NCURSES_SP_NAME(assume_default_colors) (NCURSES_SP_DCLx int fg, int bg)
     if (SP_PARM != NULL) {
 #if USE_SCREENBUFFERED_CONSOLE
 	if (ScreenIsBufferedConsole(SP_PARM))
-	    returnCode(ERR);
+	    returnCode(AsScreenBufferedConsole(SP_PARM)->default_colors(fg, bg));
 #endif
 	if ((orig_pair || orig_colors) && !initialize_pair) {
 

@@ -39,7 +39,6 @@ MODULE_ID("$Id$")
 #include <stdint.h>
 #include <sys/time.h>
 
-// FIXME JPF - For now, we disable mouse support as we need to debug why it not works
 // #define NO_MOUSE_SUPPORT
 
 #define DispatchMethod(name) screenbuffer_##name
@@ -48,6 +47,7 @@ MODULE_ID("$Id$")
 #define METHOD(name, type) static type DispatchMethod(name)
 #define T_METHOD(name,fmt) "called {lib_win32screenbuffer::screenbuffer_" #name fmt
 
+// Core methods, if not centrally implemented.
 METHOD(termname, char*) (void);
 METHOD(init, bool)(int fdOut, int fdIn);
 METHOD(size, void)(int *Lines, int *Cols);
@@ -55,6 +55,7 @@ METHOD(size_changed, bool)(void);
 METHOD(getmode, int)(int fd GCC_UNUSED, TTY *arg);
 METHOD(setmode, int)(int fd GCC_UNUSED, const TTY *arg);
 METHOD(defmode, int)(TTY *arg, short kind);
+
 METHOD(adjust_size, bool)(void);
 METHOD(termattrs, chtype)(void);
 METHOD(keypad, int)(bool flag);
@@ -63,9 +64,16 @@ METHOD(keyok, int)(int keycode, int flag);
 METHOD(has_key, int)(int keycode);
 METHOD(init_acs, void)(chtype *acs);
 METHOD(reset_color_pair, bool)(void);
+METHOD(reset_colors,bool)(void);
+METHOD(default_colors, int)(int fg, int bg);
 METHOD(init_pair, int)(int pair, int fg, int bg);
 METHOD(setcolor, void)(bool fg, int color);
+METHOD(initcolor, void)(int c, int r, int g, int b);
+METHOD(do_color, void)(int oldpair,int pair,int reverse, NCURSES_SP_OUTC outc);
 METHOD(curs_set, int)(int visibility);
+METHOD(hwlabel, void)(int num, const char* label);
+METHOD(hwlabelonoff, void)(bool on);
+METHOD(print,int)(char* data, int len);
 METHOD(read, int)(int *buf);
 METHOD(twait,int)(int mode,int milliseconds,int *timeleft EVENTLIST_2nd(_nc_eventlist *evl));
 METHOD(mvcur, int)(int yold, int xold, int y, int x);
@@ -81,12 +89,14 @@ METHOD(writeat, bool)(int y, int x, const chtype *str, int limit);
 #define read_keycode ReadConsoleInputW
 #define KeyEventChar KeyEvent.uChar.UnicodeChar
 #define CharInfoChar Char.UnicodeChar
+#define KEYMASK 0xffff
 #else
 #define write_screen WriteConsoleOutput
 #define read_screen  ReadConsoleOutput
 #define read_keycode ReadConsoleInput
 #define KeyEventChar KeyEvent.uChar.AsciiChar
 #define CharInfoChar Char.AsciiChar
+#define KEYMASK 0xff
 #endif /* USE_WIDEC_SUPPORT */
 
 #define AssertScreenBufferedConsole() assert((!(legacyCONSOLE.core.status & CONSOLE_STATUS_IS_CONPTY)))
@@ -120,9 +130,16 @@ static ScreenBufferedConsoleInterface legacyCONSOLE =
 		Dispatch(has_key),
 		Dispatch(init_acs),
 		Dispatch(reset_color_pair),
+		Dispatch(reset_colors),
+		Dispatch(default_colors),
 		Dispatch(init_pair),
 		Dispatch(setcolor),
+		Dispatch(initcolor),
+		Dispatch(do_color),
 		Dispatch(curs_set),
+		Dispatch(hwlabel),
+		Dispatch(hwlabelonoff),
+		Dispatch(print),
 		Dispatch(read),
 		Dispatch(twait),
 		Dispatch(mvcur),
@@ -612,6 +629,12 @@ METHOD(reset_color_pair, bool)(void)
 	return res;
 }
 
+METHOD(reset_colors, bool)(void)
+{
+	bool res = false;
+	return res;
+}
+
 METHOD(init_pair, int)(int pair, int f, int b)
 {
 	int code = ERR;
@@ -640,6 +663,26 @@ METHOD(setcolor, void)(bool fore, int color)
 	a |= (WORD)((MYSELF.SBI.wAttributes) & ((fore) ? 0xfff8 : 0xff8f));
 	SetConsoleTextAttribute(MYSELF.core.ConsoleHandleOut, a);
 	get_SBI();
+}
+
+METHOD(initcolor, void)(int c GCC_UNUSED, int r GCC_UNUSED, int g GCC_UNUSED, int b GCC_UNUSED)
+{
+	return;
+}
+
+METHOD(do_color, void)(
+	int oldpair GCC_UNUSED, 
+	int pair GCC_UNUSED, 
+	int reverse GCC_UNUSED, 
+	NCURSES_SP_OUTC outc GCC_UNUSED)
+{
+	return;
+}
+
+METHOD(default_colors, int)(int fg, int bg)
+{
+	int code = ERR;
+	return code;
 }
 
 METHOD(curs_set, int)(int visibility)
@@ -795,6 +838,22 @@ handle_mouse(SCREEN *sp, MOUSE_EVENT_RECORD mer)
 	returnBool(result);
 }
 
+METHOD(hwlabel,void)(int num GCC_UNUSED, const char* label GCC_UNUSED)
+{
+	return;
+}
+
+METHOD(hwlabelonoff,void)(bool on GCC_UNUSED)
+{
+	return;
+}
+
+METHOD(print,int)(char* data, int len)
+{
+	int rc = ERR;
+	return(rc);
+}	
+
 METHOD(read, int)(int *buf)
 {
 	int rc = -1;
@@ -826,7 +885,7 @@ METHOD(read, int)(int *buf)
 			{
 				if (!inp_rec.Event.KeyEvent.bKeyDown)
 					continue;
-				*buf = (int)inp_rec.Event.KeyEventChar;
+				*buf = (int)inp_rec.Event.KeyEventChar & KEYMASK;
 				vk = inp_rec.Event.KeyEvent.wVirtualKeyCode;
 				/*
 				 * There are 24 virtual function-keys, and typically
@@ -885,6 +944,10 @@ METHOD(read, int)(int *buf)
 				if (!MouseFifoHasEvent(sp))
 					continue;
 				*buf = KEY_MOUSE;
+				if ((sp->_mouse_type == M_WINDOWS_CONSOLE)
+					 && (sp->_console_mouse_head < sp->_console_mouse_tail)) {
+					 sp->_mouse_event(sp);
+				}
 				break;
 #endif
 			}
@@ -1065,7 +1128,7 @@ METHOD(twait,int)(int mode, int milliseconds, int *timeleft EVENTLIST_2nd(_nc_ev
 									/* Relevant key-down (incl. Ctrl+X etc.): leave for reader */
 									T(("twait:event KEY_EVENT: vk=%d, char=%d",
 									   vk,
-									   pInpRec[i].Event.KeyEventChar));
+									   pInpRec[i].Event.KeyEventChar & KEYMASK));
 									code |= TW_INPUT;
 									goto end;
 								}
@@ -1480,9 +1543,6 @@ METHOD(init, bool)(int fdOut, int fdIn)
 			NULL, OPEN_EXISTING, 0, NULL);
 
 		MYSELF.hShellMode = stdout_handle;
-
-		// JPF FIXME - In theory there can be scenarios, where ConPTY is not supported, but UCRT is availabe. We need to think through how to deal with that.
-		// encoding_init();
 
 		if (stdout_handle == INVALID_HANDLE_VALUE || GetConsoleMode(stdout_handle,
 																	&dwFlag) == 0)

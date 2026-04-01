@@ -243,6 +243,7 @@ NCURSES_SP_NAME(newterm) (NCURSES_SP_DCLx
 	    int value;
 	    int cols;
 #if USE_CONSOLE_API
+	    // Do NOT use ScreenConsole() here, because association is not yet established.
 	    if (!DefaultConsole()->init(fileno(_ofp), fileno(_ifp))) {
 		_nc_set_screen(current);
 		returnSP(NULL);

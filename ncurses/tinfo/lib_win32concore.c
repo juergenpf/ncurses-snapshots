@@ -79,6 +79,16 @@ get_real_windows_version(DWORD * major, DWORD * minor, DWORD * build)
     return false;
 }
 
+static bool isNT10OrBetter(void)
+{
+    DWORD major, minor, build;
+    if (!get_real_windows_version(&major, &minor, &build)) {
+	T(("RtlGetVersion failed"));
+	return false;
+    }
+    return (major >= 10);
+}
+
 /* Check if the current Windows version supports ConPTY.
  * We check for Windows 10 version 1809 or higher, which is the first version that introduced ConPTY.
  * If the version check passes, we also verify that the standard output handle is a console and that
@@ -201,7 +211,7 @@ flush_input(int fd GCC_UNUSED)
 }
 
 #define CP_UTF8 65001
-#if USE_CONPTY
+
 /* MSVCRT doesn't support UTF-8 locales, but UCRT does. However, even with UCRT we can't rely
  * on the locale being set to UTF-8 by default, so we need to set the code page explicitly for
  * the console to ensure that it uses UTF-8 encoding.
@@ -210,14 +220,16 @@ flush_input(int fd GCC_UNUSED)
 static void
 encoding_init(void)
 {
-#if defined(_UCRT)
     char *newlocale = NULL;
-#endif
     char *cur_loc = NULL;
     char localebuf[16];
     UINT cp;
+	UINT incp;
 #if USE_WIDEC_SUPPORT
     cp = CP_UTF8;
+#else
+#  if WINVER < 0x0600
+    cp = GetOEMCP();
 #else
     WCHAR buf[16];
     /* We query the system for the default ANSI code page */
@@ -234,31 +246,52 @@ encoding_init(void)
 				 * page on Western systems. This is not ideal, but there isn't much
 				 * else we can do in this case, and it at least allows the console
 				 * to function with a reasonable character set in most cases. */
+#endif /* WINVER < 0x0600 */
 #endif
+    incp = cp;
     snprintf(localebuf, sizeof(localebuf), ".%u", cp);
     cur_loc = setlocale(LC_CTYPE, NULL);
 
-    T((T_CALLED("lib_win32conpty::encoding_init() - code page will be set to %u"), cp));
+    T((T_CALLED("lib_win32concore::encoding_init() - code page will be set to %u"), cp));
     T(("conpty Current locale: %s", cur_loc ? cur_loc : "NULL"));
-#if defined(_UCRT)
-    T(("conpty using UCRT"));
+#if USE_WIDEC_SUPPORT
+#  if defined(_UCRT)
+    // only UCRT allows to set UTF-8 locales.
+    T(("Console using UCRT"));
 
-    T(("conpty: Try setting locale according to desired codepage %s", localebuf));
+    T(("Console: Try setting locale according to desired codepage %s", localebuf));
     newlocale = setlocale(LC_CTYPE, localebuf);
-    T(("conpty setlocale() result locale is %s", newlocale ? newlocale :
-       "NULL"));
+    T(("Console: setlocale() result locale is %s", newlocale ? newlocale : "NULL"));
 
     cur_loc = setlocale(LC_CTYPE, NULL);
-    T(("conpty Current locale now %s, code page %u", cur_loc ? cur_loc :
-       "NULL", cp));
-#else
-    T(("conpty: Not using UCRT - relying on current locale for code page handling"));
+    T(("Console: Current locale now %s, code page %u", cur_loc ? cur_loc : "NULL", cp));
+#else /* Not UCRT */
+    if (!isNT10OrBetter())
+    {
+	    snprintf(localebuf, sizeof(localebuf), ".%u", GetOEMCP());
+	    T(("Console: Try setting locale according to desired codepage %s", localebuf));
+	    newlocale = setlocale(LC_CTYPE, localebuf);
+	    T(("Console: setlocale() result locale is %s", newlocale ? newlocale : "NULL"));
+	    cur_loc = setlocale(LC_CTYPE, NULL);
+	    T(("Console: Current locale now %s", cur_loc ? cur_loc : "NULL"));
+    } else {
+        T(("Console API: Not using UCRT - relying on current locale for code page handling"));
+        cur_loc = setlocale(LC_CTYPE, NULL);
+        T(("Console: Current locale now %s, code page %u", cur_loc ? cur_loc : "NULL", cp));
+    }
 #endif /* defined(_UCRT ) */
+#else /* !USE_WIDEC_SUPPORT */
+    T(("Console: Try setting locale according to desired codepage %s", localebuf));
+    newlocale = setlocale(LC_CTYPE, localebuf);
+    T(("Console: setlocale() result locale is %s", newlocale ? newlocale : "NULL"));
 
-    SetConsoleCP(cp);
+    cur_loc = setlocale(LC_CTYPE, NULL);
+    T(("Console: Current locale now %s, code page %u", cur_loc ? cur_loc : "NULL", cp));
+#endif /* USE_WIDEC_SUPPORT */
+
+    SetConsoleCP(incp);
     SetConsoleOutputCP(cp);
 }
-#endif /* USE_CONPTY */
 
 NCURSES_EXPORT(bool)
 _nc_console_setup(void) {
@@ -270,13 +303,6 @@ _nc_console_setup(void) {
 #if USE_CONPTY
 		_nc_CORECONSOLE = & (_nc_currentCONPTY->core);
 		status |= CONSOLE_STATUS_IS_CONPTY;
-		/* Especially with UCRT and wide mode, make sure we use an UTF-8 capable locale.
-	 	 * At least we set the codepage to a proper value that's either compatible with
-	 	 * ASCII or UTF-8, to ensure that the console can display characters properly.
-	 	 * The actual locale setting is not that important, as long as the code page is set
-	 	 * correctly, because we handle UTF-8 encoding and decoding ourselves and we don't
-	 	 * rely on the C runtime for that. */
-		encoding_init();
 #else
 		/* This is intentional. We want to assert best possible support for ncurses functionality
 		 * on Windows is available, so this message should motivate people to use appropriate builds
@@ -290,7 +316,7 @@ _nc_console_setup(void) {
 		T(("lib_win32concore::_nc_console_setup - ConPTY supported, but not enabled. Exiting Program"));
 		fprintf(stderr, "ERROR: ConPTY is supported on this system, but not compiled into ncurses.\n");
 		fprintf(stderr, "This configuration is NOT supported.\n");
-#endif
+#endif /* USE_CONPTY */
 	} else {
 #if USE_SCREENBUFFERED_CONSOLE
 		HWND hwnd = GetConsoleWindow();
@@ -314,6 +340,14 @@ _nc_console_setup(void) {
 #endif
 	}
 	if (NULL!=DefaultConsole()) {
+		/* Especially with UCRT and wide mode, make sure we use an UTF-8 capable locale.
+	 	 * At least we set the codepage to a proper value that's either compatible with
+	 	 * ASCII or UTF-8, to ensure that the console can display characters properly.
+	 	 * The actual locale setting is not that important, as long as the code page is set
+	 	 * correctly, because we handle UTF-8 encoding and decoding ourselves and we don't
+	 	 * rely on the C runtime for that. */
+		encoding_init();
+
 		DefaultConsole()->status = status;
 		DefaultConsole()->ConsoleHandleIn = INVALID_HANDLE_VALUE;
 		DefaultConsole()->ConsoleHandleOut = INVALID_HANDLE_VALUE;

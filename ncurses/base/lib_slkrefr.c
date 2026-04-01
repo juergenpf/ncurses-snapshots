@@ -97,12 +97,20 @@ slk_intern_refresh(SCREEN *sp)
 	if (slk->dirty || slk->ent[i].dirty) {
 	    if (slk->ent[i].visible) {
 		if (numlab > 0 && SLK_STDFMT(fmt)) {
+#if USE_SCREENBUFFERED_CONSOLE
+		    if (ScreenIsBufferedConsole(sp)) {
+			AsScreenBufferedConsole(sp)->hwlabel( i + 1, slk->ent[i].form_text);
+		    } else {
+#endif
 		    if (i < num_labels) {
 			NCURSES_PUTP2("plab_norm",
 				      TPARM_2(plab_norm,
 					      i + 1,
 					      slk->ent[i].form_text));
 		    }
+#if USE_SCREENBUFFERED_CONSOLE
+		    }
+#endif		    
 		} else {
 		    if (fmt == 4)
 			slk_paint_info(slk->win);
@@ -121,11 +129,19 @@ slk_intern_refresh(SCREEN *sp)
     slk->dirty = FALSE;
 
     if (numlab > 0) {
+#if USE_SCREENBUFFERED_CONSOLE
+	if (ScreenIsBufferedConsole(sp)) {
+	    AsScreenBufferedConsole(sp)->hwlabelonoff(!(slk->hidden));
+	} else {
+#endif
 	if (slk->hidden) {
 	    NCURSES_PUTP2("label_off", label_off);
 	} else {
 	    NCURSES_PUTP2("label_on", label_on);
 	}
+#if USE_SCREENBUFFERED_CONSOLE
+	}
+#endif
     }
 }
 

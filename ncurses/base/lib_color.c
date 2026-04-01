@@ -339,7 +339,7 @@ NCURSES_SP_NAME(_nc_reset_colors) (NCURSES_SP_DCL0)
 	result = TRUE;
 #if USE_SCREENBUFFERED_CONSOLE
     if (ScreenIsBufferedConsole(SP_PARM)) {
-	returnBool(FALSE);
+	returnBool(AsScreenBufferedConsole(SP_PARM)->reset_colors());
     }
 #endif
     if (orig_colors != NULL) {
@@ -743,9 +743,16 @@ _nc_init_color(SCREEN *sp, int color, int r, int g, int b)
 	    sp->_color_table[color].green = g;
 	    sp->_color_table[color].blue = b;
 	}
-
+#if USE_SCREENBUFFERED_CONSOLE
+	if (ScreenIsBufferedConsole(sp)) {
+	    AsScreenBufferedConsole(sp)->initcolor(color, r, g, b);
+	} else {
+#endif	
 	NCURSES_PUTP2("initialize_color",
 		      TIPARM_4(initialize_color, color, r, g, b));
+#if USE_SCREENBUFFERED_CONSOLE
+	}	
+#endif
 	sp->_color_defs = Max(color + 1, sp->_color_defs);
 
 	result = OK;
@@ -999,6 +1006,12 @@ NCURSES_SP_NAME(_nc_do_color) (NCURSES_SP_DCLx
     int old_fg = -1;
     int old_bg = -1;
 
+#if USE_SCREENBUFFERED_CONSOLE
+    if (ScreenIsBufferedConsole(SP_PARM)) {
+	AsScreenBufferedConsole(SP_PARM)->do_color(old_pair, pair, reverse, outc);
+	return;
+    }
+#endif
     if (!ValidPair(SP_PARM, pair)) {
 	return;
     } else if (pair != 0) {

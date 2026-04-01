@@ -142,7 +142,7 @@ NCURSES_SP_NAME(def_shell_mode) (NCURSES_SP_DCL0)
 	    if (termp->Ottyb.c_oflag & OFLAGS_TABS)
 		tab = back_tab = NULL;
 #elif USE_CONSOLE_API
-	    DefaultConsole()->defmode(&termp->Ottyb, TTY_MODE_SHELL);
+	    ScreenConsole(SP_PARM)->defmode(&termp->Ottyb, TTY_MODE_SHELL);
 #else
 	    if (termp->Ottyb.sg_flags & XTABS)
 		tab = back_tab = NULL;
@@ -177,7 +177,7 @@ NCURSES_SP_NAME(def_prog_mode) (NCURSES_SP_DCL0)
 #ifdef TERMIOS
 	    termp->Nttyb.c_oflag &= (unsigned) (~OFLAGS_TABS);
 #elif USE_CONSOLE_API
-	    DefaultConsole()->defmode(&termp->Nttyb, TTY_MODE_PROGRAM);
+	    ScreenConsole(SP_PARM)->defmode(&termp->Nttyb, TTY_MODE_PROGRAM);
 #else
 	    termp->Nttyb.sg_flags &= (unsigned) (~XTABS);
 #endif
@@ -283,7 +283,7 @@ NCURSES_SP_NAME(savetty) (NCURSES_SP_DCL0)
     code = NCURSES_SP_NAME(_nc_get_tty_mode) (NCURSES_SP_ARGx tty);
 #if USE_CONSOLE_API
     if (code == OK)
-	code = DefaultConsole()->defmode(tty, TTY_MODE_AUTO);
+	code = ScreenConsole(SP_PARM)->defmode(tty, TTY_MODE_AUTO);
 #endif
     returnCode(code);
 

@@ -54,7 +54,10 @@ _nc_term_select (void)
     if (!CoreConsoleInitialized()) {
 	    if (!_nc_console_setup()) {
 	        fprintf(stderr, CONSOLE_INIT_FAILURE_MSG);
-	        ExitProgram(EXIT_FAILURE);
+            /* This is part of termlib and detected early in the initialization phase,
+            *  so - for now - we skip formal release  of potentially allocated resources
+            *  if there are any at all in that early stage. */
+	        exit(EXIT_FAILURE);
 	    }
     }
     assert(DefaultConsole() != NULL);

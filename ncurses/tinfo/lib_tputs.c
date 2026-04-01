@@ -63,7 +63,7 @@ NCURSES_EXPORT_VAR(int) _nc_nulls_sent = 0;
 #define NC_WRITE(fd,buf,len) (ScreenIsConPTYInProgMode(SP_PARM) ? AsConPTY(SP_PARM)->write(fd,buf, len) : write(fd, buf, len))
 #else
 #define NC_WRITE(fd,buf,len) write(fd, buf, len)
-#endif /* USE_CONSOLE_API */
+#endif /* USE_CONPTY */
 
 #if NCURSES_NO_PADDING
 NCURSES_EXPORT(void)

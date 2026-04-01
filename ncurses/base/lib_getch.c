@@ -285,17 +285,6 @@ fifo_push(SCREEN *sp EVENTLIST_2nd(_nc_eventlist * evl))
 	    n = AsScreenBufferedConsole(sp)->read(&buf);
 	    _nc_set_read_thread(FALSE);
 	    ch = buf;
-	    /*
-	     * read() calls handle_mouse() internally and stores the event in
-	     * the driver FIFO.  Transfer it to the ncurses mouse-event ring
-	     * now, exactly as the M_WINDOWS_CONSOLE early-branch above does
-	     * when the FIFO is pre-populated.
-	     */
-	    if (ch == KEY_MOUSE
-		&& (sp->_mouse_type == M_WINDOWS_CONSOLE)
-		&& (sp->_console_mouse_head < sp->_console_mouse_tail)) {
-		sp->_mouse_event(sp);
-	    }
 	} else {
 #endif /* USE_SCREENBUFFERED_CONSOLE */
 	unsigned char c2 = 0;
@@ -566,7 +555,7 @@ _nc_wgetch(WINDOW *win,
     }
 #if USE_CONSOLE_API
     /* Check for console resize events after getting input */
-    if (DefaultConsole()->size_changed()) {
+    if (ScreenConsole(sp)->size_changed()) {
 	/* Resize detected - preserve the triggering character */
 	safe_ungetch(sp, ch);
 	ch = ERR; // Fake an error to trigger the resize handling below

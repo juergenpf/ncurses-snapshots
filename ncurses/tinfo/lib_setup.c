@@ -496,7 +496,7 @@ _nc_get_screensize(SCREEN *sp,
     /* If we are here, then Windows console is used in terminfo mode.
        We need to figure out the size using the console API
      */
-    DefaultConsole()->size(linep, colp);
+    ScreenConsole(sp)->size(linep, colp);
     T(("screen size: winconsole lines = %d columns = %d", *linep, *colp));
 #else
     /* figure out the size of the screen */
@@ -840,6 +840,7 @@ _nc_setupterm(const char *tname,
 
 #if USE_CONSOLE_API
     tname = _nc_term_select();
+    // Do NOT use ScreenConsole() here, because association is not yet established.
     if (!DefaultConsole()->init(Filedes, -1)) {
 	code = ERR;
 	ret_error0(TGETENT_ERR,

@@ -2526,15 +2526,15 @@ typedef struct consoleCoreInterface {
     SCREEN* sp;                      /* Screen pointer */
 
     // Methods
-    char*(*termname)(void);                           /* Get the name of the terminal type. */
+    char*(*termname)(void);                            /* Get the name of the terminal type. */
     bool (*init)(int fdOut, int fdIn);                 /* Initialize with I/O file descriptors. fdIn maybe -1 in first call */
     bool (*getSBI)(CONSOLE_SCREEN_BUFFER_INFO *sbi);   /* Get the current console size. Returns FALSE on failure. */
     void (*size)(int *Lines, int *Cols);               /* Query console size. Safe to be called before init */ 
     bool (*size_changed)(void);                        /* Return TRUE if the console has been resized */
-    int  (*setmode)(int fd, const ConsoleMode *arg);    /* Our SET_TTY implementation */
-    int  (*getmode)(int fd, ConsoleMode *arg);          /* Our GET_TTY implementation */
-    int  (*defmode )(ConsoleMode *arg, short kind);     /* Used by shell-/prog-mode handling to manage start/stop of the I/O subsystem of ncurses */
-    int  (*flush)(int fd);                              /* flush the console I/O stream denoted by the file descriptor. Actualy, we only flush the input. */
+    int  (*setmode)(int fd, const ConsoleMode *arg);   /* Our SET_TTY implementation */
+    int  (*getmode)(int fd, ConsoleMode *arg);         /* Our GET_TTY implementation */
+    int  (*defmode )(ConsoleMode *arg, short kind);    /* Used by shell-/prog-mode handling to manage start/stop of the I/O subsystem of ncurses */
+    int  (*flush)(int fd);                             /* flush the console I/O stream denoted by the file descriptor. Actualy, we only flush the input. */
 } ConsoleCoreInterface;
 
 extern NCURSES_EXPORT_VAR(ConsoleCoreInterface*) _nc_CORECONSOLE;
@@ -2554,6 +2554,7 @@ extern NCURSES_EXPORT_VAR(ConsoleCoreInterface*) _nc_CORECONSOLE;
 // The following two Macros work even if sp is NULL. In that case, the DefaultConsole() is used.
 #define ScreenIsConPTY(sp) (IsConPTY(ScreenConsole(sp)))
 #define ScreenIsBufferedConsole(sp) (IsScreenBufferedConsole(ScreenConsole(sp)))
+#define ScreenIsNotTerminfoConsole(sp) (ScreenIsBufferedConsole)
 
 #define IsConsoleInitialized(console) ((console)->status & CONSOLE_STATUS_INITIALIZED)
 #define MarkConsoleInitialized(console) ((console)->status |= CONSOLE_STATUS_INITIALIZED)
@@ -2624,24 +2625,31 @@ typedef struct {
 
     TerminalInfo info;			           // Core capabilities.
 
-    bool (*adjust_size)(void);                     // Adjust the console buffer size.
-    chtype (*termattrs)(void);                     // Pointer to the termattrs function used by the buffered console.
-    int (*keypad)(bool);                           // Pointer to the keypad function used by the buffered console.
-    int (*beeporflash)(bool);                      // Pointer to the beep or flash function used by the buffered console.
-    int (*keyok)(int keycode,int flag);            // Pointer to the keyok function used by the buffered console.
-    int (*has_key)(int keycode);                   // Pointer to the has_key function used by the buffered console.
-    void (*init_acs)(chtype *acs);                 // Pointer to the init_acs function used by the buffered console.
-    bool (*reset_color_pair)(void);                // Pointer to the reset_color_pair function used by the buffered console.
-    int (*init_pair)(int pair, int fg, int bg);    // Pointer to the init_pair function used by the buffered console.')
-    void (*setcolor)(bool fg, int color);	   // Pointer to the setcolor function used by the buffered console.)
-    int (*curs_set)(int visibility);               // Pointer to the curs_set function used by the buffered console.
-    int (*read)(int *buf); 		           // Pointer to the read function used by the buffered console.
-    int (*twait)(int, int, int* EVENTLIST_2nd(_nc_eventlist*)); 
+    bool (*adjust_size)(void);                     // Adjust the console buffer size to match the physical window size.
+    chtype (*termattrs)(void);
+    int (*keypad)(bool);
+    int (*beeporflash)(bool);
+    int (*keyok)(int keycode,int flag);
+    int (*has_key)(int keycode);
+    void (*init_acs)(chtype *acs);
+    bool (*reset_color_pair)(void);
+    bool (*reset_colors)(void);
+    int  (*default_colors)(int fg, int bg);
+    int (*init_pair)(int pair, int fg, int bg);
+    void (*setcolor)(bool fg, int color);
+    void (*initcolor)(int c, int r, int g, int b);
+    void (*do_color)(int oldpair,int pair,int reverse, NCURSES_SP_OUTC outc);
+    int (*curs_set)(int visibility);
+    void (*hwlabel)(int num, const char* label);
+    void (*hwlabelonoff)(bool on);
+    int (*print)(char* data, int len);
+    int (*read)(int *buf);
+    int (*twait)(int, int, int* EVENTLIST_2nd(_nc_eventlist*));
     int (*mvcur)(int yold, int xold, int y, int x);
 #if USE_WIDEC_SUPPORT
-    bool (*writeat)(int y, int x, const cchar_t *str, int limit); // Pointer to the writeat function used by the buffered console.
+    bool (*writeat)(int y, int x, const cchar_t *str, int limit);
 #else
-    bool (*writeat)(int y, int x, const chtype *str, int limit); // Pointer to the writeat function used by the buffered console.
+    bool (*writeat)(int y, int x, const chtype *str, int limit);
 #endif
 } ScreenBufferedConsoleInterface;
 extern NCURSES_EXPORT_VAR(ScreenBufferedConsoleInterface *) _nc_SCREENBUFFEREDCONSOLE;
@@ -2675,7 +2683,7 @@ typedef struct {
   // Properties
     ConsoleCoreInterface core;                                        /* The common part for ConPTY as well as legacy console API*/
   // Methods
-    int (*read)(int fd, void* result, size_t count);         /* Read bytes from the input stream. */
+    int (*read)(int fd, void* result, size_t count);                  /* Read bytes from the input stream. */
     int (*write)(int fd, const void *buf, size_t count);              /* Write bytes to the output stream. */
     int (*start_input_subsystem)(void);                               /* In prog mode, we control the input stream */
     int (*stop_input_subsystem)(void);                                /* In shell mode, we leave it to the C runtime */
@@ -2691,6 +2699,7 @@ extern NCURSES_EXPORT_VAR(ConPtyInterface*) _nc_currentCONPTY;
 #endif /* USE_CONSOLE_API */
 
 /*
+
  * Exported entrypoints beyond the published API
  */
 #if NCURSES_SP_FUNCS
