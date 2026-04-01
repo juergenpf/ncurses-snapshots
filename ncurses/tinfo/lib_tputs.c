@@ -144,7 +144,13 @@ NCURSES_SP_NAME(_nc_flush) (NCURSES_SP_DCL0)
 	    while (amount) {
 		ssize_t res = NC_WRITE(SP_PARM->_ofd, buf, amount);
 		if (res > 0) {
-		    if ((size_t)res > amount) // weird, but can happen with strange C runtimes.
+		    /* Because this is part of termlib, it can be called when we are not in program mode.
+		     * In that case on Windows for example the output file will be in it's default mode, 
+		     * which is text mode. In that case, effects like CRLF translation can cause the effect,
+		     * so the number of bytes written is greater than the amount requested. In that case, 
+		     * we must not subtract the number of bytes written from the amount, because that would
+		     * produce an underflow effect. */
+		    if ((size_t)res > amount) 
 			break;
 		    /* if the write was incomplete, try again */
 		    amount -= (size_t) res;

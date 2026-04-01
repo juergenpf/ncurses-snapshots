@@ -614,10 +614,9 @@ NCURSES_SP_NAME(_nc_setupscreen) (
     NCURSES_SP_NAME(_nc_init_acs) (NCURSES_SP_ARG);
 #if USE_WIDEC_SUPPORT
     sp->_screen_unicode = _nc_unicode_locale();
-    if (_nc_wacs == NULL) {
-	_nc_init_wacs();
-    }
-    if (_nc_wacs == NULL) {
+    _nc_init_wacs(sp);
+
+    if (sp->_wacs_map == NULL) {
 	ReturnScreenError();
     }
 

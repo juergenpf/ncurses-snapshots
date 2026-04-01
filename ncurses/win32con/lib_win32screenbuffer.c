@@ -358,9 +358,6 @@ _nc_screenbuffered_console_init(void)
 	MYSELF.info.nocolorvideo = 1;
 	MYSELF.info.tabsize = 8;
 	MYSELF.info.numbuttons = 1;
-#if USE_WIDEC_SUPPORT
-	MYSELF.info.wacs_map = NULL;
-#endif
 }
 
 METHOD(adjust_size, bool)(void)
@@ -1606,7 +1603,6 @@ MapAttr(WORD res, attr_t ch)
  * TODO: support surrogate pairs
  * TODO: support combining characters
  * TODO: support acsc
- * TODO: _nc_wacs should be part of sp.
  */
 METHOD(writeat,bool)(int y, int x, const cchar_t *str, int limit)
 {
@@ -1616,8 +1612,9 @@ METHOD(writeat,bool)(int y, int x, const cchar_t *str, int limit)
 	SMALL_RECT rec;
 	int i;
 	cchar_t ch;
-	// JPF unused: SCREEN *sp = ConsoleScreen(&legacyCONSOLE.core);
-
+	SCREEN *sp = ConsoleScreen(&MYSELF.core);
+	
+	assert(sp);
 
 	for (i = actual = 0; i < limit; i++)
 	{
@@ -1629,12 +1626,12 @@ METHOD(writeat,bool)(int y, int x, const cchar_t *str, int limit)
 										AttrOf(ch));
 		if (AttrOf(ch) & A_ALTCHARSET)
 		{
-			if (MYSELF.info.wacs_map)
+			if (sp->_wacs_map)
 			{
 				int which = CharOf(ch);
-				if (which > 0 && which < ACS_LEN && CharOf(MYSELF.info.wacs_map[which]) != 0)
+				if (which > 0 && which < ACS_LEN && CharOf(sp->_wacs_map[which]) != 0)
 				{
-					ci[actual].CharInfoChar = CharOf(MYSELF.info.wacs_map[which]);
+					ci[actual].CharInfoChar = CharOf(sp->_wacs_map[which]);
 				}
 				else
 				{

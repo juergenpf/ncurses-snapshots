@@ -1308,6 +1308,13 @@ typedef struct screen {
 	 */
 	bool		_screen_acs_fix;
 	bool		_screen_unicode;
+	/* This will always point to the global static _nc_wacs array, if at all.
+	 * So it MUST NOT be freed if the screen got deleted.
+	 * It simply provides a smoother programming model if we pretend this is
+	 * a per-screen data, and it allows the possibility of a future extension 
+	 * where each screen could have its own ACS mapping.
+	*/
+	cchar_t*		_wacs_map;
 #endif
 
 #if NCURSES_EXT_FUNCS && NCURSES_EXT_COLORS
@@ -2169,7 +2176,7 @@ extern NCURSES_EXPORT(int) _nc_handle_sigwinch(SCREEN *);
 
 /* lib_wacs.c */
 #if USE_WIDEC_SUPPORT
-extern NCURSES_EXPORT(void) _nc_init_wacs(void);
+extern NCURSES_EXPORT(void) _nc_init_wacs(SCREEN *sp);
 #endif
 
 typedef struct {
@@ -2598,9 +2605,6 @@ typedef struct _termInfo
     int  numlabels;
     int  labelwidth;
     int  labelheight;
-#if USE_WIDEC_SUPPORT
-    cchar_t *wacs_map;
-#endif
 } TerminalInfo;
 
 extern NCURSES_EXPORT_VAR(const color_t*) _nc_cga_palette;
