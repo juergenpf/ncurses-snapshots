@@ -240,6 +240,7 @@ encoding_init(void)
 #if USE_WIDEC_SUPPORT
 	cp = CP_UTF8;
 #else
+#if WINVER >= 0x0600	
 	if (!isNT10OrBetter())
 	{
 		cp = GetOEMCP();
@@ -259,7 +260,10 @@ encoding_init(void)
 			cp = GetOEMCP(); /* last line of defense if GetLocaleInfoEx fails is to assume a
 					  * reasonable default code page. */
 	}
-#endif
+#else
+	cp = GetOEMCP();
+#endif /* WINVER >= 0x0600 */
+#endif /* USE_WIDEC_SUPPORT */
 	snprintf(localebuf, sizeof(localebuf), ".%u", cp);
 	cur_loc = setlocale(LC_CTYPE, NULL);
 
