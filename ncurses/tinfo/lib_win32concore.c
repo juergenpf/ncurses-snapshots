@@ -83,6 +83,17 @@ get_real_windows_version(DWORD *major, DWORD *minor, DWORD *build)
 	return false;
 }
 
+#if USE_SCREENBUFFERED_CONSOLE || !USE_WIDEC_SUPPORT
+/* Windows version prior to version 10 have mixed behaviour when it comes to console resizing.
+ * In some versions, the console can be resized freely, but the application is not notified of
+ * the resize events, which means that ncurses cannot update its internal state to reflect the
+ * new console size. In other versions, resizing the console is not possible at all, which
+ * means that ncurses cannot function properly because it relies on being able to query the
+ * console size and receive notifications of resize events. To work around these issues, we
+ * disable resizing of the console window when running on legacy consoles, and we also check for
+ * the Windows version to determine if there are any limitations on resizing that we need to be
+ * aware of. 
+ * */
 static bool isNT10OrBetter(void)
 {
 	DWORD major, minor, build;
@@ -94,6 +105,8 @@ static bool isNT10OrBetter(void)
 	return (major >= 10);
 }
 
+#endif /* USE_SCREENBUFFERED_CONSOLE */
+
 /* Check if the current Windows version supports ConPTY.
  * We check for Windows 10 version 1809 or higher, which is the first version that introduced ConPTY.
  * If the version check passes, we also verify that the standard output handle is a console and that
@@ -103,6 +116,10 @@ static bool isNT10OrBetter(void)
  * Even if the Windows version supports conpty, the environment may have disabled it, for example by
  * setting the registry key HKCU\Console\VirtualTerminalLevel to 0. In this case, we also return false
  * to indicate that ConPTY is not supported.
+ * 
+ * Also starting with Windows 10 there is support to get more detailed locale information, which allows 
+ * us to set the console code page more appropriately, so we also check for that and if it is not 
+ * available, we fall back to a reasonable default code page.
  */
 static bool
 conpty_supported(void)
@@ -166,34 +183,6 @@ conpty_supported(void)
 	returnBool(result);
 }
 
-#if USE_SCREENBUFFERED_CONSOLE
-/* Windows version prior to version 10 have mixed behaviour when it comes to console resizing.
- * In some versions, the console can be resized freely, but the application is not notified of
- * the resize events, which means that ncurses cannot update its internal state to reflect the
- * new console size. In other versions, resizing the console is not possible at all, which
- * means that ncurses cannot function properly because it relies on being able to query the
- * console size and receive notifications of resize events. To work around these issues, we
- * disable resizing of the console window when running on legacy consoles, and we also check for
- * the Windows version to determine if there are any limitations on resizing that we need to be
- * aware of. */
-static bool
-has_limiuted_resize(void)
-{
-	bool result = true;
-	DWORD major, minor, build;
-
-	if (!get_real_windows_version(&major, &minor, &build))
-	{
-		T(("RtlGetVersion failed"));
-	}
-	else
-	{
-		result = (major >= 10) ? false : true;
-	}
-	return result;
-}
-#endif /* USE_SCREENBUFFERED_CONSOLE */
-
 NCURSES_EXPORT_VAR(ConsoleCoreInterface *)
 _nc_CORECONSOLE = NULL;
 
@@ -248,7 +237,6 @@ encoding_init(void)
 	char *cur_loc = NULL;
 	char localebuf[16];
 	UINT cp;
-	UINT incp;
 #if USE_WIDEC_SUPPORT
 	cp = CP_UTF8;
 #else
@@ -268,14 +256,10 @@ encoding_init(void)
 		if (len > 0)
 			cp = (UINT)_wtoi(buf);
 		else
-			cp = 1252; /* last line of defense if GetLocaleInfoEx fails is to assume a
-						* reasonable default code page, which is the most common ANSI code
-						* page on Western systems. This is not ideal, but there isn't much
-						* else we can do in this case, and it at least allows the console
-						* to function with a reasonable character set in most cases. */
+			cp = GetOEMCP(); /* last line of defense if GetLocaleInfoEx fails is to assume a
+					  * reasonable default code page. */
 	}
 #endif
-	incp = cp;
 	snprintf(localebuf, sizeof(localebuf), ".%u", cp);
 	cur_loc = setlocale(LC_CTYPE, NULL);
 
@@ -284,29 +268,25 @@ encoding_init(void)
 #if USE_WIDEC_SUPPORT
 #if defined(_UCRT)
 	// only UCRT allows to set UTF-8 locales.
-	T(("Console using UCRT"));
-
-	T(("Console: Try setting locale according to desired codepage %s", localebuf));
+	T(("Console: UCRT allows setting locale according to desired codepage %s", localebuf));
 	newlocale = setlocale(LC_CTYPE, localebuf);
 	T(("Console: setlocale() result locale is %s", newlocale ? newlocale : "NULL"));
-
 	cur_loc = setlocale(LC_CTYPE, NULL);
 	T(("Console: Current locale now %s, code page %u", cur_loc ? cur_loc : "NULL", cp));
 #else  /* Not UCRT */
-	T(("Console API: Not using UCRT - relying on current locale for code page handling"));
+	T(("Console: Not using UCRT for wide characters - relying on current locale for code page handling"));
 	cur_loc = setlocale(LC_CTYPE, NULL);
 	T(("Console: Current locale now %s, code page %u", cur_loc ? cur_loc : "NULL", cp));
 #endif /* defined(_UCRT ) */
 #else  /* !USE_WIDEC_SUPPORT */
-	T(("Console: Try setting locale according to desired codepage %s", localebuf));
+	T(("Console: Try setting ASCII locale according to desired codepage %s", localebuf));
 	newlocale = setlocale(LC_CTYPE, localebuf);
 	T(("Console: setlocale() result locale is %s", newlocale ? newlocale : "NULL"));
-
 	cur_loc = setlocale(LC_CTYPE, NULL);
 	T(("Console: Current locale now %s, code page %u", cur_loc ? cur_loc : "NULL", cp));
 #endif /* USE_WIDEC_SUPPORT */
 
-	SetConsoleCP(incp);
+	SetConsoleCP(cp);
 	SetConsoleOutputCP(cp);
 }
 
@@ -346,7 +326,7 @@ _nc_console_setup(void)
 		T(("lib_win32concore::_nc_console_setup - Legacy console detected, disabling resizing"));
 		SetWindowLong(hwnd, GWL_STYLE, style);
 		_nc_CORECONSOLE = &(_nc_SCREENBUFFEREDCONSOLE->core);
-		if (has_limiuted_resize())
+		if (!isNT10OrBetter())
 		{
 			T(("lib_win32concore::_nc_console_setup - Legacy console has resize limitations"));
 			status |= CONSOLE_STATUS_LIMITED_RESIZE;
