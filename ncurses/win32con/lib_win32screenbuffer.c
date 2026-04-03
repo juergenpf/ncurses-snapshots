@@ -82,6 +82,9 @@ METHOD(writeat, bool)(int y, int x, const cchar_t *str, int limit);
 #else
 METHOD(writeat, bool)(int y, int x, const chtype *str, int limit);
 #endif
+METHOD(screen_init, void)(void);
+METHOD(screen_exit, void)(void);
+METHOD(setfilter, void)(void);
 
 #if USE_WIDEC_SUPPORT
 #define write_screen WriteConsoleOutputW
@@ -143,7 +146,10 @@ static ScreenBufferedConsoleInterface legacyCONSOLE =
 		Dispatch(read),
 		Dispatch(twait),
 		Dispatch(mvcur),
-		Dispatch(writeat)
+		Dispatch(writeat),
+		Dispatch(screen_init),
+		Dispatch(screen_exit),
+		Dispatch(setfilter)
 };
 NCURSES_EXPORT_VAR(ScreenBufferedConsoleInterface *)
 _nc_SCREENBUFFEREDCONSOLE = &legacyCONSOLE;
@@ -1762,5 +1768,17 @@ METHOD(writeat,bool)(int y, int x, const chtype *str, int limit)
 	return (bool)(0 != write_screen(MYSELF.core.ConsoleHandleOut, ci, siz, loc, &rec));
 }
 #endif
+
+METHOD(screen_init, void)(void)
+{
+}
+
+METHOD(screen_exit, void)(void)
+{
+}
+
+METHOD(setfilter,void)(void)
+{
+}
 
 #endif /* USE_SCREENBUFFERED_CONSOLE */

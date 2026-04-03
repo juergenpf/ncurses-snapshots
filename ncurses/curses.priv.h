@@ -2651,6 +2651,9 @@ typedef struct {
 #else
     bool (*writeat)(int y, int x, const chtype *str, int limit);
 #endif
+   void (*screen_init)(void);
+   void (*screen_exit)(void);
+   void (*setfilter)(void);
 } ScreenBufferedConsoleInterface;
 extern NCURSES_EXPORT_VAR(ScreenBufferedConsoleInterface *) _nc_SCREENBUFFEREDCONSOLE;
 #define AsScreenBufferedConsole(sp) ((ScreenBufferedConsoleInterface*)(ScreenConsole(sp)))

@@ -310,6 +310,11 @@ NCURSES_SP_NAME(newterm) (NCURSES_SP_DCLx
 
 	    SP_PARM->_keytry = NULL;
 
+#if USE_SCREENBUFFERED_CONSOLE
+	    if (ScreenIsBufferedConsole(SP_PARM)) {
+		AsScreenBufferedConsole(SP_PARM)->screen_init();
+	    } else {
+#endif
 	    /* compute movement costs so we can do better move optimization */
 	    /*
 	     * Check for mismatched graphic-rendition capabilities.  Most SVr4
@@ -332,7 +337,9 @@ NCURSES_SP_NAME(newterm) (NCURSES_SP_DCLx
 
 	    /* initialize terminal to a sane state */
 	    _nc_screen_init();
-
+#if USE_SCREENBUFFERED_CONSOLE
+	    }
+#endif	    
 	    /* Initialize the terminal line settings. */
 	    _nc_initscr(NCURSES_SP_ARG);
 

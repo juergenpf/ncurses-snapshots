@@ -399,6 +399,11 @@ NCURSES_SP_NAME(_nc_setupscreen) (
     if (filtered) {
 	slines = 1;
 	SET_LINES(slines);
+#if USE_SCREENBUFFERED_CONSOLE
+	if (ScreenIsBufferedConsole(sp)) {
+	    AsScreenBufferedConsole(sp)->setfilter();
+	} else {
+#endif
 	/* *INDENT-EQLS* */
 	clear_screen     = ABSENT_STRING;
 	cursor_address   = ABSENT_STRING;
@@ -411,7 +416,9 @@ NCURSES_SP_NAME(_nc_setupscreen) (
 
 	if (back_color_erase)
 	    clr_eos = ABSENT_STRING;
-
+#if USE_SCREENBUFFERED_CONSOLE
+	}
+#endif
 	T(("filter screensize %dx%d", slines, scolumns));
     }
     sp->_lines = (NCURSES_SIZE_T) slines;

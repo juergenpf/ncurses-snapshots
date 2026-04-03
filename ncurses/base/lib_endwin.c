@@ -54,10 +54,19 @@ NCURSES_SP_NAME(endwin) (NCURSES_SP_DCL0)
 
     if (SP_PARM != NULL) {
 	if (SP_PARM->_endwin != ewSuspend) {
+#if USE_SCREENBUFFERED_CONSOLE
+	    if (ScreenIsBufferedConsole(SP_PARM)) {
+		SP_PARM->_endwin = ewSuspend;
+		AsScreenBufferedConsole(SP_PARM)->screen_exit();
+	    } else {
+#endif		
 	    SP_PARM->_endwin = ewSuspend;
 	    SP_PARM->_mouse_wrap(SP_PARM);
 	    _nc_screen_wrap();
 	    _nc_mvcur_wrap();	/* wrap up cursor addressing */
+#if USE_SCREENBUFFERED_CONSOLE
+	    }
+#endif	    
 	    code = OK;
 	}
 	if (NCURSES_SP_NAME(reset_shell_mode) (NCURSES_SP_ARG) == ERR)
