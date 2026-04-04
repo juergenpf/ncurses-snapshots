@@ -196,17 +196,8 @@ METHOD(init, bool) (int fdOut, int fdIn)
 	 * console I/O operations. Essentially, this are pseudo-console handles that ConPTY gives 
 	 * us, which we can read from and write to, and ConPTY will forward the data to the actual 
 	 * console. This allows us to stay in the pipe I/O model. */
-	HANDLE stdin_hdl = CreateFileA(
-			"CONIN$", 
-			GENERIC_READ | GENERIC_WRITE, 
-			FILE_SHARE_READ, 
-			NULL, OPEN_EXISTING, 0, NULL);
-
-	HANDLE stdout_hdl = CreateFileA(
-			"CONOUT$", 
-			GENERIC_READ | GENERIC_WRITE, 
-			FILE_SHARE_WRITE, 
-			NULL, OPEN_EXISTING, 0, NULL);
+	HANDLE stdin_hdl  = GetDirectHandle("CONIN$" , FILE_SHARE_READ);
+	HANDLE stdout_hdl = GetDirectHandle("CONOUT$", FILE_SHARE_WRITE);	
 
 	if (fdIn != -1) {
 	    T(("In the first call fdIn is expected to be -1."));

@@ -225,10 +225,10 @@ extern int errno;
 	CreateFile(TEXT(fileName), \
 		   GENERIC_READ | GENERIC_WRITE, \
 		   shareMode, \
-		   0, \
+		   NULL, \
 		   OPEN_EXISTING, \
 		   0, \
-		   0)
+		   NULL)
 #endif
 
 /*
@@ -429,7 +429,7 @@ typedef TRIES {
 
 #undef USE_CONSOLE_API
 #if USE_CONPTY || USE_SCREENBUFFERED_CONSOLE
-  // We define USE_CONSOLE_API to describe that we use either conpty or legacy.
+  // We define USE_CONSOLE_API to describe that we use either conpty or buffered.
 # define USE_CONSOLE_API 1	
   //  Although Windows doesn't have SIGWINCH actually, we can use the console API
   //  to simulate the behavior of SIGWINCH.
@@ -439,6 +439,10 @@ typedef TRIES {
 # define USE_SIGWINCH 1
 #else
 # define USE_CONSOLE_API 0
+#endif
+
+#if USE_SCREENBUFFERED_CONSOLE && USE_WIDEC_SUPPORT && !defined(_UCRT)
+# warning Wide character suport under MSVCRT with classical console API is not recommended.
 #endif
 
 #if defined(NC_WINDOWS_NATIVE) && !USE_CONSOLE_API

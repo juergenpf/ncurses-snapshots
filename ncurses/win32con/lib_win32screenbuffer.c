@@ -1536,17 +1536,8 @@ METHOD(init, bool)(int fdOut, int fdIn)
 		HANDLE stdin_handle = INVALID_HANDLE_VALUE;
 		HANDLE stdout_handle = INVALID_HANDLE_VALUE;
 
-		stdin_handle = CreateFileA(
-			"CONIN$",
-			GENERIC_READ | GENERIC_WRITE,
-			FILE_SHARE_READ,
-			NULL, OPEN_EXISTING, 0, NULL);
-
-		stdout_handle = CreateFileA(
-			"CONOUT$",
-			GENERIC_READ | GENERIC_WRITE,
-			FILE_SHARE_WRITE,
-			NULL, OPEN_EXISTING, 0, NULL);
+		stdin_handle  = GetDirectHandle("CONIN$" ,FILE_SHARE_READ);
+		stdout_handle = GetDirectHandle("CONOUT$",FILE_SHARE_WRITE);
 
 		MYSELF.hShellMode = stdout_handle;
 

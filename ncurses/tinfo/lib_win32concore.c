@@ -237,7 +237,7 @@ encoding_init(void)
 	char *cur_loc = NULL;
 	char localebuf[16];
 	UINT cp;
-#if USE_WIDEC_SUPPORT
+#if USE_WIDEC_SUPPORT && defined(_UCRT)
 	cp = CP_UTF8;
 #else
 #if WINVER >= 0x0600	
@@ -278,7 +278,14 @@ encoding_init(void)
 	cur_loc = setlocale(LC_CTYPE, NULL);
 	T(("Console: Current locale now %s, code page %u", cur_loc ? cur_loc : "NULL", cp));
 #else  /* Not UCRT */
-	T(("Console: Not using UCRT for wide characters - relying on current locale for code page handling"));
+	newlocale = setlocale(LC_CTYPE, localebuf);
+	T(("Console: setlocale() result locale is %s", newlocale ? newlocale : "NULL"));
+	if (!newlocale)
+	{
+		T(("Console: Failed to set locale according to code page, falling back to ASCII"));
+		newlocale = setlocale(LC_CTYPE, "");
+		T(("Console: setlocale() result locale is %s", newlocale ? newlocale : "NULL"));
+	}	
 	cur_loc = setlocale(LC_CTYPE, NULL);
 	T(("Console: Current locale now %s, code page %u", cur_loc ? cur_loc : "NULL", cp));
 #endif /* defined(_UCRT ) */
