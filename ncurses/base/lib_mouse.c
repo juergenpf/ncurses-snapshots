@@ -1117,7 +1117,7 @@ decode_xterm_X10(SCREEN *sp, MEVENT * eventp)
     _nc_set_read_thread(TRUE);
     for (grabbed = 0; grabbed < MAX_KBUF; grabbed += (size_t) res) {
 
-	res = (int) NC_READ(Mouse_FD(sp),
+	res = (int) NC_READ(sp, Mouse_FD(sp),
 			    kbuf + grabbed, (MAX_KBUF - (int) grabbed));
 	if (res < 0)
 	    break;
@@ -1160,7 +1160,7 @@ decode_xterm_1005(SCREEN *sp, MEVENT * eventp)
     for (grabbed = 0; grabbed < limit;) {
 	int res;
 
-	res = (int) NC_READ(Mouse_FD(sp),
+	res = (int) NC_READ(sp, Mouse_FD(sp),
 			    (kbuf + grabbed), 1);
 	if (res < 0)
 	    break;
@@ -1233,7 +1233,7 @@ read_SGR(const SCREEN *sp, SGR_DATA * result)
     do {
 	int res;
 
-	res = (int) NC_READ(Mouse_FD(sp),
+	res = (int) NC_READ(sp, Mouse_FD(sp),
 			    (kbuf + grabbed), 1);
 	if (res < 0)
 	    break;
