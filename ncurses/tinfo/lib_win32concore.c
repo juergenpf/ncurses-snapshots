@@ -223,6 +223,74 @@ flush_input(int fd GCC_UNUSED)
 	returnCode(code);
 }
 
+/* getmode always sets the kind field to TTY_MODE_UNSPECIFIED. The trick is, that
+ * def_shell_mode, def_prog_mode and savetty will call above method defmode to
+ * set the field right after getting it.
+ * So only calls to reset_shell_mode, reset_prog_mode and resetty will have the kind
+ * field in the TTY structure set to a specific mode, which means that the setmode
+ * function will know that it should apply the necessary changes to the input subsystem
+ * when restoring that TTY. All other calls to setmode will have the kind field in the
+ * TTY structure set to TTY_MODE_UNSPECIFIED, which means that the setmode function
+ * will know that it should not change the status of the input subsystem when restoring
+ * that TTY. */
+static int
+getmode(int fd GCC_UNUSED, TTY *arg)
+{
+	T((T_CALLED("lib_win32concore::getmode(fd=%d, TTY*=%p)"), fd, arg));
+	if (NULL == arg)
+		returnCode(ERR);
+
+	assert(DefaultConsole() != NULL);
+
+	*arg = DefaultConsole()->ttyflags;
+	arg->kind = TTY_MODE_UNSPECIFIED;
+	returnCode(OK);
+}
+
+/* The defmode function is only called from def_shell_mode, def_prog_mode, and savetty.
+ * It's only purpose is to set the kind field in the TTY structure and to set the
+ * REQUIRED console mode flags for shell mode and program mode.
+ * The design idea is this: the three mentioned calls are the only ones used to get the
+ * TTY structure in order to store it and later on use it to restore the console to the
+ * desired state. TTY changing calls like raw() or cbreak() don't do that. The implementation
+ * of the getmode function will always set the kind field to TTY_MODE_UNSPECIFIED, which means
+ * that if that TTY is later used in a setmode call, the setmode function will know that it
+ * should not change the status of the input subsystem. Only the def_shell_mode, def_prog_mode,
+ * and savetty functions will set the kind field to a specific mode, which means that the setmode
+ * function will know that it should apply the necessary changes to the input subsystem when
+ * restoring that TTY. */
+static int
+defmode(TTY * arg, short kind)
+{
+    short realMode = kind;
+
+    T((T_CALLED("lib_win32concore::defmode(TTY*=%p, kind=%d)"), arg, kind));
+
+    if (NULL == arg)
+		returnCode(ERR);
+
+    assert(DefaultConsole() != NULL);
+
+    if (realMode == TTY_MODE_AUTO)
+	{
+		realMode = IsConsoleProgMode(DefaultConsole()) ? TTY_MODE_PROGRAM : TTY_MODE_SHELL;
+	}
+
+	if (IsConPTY(DefaultConsole())) {
+	    if (realMode == TTY_MODE_SHELL) {
+			arg->dwFlagIn &= ~(ENABLE_VIRTUAL_TERMINAL_INPUT);
+			arg->dwFlagOut |= ENABLE_VIRTUAL_TERMINAL_PROCESSING;
+    	} else if (realMode == TTY_MODE_PROGRAM) {
+			arg->dwFlagIn |= ENABLE_VIRTUAL_TERMINAL_INPUT;
+			arg->dwFlagOut |= ENABLE_VIRTUAL_TERMINAL_PROCESSING;
+    	}
+	}
+
+    arg->kind = realMode;
+    returnCode(OK);
+}
+
+
 #define CP_UTF8 65001
 
 /* MSVCRT doesn't support UTF-8 locales, but UCRT does. However, even with UCRT we can't rely
@@ -377,6 +445,8 @@ _nc_console_setup(void)
 
 		DefaultConsole()->getSBI = get_sbi;
 		DefaultConsole()->flush = flush_input;
+		DefaultConsole()->getmode = getmode;
+		DefaultConsole()->defmode = defmode;
 
 		res = true;
 	}

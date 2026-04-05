@@ -59,8 +59,6 @@ METHOD(init, bool) (int fdOut, int fdIn);
 METHOD(size, void) (int *Lines, int *Cols);
 METHOD(size_changed, bool) (void);
 METHOD(setmode, int) (int fd, const TTY * arg);
-METHOD(getmode, int) (int fd, TTY * arg);
-METHOD(defmode, int) (TTY * arg, short kind);
 METHOD(read, int) (int fd, void *result, size_t count);
 METHOD(write, int) (int fd, const void *buf, size_t count);
 METHOD(start_input_subsystem, int) (void);
@@ -79,9 +77,7 @@ static ConPtyInterface defaultCONPTY =
  	    Dispatch(init),
     	    Dispatch(size),
             Dispatch(size_changed),
-            Dispatch(setmode),
-            Dispatch(getmode),
-            Dispatch(defmode)
+            Dispatch(setmode)
     },
     Dispatch(read),
     Dispatch(write),
@@ -788,10 +784,20 @@ METHOD(setmode, int) (int fd GCC_UNUSED, const TTY * arg)
 
     if (arg->kind == TTY_MODE_SHELL) {
 	T(("Shell mode set"));
-	DispatchMethod(stop_input_subsystem) ();
+	if (IsConsoleProgMode(&MYSELF.core)) {
+		ClearConsoleProgMode(&MYSELF.core);
+		DispatchMethod(stop_input_subsystem) ();
+	} else {
+		T(("Already in shell mode, skipping input subsystem shutdown"));		
+	}
     } else if (arg->kind == TTY_MODE_PROGRAM) {
-	T(("Program mode set"));
-	DispatchMethod(start_input_subsystem) ();
+		T(("Program mode set"));
+		if (!IsConsoleProgMode(&MYSELF.core)) {
+			SetConsoleProgMode(&MYSELF.core);
+			DispatchMethod(start_input_subsystem) ();
+		} else {
+			T(("Already in program mode, skipping input subsystem startup"));
+		}
     }
 
     // Handle errors
@@ -799,66 +805,6 @@ METHOD(setmode, int) (int fd GCC_UNUSED, const TTY * arg)
 	returnCode(ERR);
     }
 
-    returnCode(OK);
-}
-
-/* The defmode function is only called from def_shell_mode, def_prog_mode, and savetty.
- * It's only purpose is to set the kind field in the TTY structure and to set the
- * REQUIRED console mode flags for shell mode and program mode.
- * The design idea is this: the three mentioned calls are the only ones used to get the
- * TTY structure in order to store it and later on use it to restore the console to the
- * desired state. TTY changing calls like raw() or cbreak() don't do that. The implementation
- * of the getmode function will always set the kind field to TTY_MODE_UNSPECIFIED, which means
- * that if that TTY is later used in a setmode call, the setmode function will know that it
- * should not change the status of the input subsystem. Only the def_shell_mode, def_prog_mode,
- * and savetty functions will set the kind field to a specific mode, which means that the setmode
- * function will know that it should apply the necessary changes to the input subsystem when
- * restoring that TTY. */
-METHOD(defmode, int) (TTY * arg, short kind)
-{
-    short realMode = kind;
-
-    T((T_METHOD(defmode,"(TTY*=%p, kind=%d)"), arg, kind));
-    AssertIsConPTY();
-
-    if (NULL == arg)
-	returnCode(ERR);
-
-    if (realMode == TTY_MODE_AUTO)
-	realMode = (g_input_thread != NULL) ? TTY_MODE_PROGRAM : TTY_MODE_SHELL;
-
-    if (realMode == TTY_MODE_SHELL) {
-	arg->dwFlagIn &= ~(ENABLE_VIRTUAL_TERMINAL_INPUT);
-	arg->dwFlagOut |= ENABLE_VIRTUAL_TERMINAL_PROCESSING;
-    } else if (realMode == TTY_MODE_PROGRAM) {
-	arg->dwFlagIn |= ENABLE_VIRTUAL_TERMINAL_INPUT;
-	arg->dwFlagOut |= ENABLE_VIRTUAL_TERMINAL_PROCESSING;
-    }
-    arg->kind = realMode;
-    returnCode(OK);
-}
-
-/* getmode always sets the kind field to TTY_MODE_UNSPECIFIED. The trick is, that
- * def_shell_mode, def_prog_mode and savetty will call above method defmode to
- * set the field right after getting it.
- * So only calls to reset_shell_mode, reset_prog_mode and resetty will have the kind
- * field in the TTY structure set to a specific mode, which means that the setmode
- * function will know that it should apply the necessary changes to the input subsystem
- * when restoring that TTY. All other calls to setmode will have the kind field in the
- * TTY structure set to TTY_MODE_UNSPECIFIED, which means that the setmode function
- * will know that it should not change the status of the input subsystem when restoring
- * that TTY. */
-METHOD(getmode, int) (int fd GCC_UNUSED, TTY * arg)
-{
-    T((T_METHOD(getmode,"(fd=%d, TTY*=%p)"), fd, arg));
-
-    if (NULL == arg)
-	returnCode(ERR);
-
-    AssertIsConPTY();
-
-    *arg = defaultCONPTY.core.ttyflags;
-    arg->kind = TTY_MODE_UNSPECIFIED;
     returnCode(OK);
 }
 
