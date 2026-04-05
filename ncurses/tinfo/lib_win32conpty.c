@@ -58,12 +58,13 @@ METHOD(termname,char*) (void);
 METHOD(init, bool) (int fdOut, int fdIn);
 METHOD(size, void) (int *Lines, int *Cols);
 METHOD(size_changed, bool) (void);
-METHOD(setmode, int) (int fd, const TTY * arg);
+METHOD(togglemode,void)(void);
 METHOD(read, int) (int fd, void *result, size_t count);
 METHOD(write, int) (int fd, const void *buf, size_t count);
-METHOD(start_input_subsystem, int) (void);
-METHOD(stop_input_subsystem, int) (void);
 METHOD(poll, int) (struct pty_pollfd * fds, nfds_t nfds, int timeout_ms);
+
+static int pty_start_input_subsystem(void);
+static int pty_stop_input_subsystem(void);
 
 #define AssertIsConPTY() assert((defaultCONPTY.core.status & CONSOLE_STATUS_IS_CONPTY))
 
@@ -77,12 +78,10 @@ static ConPtyInterface defaultCONPTY =
  	    Dispatch(init),
     	    Dispatch(size),
             Dispatch(size_changed),
-            Dispatch(setmode)
+	    Dispatch(togglemode)
     },
     Dispatch(read),
     Dispatch(write),
-    Dispatch(start_input_subsystem),
-    Dispatch(stop_input_subsystem),
     Dispatch(poll)
 };
 #define MYSELF defaultCONPTY
@@ -322,9 +321,10 @@ METHOD(size_changed, bool) (void)
  * control over the console input and use our own input thread and buffer to manage console
  * input. We initialize the necessary synchronization primitives and start the input thread,
  * which will block on reading from the console input handle. */
-METHOD(start_input_subsystem, int) (void)
+static int 
+pty_start_input_subsystem(void)
 {
-    T((T_METHOD(start_input_subsystem,"()")));
+    T((T_CALLED("libwin32conpty::pty_start_input_subsystem()")));
 
     AssertIsConPTY();
 
@@ -372,9 +372,9 @@ METHOD(start_input_subsystem, int) (void)
  * thread is currently blocked on reading from the console, to ensure that it can exit promptly.
  * We then wait for the thread to exit. Finally, we clean up all the resources and reset the
  * global variables to their initial state. */
-METHOD(stop_input_subsystem, int) (void)
+static int pty_stop_input_subsystem(void)
 {
-    T((T_METHOD(stop_input_subsystem,"()")));
+    T((T_CALLED("libwin32conpty::pty_stop_input_subsystem()")));
 
     AssertIsConPTY();
 
@@ -700,112 +700,13 @@ METHOD(write, int) (int fd GCC_UNUSED, const void *buf, size_t count)
     returnCode((int) written);
 }
 
-/* This function sets the console mode for the input and output handles. It is called by the main thread
- * when it wants to change the console mode. The function takes a TTY structure that contains the desired
- * mode flags, and it returns OK on success or ERR on failure.
- * It is also responsible for detecting switches between shell mode and program mode, and starting or
- * stopping the input subsystem accordingly. */
-METHOD(setmode, int) (int fd GCC_UNUSED, const TTY * arg)
+METHOD(togglemode, void) (void)
 {
-    HANDLE input_target = defaultCONPTY.core.ConsoleHandleIn;
-    HANDLE output_target = defaultCONPTY.core.ConsoleHandleOut;
-    bool input_ok = false;
-    bool output_ok = false;
-
-    T((T_METHOD(setmode,"(fd=%d, TTY*=%p)"), fd, arg));
-
-    AssertIsConPTY();
-
-    if (!arg)
-	returnCode(ERR);
-
-    if (input_target != INVALID_HANDLE_VALUE) {
-	DWORD mode = arg->dwFlagIn;
-	if (arg->kind == TTY_MODE_SHELL) {
-	    /* In shell mode, we want to disable VT input and enable the basic line input, processed
-	     * input and echo input modes, to provide a more traditional console input experience.
-	     * This allows the user to interact with the console in a way that is consistent with
-	     * what they would expect from a typical command prompt or terminal window, with
-	     * features like line editing and input processing enabled. */
-	    mode &= ~ENABLE_VIRTUAL_TERMINAL_INPUT;
-	    mode |= (ENABLE_LINE_INPUT | ENABLE_PROCESSED_INPUT | ENABLE_ECHO_INPUT);
-	} else {
-	    /* In program mode, we want to enable VT input. */
-	    mode |= ENABLE_VIRTUAL_TERMINAL_INPUT;
-	}
-
-	/* ENABLE_VIRTUAL_TERMINAL_INPUT (VT) requires ENABLE_PROCESSED_INPUT to be effective.
-	 * If we request VT, we must ensure PROCESSED is set, otherwise SetConsoleMode fails.
-	 * We always allow mouse and window input events if VT input is requested, as these
-	 * are commonly used together and it simplifies the logic to just enable them when
-	 * VT is enabled. */
-	if (mode & ENABLE_VIRTUAL_TERMINAL_INPUT) {
-	    mode |= ENABLE_PROCESSED_INPUT;
-	}
-
-	/* Sanitize: ENABLE_ECHO_INPUT requires ENABLE_LINE_INPUT */
-	if ((mode & ENABLE_ECHO_INPUT) && !(mode & ENABLE_LINE_INPUT)) {
-	    mode &= ~ENABLE_ECHO_INPUT;
-	}
-
-	input_ok = (bool)(0 != SetConsoleMode(input_target, mode));
-	if (input_ok) {
-	    /* Make sure the cached value reflects the real value we set, as the
-	     * caller may not have provided all necessary flags (e.g.
-	     * ENABLE_PROCESSED_INPUT when VT is requested) */
-	    DWORD realMode;
-	    if (GetConsoleMode(input_target, &realMode)) {
-		defaultCONPTY.core.ttyflags.dwFlagIn = realMode;
-	    } else {
-		defaultCONPTY.core.ttyflags.dwFlagIn = mode;
-	    }
-	} else {
-	    T(("Invalid input file descriptor"));
-	}
-    }
-
-    if (output_target != INVALID_HANDLE_VALUE) {
-	DWORD mode = ENABLE_VIRTUAL_TERMINAL_PROCESSING | arg->dwFlagOut;
-	output_ok = (bool)(0 != SetConsoleMode(output_target, mode));
-	if (output_ok) {
-	    /* Make sure the cached value reflects the real value we set,
-	     * as the caller may not have provided all necessary flags
-	     * (e.g. VT output is required for the Windows Console backend) */
-	    DWORD realMode;
-	    if (GetConsoleMode(output_target, &realMode)) {
-		defaultCONPTY.core.ttyflags.dwFlagOut = realMode;
-	    } else {
-		defaultCONPTY.core.ttyflags.dwFlagOut = mode;
-	    }
-	} else {
-	    T(("Invalid output file descriptor"));
-	}
-    }
-
-    if (arg->kind == TTY_MODE_SHELL) {
-	T(("Shell mode set"));
 	if (IsConsoleProgMode(&MYSELF.core)) {
-		ClearConsoleProgMode(&MYSELF.core);
-		DispatchMethod(stop_input_subsystem) ();
+		pty_start_input_subsystem ();
 	} else {
-		T(("Already in shell mode, skipping input subsystem shutdown"));		
+		pty_stop_input_subsystem ();
 	}
-    } else if (arg->kind == TTY_MODE_PROGRAM) {
-		T(("Program mode set"));
-		if (!IsConsoleProgMode(&MYSELF.core)) {
-			SetConsoleProgMode(&MYSELF.core);
-			DispatchMethod(start_input_subsystem) ();
-		} else {
-			T(("Already in program mode, skipping input subsystem startup"));
-		}
-    }
-
-    // Handle errors
-    if (!input_ok || !output_ok) {
-	returnCode(ERR);
-    }
-
-    returnCode(OK);
 }
 
 #endif /* USE_CONPTY */

@@ -2539,6 +2539,7 @@ typedef struct consoleCoreInterface {
     int  (*getmode)(int fd, ConsoleMode *arg);         /* Our GET_TTY implementation */
     int  (*defmode )(ConsoleMode *arg, short kind);    /* Used by shell-/prog-mode handling to manage start/stop of the I/O subsystem of ncurses */
     int  (*flush)(int fd);                             /* flush the console I/O stream denoted by the file descriptor. Actualy, we only flush the input. */
+    void (*togglemode)(void);                          /* Toggle physical state of Console according to selected mode. Please never call directly. */
 } ConsoleCoreInterface;
 
 extern NCURSES_EXPORT_VAR(ConsoleCoreInterface*) _nc_CORECONSOLE;
@@ -2692,8 +2693,6 @@ typedef struct {
   // Methods
     int (*read)(int fd, void* result, size_t count);                  /* Read bytes from the input stream. */
     int (*write)(int fd, const void *buf, size_t count);              /* Write bytes to the output stream. */
-    int (*start_input_subsystem)(void);                               /* In prog mode, we control the input stream */
-    int (*stop_input_subsystem)(void);                                /* In shell mode, we leave it to the C runtime */
     int (*poll)(struct pty_pollfd *fds, nfds_t nfds, int timeout_ms); /* Minimalistic clone of UNIX poll, just polling stdin console input */
   } ConPtyInterface;
 

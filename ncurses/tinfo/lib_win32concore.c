@@ -193,7 +193,7 @@ _nc_CORECONSOLE = NULL;
  * size from the main output handle, and if that fails, it tries the standard output
  * and standard error handles as well. If all attempts fail, it returns FALSE. */
 static bool
-get_sbi(CONSOLE_SCREEN_BUFFER_INFO *csbi)
+core_get_sbi(CONSOLE_SCREEN_BUFFER_INFO *csbi)
 {
 	HANDLE test_handles[] = {
 		DefaultConsole()->ConsoleHandleOut,
@@ -215,56 +215,32 @@ get_sbi(CONSOLE_SCREEN_BUFFER_INFO *csbi)
 /* This function flushes the console input buffer. It is called by the main thread when it
  * wants to discard any pending input in the console. The function returns OK on success. */
 static int
-flush_input(int fd GCC_UNUSED)
+core_flush_input(int fd GCC_UNUSED)
 {
 	int code = OK;
-	T((T_CALLED("lib_win32concore::flush_input(fd=%d)"), fd));
+	T((T_CALLED("lib_win32concore::core_flush_input(fd=%d)"), fd));
 	FlushConsoleInputBuffer(GetStdHandle(STD_INPUT_HANDLE));
 	returnCode(code);
 }
 
-/* getmode always sets the kind field to TTY_MODE_UNSPECIFIED. The trick is, that
- * def_shell_mode, def_prog_mode and savetty will call above method defmode to
- * set the field right after getting it.
- * So only calls to reset_shell_mode, reset_prog_mode and resetty will have the kind
- * field in the TTY structure set to a specific mode, which means that the setmode
- * function will know that it should apply the necessary changes to the input subsystem
- * when restoring that TTY. All other calls to setmode will have the kind field in the
- * TTY structure set to TTY_MODE_UNSPECIFIED, which means that the setmode function
- * will know that it should not change the status of the input subsystem when restoring
- * that TTY. */
-static int
-getmode(int fd GCC_UNUSED, TTY *arg)
-{
-	T((T_CALLED("lib_win32concore::getmode(fd=%d, TTY*=%p)"), fd, arg));
-	if (NULL == arg)
-		returnCode(ERR);
-
-	assert(DefaultConsole() != NULL);
-
-	*arg = DefaultConsole()->ttyflags;
-	arg->kind = TTY_MODE_UNSPECIFIED;
-	returnCode(OK);
-}
-
-/* The defmode function is only called from def_shell_mode, def_prog_mode, and savetty.
+/* The core_defmode function is only called from def_shell_mode, def_prog_mode, and savetty.
  * It's only purpose is to set the kind field in the TTY structure and to set the
  * REQUIRED console mode flags for shell mode and program mode.
  * The design idea is this: the three mentioned calls are the only ones used to get the
  * TTY structure in order to store it and later on use it to restore the console to the
  * desired state. TTY changing calls like raw() or cbreak() don't do that. The implementation
- * of the getmode function will always set the kind field to TTY_MODE_UNSPECIFIED, which means
- * that if that TTY is later used in a setmode call, the setmode function will know that it
- * should not change the status of the input subsystem. Only the def_shell_mode, def_prog_mode,
- * and savetty functions will set the kind field to a specific mode, which means that the setmode
+ * of the core_getmode function will always set the kind field to TTY_MODE_UNSPECIFIED, which means
+ * that if that TTY is later used in a core_setmode call, the core_setmode function will know that it
+ * should not change the prog/shell mode of the console. Only the def_shell_mode, def_prog_mode,
+ * and savetty functions will set the kind field to a specific mode, which means that the core_setmode
  * function will know that it should apply the necessary changes to the input subsystem when
  * restoring that TTY. */
 static int
-defmode(TTY * arg, short kind)
+core_defmode(TTY * arg, short kind)
 {
     short realMode = kind;
 
-    T((T_CALLED("lib_win32concore::defmode(TTY*=%p, kind=%d)"), arg, kind));
+    T((T_CALLED("lib_win32concore::core_defmode(TTY*=%p, kind=%d)"), arg, kind));
 
     if (NULL == arg)
 		returnCode(ERR);
@@ -287,6 +263,157 @@ defmode(TTY * arg, short kind)
 	}
 
     arg->kind = realMode;
+    returnCode(OK);
+}
+
+/* core_getmode always sets the kind field to TTY_MODE_UNSPECIFIED. The trick is, that
+ * def_shell_mode, def_prog_mode and savetty will call above method core_defmode to
+ * set the field right after getting it.
+ * So only calls to reset_shell_mode, reset_prog_mode and resetty will have the kind
+ * field in the TTY structure set to a specific mode, which means that the core_setmode
+ * function will know that it should apply the necessary changes to the input subsystem
+ * when restoring that TTY. All other calls to core_setmode will have the kind field in the
+ * TTY structure set to TTY_MODE_UNSPECIFIED, which means that the core_setmode function
+ * will know that it should not change the status of the input subsystem when restoring
+ * that TTY. */
+static int
+core_getmode(int fd GCC_UNUSED, TTY *arg)
+{
+	T((T_CALLED("lib_win32concore::core_getmode(fd=%d, TTY*=%p)"), fd, arg));
+	if (NULL == arg)
+		returnCode(ERR);
+
+	assert(DefaultConsole() != NULL);
+
+	*arg = DefaultConsole()->ttyflags;
+	arg->kind = TTY_MODE_UNSPECIFIED;
+	returnCode(OK);
+}
+
+
+/* This function sets the console mode for the input and output handles. It is called by the main thread
+ * when it wants to change the console mode. The function takes a TTY structure that contains the desired
+ * mode flags, and it returns OK on success or ERR on failure.
+ * It is also responsible for detecting switches between shell mode and program mode and to call the
+ * togglemode() method to do the necessary adjustments. */
+static int 
+core_setmode(int fd GCC_UNUSED, const TTY * arg)
+{
+    HANDLE input_target = INVALID_HANDLE_VALUE;
+    HANDLE output_target = INVALID_HANDLE_VALUE;
+    bool input_ok = false;
+    bool output_ok = false;
+    bool isConPTY = false;
+
+    T((T_CALLED("lib_win32concore::core_setmode(fd=%d, TTY*=%p)"), fd, arg));
+
+	if (!arg)
+		returnCode(ERR);
+
+    assert(DefaultConsole() != NULL);
+
+	input_target = DefaultConsole()->ConsoleHandleIn;
+	output_target = DefaultConsole()->ConsoleHandleOut;
+	isConPTY = IsConPTY(DefaultConsole());
+
+    if (input_target != INVALID_HANDLE_VALUE) {
+		DWORD mode = arg->dwFlagIn;
+		if (arg->kind == TTY_MODE_SHELL) {
+	    	/* In shell mode, we want to disable VT input and enable the basic line input, processed
+	     	 * input and echo input modes, to provide a more traditional console input experience.
+	     	 * This allows the user to interact with the console in a way that is consistent with
+	     	 * what they would expect from a typical command prompt or terminal window, with
+	     	 * features like line editing and input processing enabled. */
+			if (isConPTY) {
+		    	mode &= ~ENABLE_VIRTUAL_TERMINAL_INPUT;
+			}
+		    mode |= (ENABLE_LINE_INPUT | ENABLE_PROCESSED_INPUT | ENABLE_ECHO_INPUT);
+			mode &= ~(ENABLE_MOUSE_INPUT | ENABLE_WINDOW_INPUT);	
+		} else if (arg->kind == TTY_MODE_PROGRAM) {
+		    /* In program mode, we want to enable VT input. */
+	    	if (isConPTY) {
+				mode |= ENABLE_VIRTUAL_TERMINAL_INPUT;
+	    	} else {
+				mode |= ENABLE_MOUSE_INPUT | ENABLE_WINDOW_INPUT;
+			}
+		}
+		
+		/* ENABLE_VIRTUAL_TERMINAL_INPUT (VT) requires ENABLE_PROCESSED_INPUT to be effective.
+	 	 * If we request VT, we must ensure PROCESSED is set, otherwise SetConsoleMode fails.
+	 	 * We always allow mouse and window input events if VT input is requested, as these
+	 	 * are commonly used together and it simplifies the logic to just enable them when
+	 	 * VT is enabled. */
+		if (isConPTY) {
+			if (mode & ENABLE_VIRTUAL_TERMINAL_INPUT) {
+		    	mode |= ENABLE_PROCESSED_INPUT;
+			}
+		}
+
+		/* Sanitize: ENABLE_ECHO_INPUT requires ENABLE_LINE_INPUT */
+		if ((mode & ENABLE_ECHO_INPUT) && !(mode & ENABLE_LINE_INPUT)) {
+	    	mode &= ~ENABLE_ECHO_INPUT;
+		}
+
+		input_ok = (bool)(0 != SetConsoleMode(input_target, mode));
+		if (input_ok) {
+	    	/* Make sure the cached value reflects the real value we set, as the
+	     	 * caller may not have provided all necessary flags (e.g.
+	     	 * ENABLE_PROCESSED_INPUT when VT is requested) */
+	    	DWORD realMode;
+	    	if (GetConsoleMode(input_target, &realMode)) {
+				DefaultConsole()->ttyflags.dwFlagIn = realMode;
+	    	} else {
+				DefaultConsole()->ttyflags.dwFlagIn = mode;
+	    	}
+		} else {
+	    	T(("Invalid input file descriptor"));
+		}
+    }
+
+    if (output_target != INVALID_HANDLE_VALUE) {
+		DWORD mode = arg->dwFlagOut;
+		if (isConPTY)
+			mode |= ENABLE_VIRTUAL_TERMINAL_PROCESSING;
+	
+		output_ok = (bool)(0 != SetConsoleMode(output_target, mode));
+		if (output_ok) {
+	    	/* Make sure the cached value reflects the real value we set,
+	     	 * as the caller may not have provided all necessary flags
+	     	 * (e.g. VT output is required for the Windows Console backend) */
+	    	DWORD realMode;
+	    	if (GetConsoleMode(output_target, &realMode)) {
+				DefaultConsole()->ttyflags.dwFlagOut = realMode;
+	    	} else {
+				DefaultConsole()->ttyflags.dwFlagOut = mode;
+	    	}
+		} else {
+	    	T(("Invalid output file descriptor"));
+		}
+    }
+
+    if (arg->kind == TTY_MODE_SHELL) {
+		T(("Shell mode set"));
+		if (IsConsoleProgMode(DefaultConsole())) {
+			ClearConsoleProgMode(DefaultConsole());
+			DefaultConsole()->togglemode();
+		} else {
+			T(("Already in shell mode, skipping toggling mode."));		
+		}
+    } else if (arg->kind == TTY_MODE_PROGRAM) {
+		T(("Program mode set"));
+		if (!IsConsoleProgMode(DefaultConsole())) {
+			SetConsoleProgMode(DefaultConsole());
+			DefaultConsole()->togglemode();
+		} else {
+			T(("Already in program mode, skipping toggling mode."));
+		}
+    }
+
+    // Handle errors
+    if (!input_ok || !output_ok) {
+		returnCode(ERR);
+    }
+
     returnCode(OK);
 }
 
@@ -443,10 +570,11 @@ _nc_console_setup(void)
 		DefaultConsole()->sbi_cols = -1;
 		DefaultConsole()->sp = 0;
 
-		DefaultConsole()->getSBI = get_sbi;
-		DefaultConsole()->flush = flush_input;
-		DefaultConsole()->getmode = getmode;
-		DefaultConsole()->defmode = defmode;
+		DefaultConsole()->getSBI = core_get_sbi;
+		DefaultConsole()->flush = core_flush_input;
+		DefaultConsole()->getmode = core_getmode;
+		DefaultConsole()->defmode = core_defmode;
+		DefaultConsole()->setmode = core_setmode;
 
 		res = true;
 	}

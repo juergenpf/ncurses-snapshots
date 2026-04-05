@@ -52,7 +52,7 @@ METHOD(termname, char*) (void);
 METHOD(init, bool)(int fdOut, int fdIn);
 METHOD(size, void)(int *Lines, int *Cols);
 METHOD(size_changed, bool)(void);
-METHOD(setmode, int)(int fd GCC_UNUSED, const TTY *arg);
+METHOD(togglemode, void)(void);
 
 METHOD(adjust_size, bool)(void);
 METHOD(termattrs, chtype)(void);
@@ -110,7 +110,7 @@ static ScreenBufferedConsoleInterface legacyCONSOLE =
 				Dispatch(init),
 				Dispatch(size),
 				Dispatch(size_changed),
-				Dispatch(setmode)
+				Dispatch(togglemode)
 			},
 		.hShellMode = INVALID_HANDLE_VALUE,
 		.hProgMode = INVALID_HANDLE_VALUE,
@@ -1244,168 +1244,38 @@ end:
 	return code;
 }
 
-/* This function sets the console mode for the input and output handles. It is called by the main thread
- * when it wants to change the console mode. The function takes a TTY structure that contains the desired
- * mode flags, and it returns OK on success or ERR on failure.
- * It is also responsible for detecting switches between shell mode and program mode, and starting or
- * stopping the input subsystem accordingly. */
-METHOD(setmode, int)(int fd GCC_UNUSED, const TTY *arg)
-{
-	HANDLE input_target = INVALID_HANDLE_VALUE;
-	HANDLE output_target = INVALID_HANDLE_VALUE;
-	 bool input_ok = false;
-	bool output_ok = false;
-	SCREEN *sp = NULL;
+METHOD(togglemode, void)(void) {
+	SCREEN *sp = ConsoleScreen(&MYSELF.core);
 
-	T((T_METHOD(setmode,"(fd=%d, TTY*=%p)"), fd, arg));
-
-	AssertScreenBufferedConsole();
-
-	input_target = MYSELF.core.ConsoleHandleIn;
-	output_target = MYSELF.core.ConsoleHandleOut;
-	sp = ConsoleScreen(&legacyCONSOLE.core);
-
-	if (!arg)
-		returnCode(ERR);
-
-	if (input_target != INVALID_HANDLE_VALUE)
-	{
-		DWORD mode = arg->dwFlagIn;
-		if (arg->kind == TTY_MODE_SHELL)
-		{
-			/* In shell mode, we want to disable VT input and enable the basic line input, processed
-			 * input and echo input modes, to provide a more traditional console input experience.
-			 * This allows the user to interact with the console in a way that is consistent with
-			 * what they would expect from a typical command prompt or terminal window, with
-			 * features like line editing and input processing enabled. */
-			mode |= (ENABLE_LINE_INPUT | ENABLE_PROCESSED_INPUT | ENABLE_ECHO_INPUT);
-			// mode &= ~(ENABLE_MOUSE_INPUT | ENABLE_WINDOW_INPUT);
-		}
-		else if (arg->kind == TTY_MODE_PROGRAM)
-		{
-			/* In program mode, we want to enable VT input. */
-			mode |= ENABLE_MOUSE_INPUT | ENABLE_WINDOW_INPUT;
+	if (IsConsoleProgMode(&MYSELF.core)) {
+		if (sp)	{
+			if (sp->_keypad_on)
+				_nc_keypad(sp, TRUE);
 		}
 
-		/* Sanitize: ENABLE_ECHO_INPUT requires ENABLE_LINE_INPUT */
-		if ((mode & ENABLE_ECHO_INPUT) && !(mode & ENABLE_LINE_INPUT))
-		{
-			mode &= ~ENABLE_ECHO_INPUT;
+		if (MYSELF.hProgMode != INVALID_HANDLE_VALUE) {
+			T(("... MYSELF: switching to program mode buffer"));
+			MYSELF.core.ConsoleHandleOut = MYSELF.hProgMode;
+			SetConsoleActiveScreenBuffer(MYSELF.core.ConsoleHandleOut);
+			SetConsoleCursorInfo(MYSELF.core.ConsoleHandleOut, &MYSELF.save_CI);
 		}
-
-		input_ok = (bool)(0!=SetConsoleMode(input_target, mode));
-		if (input_ok)
-		{
-			/* Make sure the cached value reflects the real value we set, as the
-			 * caller may not have provided all necessary flags (e.g.
-			 * ENABLE_PROCESSED_INPUT when VT is requested) */
-			DWORD realMode;
-			if (GetConsoleMode(input_target, &realMode))
-			{
-				MYSELF.core.ttyflags.dwFlagIn = realMode;
-			}
-			else
-			{
-				MYSELF.core.ttyflags.dwFlagIn = mode;
-			}
+		else {
+			T(("... MYSELF: no valid program mode buffer"));
 		}
-		else
-		{
-			T(("Invalid input file descriptor"));
+	} else {
+		if (sp) {
+			_nc_keypad(sp, FALSE);
+			MYSELF.core.flush(sp->_ifd);
+		}
+		if (MYSELF.hShellMode != INVALID_HANDLE_VALUE) {
+			T(("... MYSELF: switching to shell mode buffer"));
+			MYSELF.core.ConsoleHandleOut = MYSELF.hShellMode;
+			SetConsoleActiveScreenBuffer(MYSELF.core.ConsoleHandleOut);
+			SetConsoleCursorInfo(MYSELF.core.ConsoleHandleOut, &MYSELF.save_CI);
+		} else {
+			T(("... MYSELF: no valid shell mode buffer"));
 		}
 	}
-
-	if (output_target != INVALID_HANDLE_VALUE)
-	{
-		DWORD mode = arg->dwFlagOut;
-		output_ok = (bool)(0!=SetConsoleMode(output_target, mode));
-		if (output_ok)
-		{
-			/* Make sure the cached value reflects the real value we set,
-			 * as the caller may not have provided all necessary flags
-			 * (e.g. VT output is required for the Windows Console backend) */
-			DWORD realMode;
-			if (GetConsoleMode(output_target, &realMode))
-			{
-				MYSELF.core.ttyflags.dwFlagOut = realMode;
-			}
-			else
-			{
-				MYSELF.core.ttyflags.dwFlagOut = mode;
-			}
-		}
-		else
-		{
-			T(("Invalid output file descriptor"));
-		}
-	}
-
-	if (arg->kind == TTY_MODE_SHELL)
-	{
-		T(("Shell mode set"));
-		if (IsConsoleProgMode(&MYSELF.core))
-		{
-			ClearConsoleProgMode(&MYSELF.core);
-			if (sp)
-			{
-				_nc_keypad(sp, FALSE);
-				MYSELF.core.flush(sp->_ifd);
-			}
-
-			if (MYSELF.hShellMode != INVALID_HANDLE_VALUE)
-			{
-				T(("... MYSELF: switching to shell mode buffer"));
-				MYSELF.core.ConsoleHandleOut = MYSELF.hShellMode;
-				SetConsoleActiveScreenBuffer(MYSELF.core.ConsoleHandleOut);
-				SetConsoleCursorInfo(MYSELF.core.ConsoleHandleOut, &MYSELF.save_CI);
-			}
-			else
-			{
-				T(("... MYSELF: no valid shell mode buffer"));
-			}
-		}
-		else
-		{
-			T(("... MYSELF: Already in shell mode"));
-		}
-	}
-	else if (arg->kind == TTY_MODE_PROGRAM)
-	{
-		T(("Program mode set"));
-		if (!IsConsoleProgMode(&MYSELF.core))
-		{
-			SetConsoleProgMode(&MYSELF.core);
-			if (sp)
-			{
-				if (sp->_keypad_on)
-					_nc_keypad(sp, TRUE);
-			}
-
-			if (MYSELF.hProgMode != INVALID_HANDLE_VALUE)
-			{
-				T(("... MYSELF: switching to program mode buffer"));
-				MYSELF.core.ConsoleHandleOut = MYSELF.hProgMode;
-				SetConsoleActiveScreenBuffer(MYSELF.core.ConsoleHandleOut);
-				SetConsoleCursorInfo(MYSELF.core.ConsoleHandleOut, &MYSELF.save_CI);
-			}
-			else
-			{
-				T(("... MYSELF: no valid program mode buffer"));
-			}
-		}
-		else
-		{
-			T(("... MYSELF: Already in program mode"));
-		}
-	}
-
-	// Handle errors
-	if (!input_ok || !output_ok)
-	{
-		returnCode(ERR);
-	}
-
-	returnCode(OK);
 }
 
 METHOD(size, void)(int *Lines, int *Cols)
