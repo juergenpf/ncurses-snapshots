@@ -51,7 +51,7 @@ and the old Windows console screen buffer API.
 
 In the older Windows code for versions older than the above mentioned, there is
 no terminfo support. We have just support for the classical ncurses, panel, menu
-and form library. This is important to notice, because there are some programs who
+and form library. This is important to notice, because there are some programs which
 use and link against ncurses, but actually are using terminfo functionality. these
 programs won't run like expected on older Windows.
 
@@ -122,6 +122,14 @@ This situation may change in the future, as Debian in it's SID version (the name
 they use for the development of the next major release) they will have the MinGW
 packages that target UCRT. It's very likely this will end up in Ubuntu too.
 
+If you don't want to wait until these toolchains become avaiable in official
+Debian/Ubuntu distributions, you may want to make use of a devcontainer I've
+configured, which supports these toolchains already and also allwos to build
+ncurses for Windows on ARM. Please take a look at
+
+	https://github.com/juergenpf/Wincurses.git
+
+
 To build a decent but still small footprint ncurses that provides
 hooks for interop, I recommend using these options:
 
@@ -148,7 +156,7 @@ The two relevant configure options for Windows are:
   This option compiles ncurses with support for older Windows versions (before Windows 10 1809).
   It uses a console screen buffer of the Windows console API to render display content. It
   supports the upper layers of the ncurses library (curses,panel,menu,form), but NOT terminfo.
-  The reason is simply, that the classicaö console is not a character device terminal, but A
+  The reason is simply, that the classical console is not a character device terminal, but A
   buffer oriented display device. You must have at least NT Version 5 (Windows 2000 or newer).
 
 You can use both of these options together to compile a ncurses library that automatically uses
@@ -157,24 +165,32 @@ use ConPTY, on older Windows it uses the screen buffered console and doesn't sup
 But be aware, if you target older Windows platforms, you should not target UCRT as C runtime, but
 stay with msvcrt. The reason is, that older Windows version do usually not support UCRT out of the
 box. UCRT was introduced with Windows 10 and is avaiable on older Windows versions (back to Windows 8
-and some Server versions) as an optional install. 
+and some Server versions) as an optional install. So you can't bet its there on older Windows. 
 
 In theory you can also use --enable-win-console only and dismiss ConPTY completely. The downside of this
 approach is, that there are issues when using the classical screen buffered console on newer Windows systems.
 The newer Windows systems were built with ConPTY in mind to have better support for terminal based tools
 in the Windows console (ssh, WSL2, docker etc.). Certain aspects of the traditional API may not work as
 expected in that context, and the way how the traditional API is supported varies between the Windows
-versions and the different console hosts (e.g. Windows Terminal, conhost, VS Code etc.).
+versions and the different console hosts (e.g. Windows Terminal, conhost, VS Code etc.). 
 
 Please note, that if you compile ncurses only with --enable-win-console but WITHOUT --enable-conpty, your
-code will ONLY run on older Windows systems. If thr runtime detects a Widows version that has ConPTY
+code will ONLY run on older Windows systems. If the runtime detects a Widows version that has ConPTY
 support, it will abort execution with an error message. The reason is - as decribed above - that the
 side-effects of running the old console API on ConPTY enabled systems would result in a degraded user
-experience.
+experience, and that can and should be avoided.
 
 So my clear recommendation is: compile with --enable-win-console only if you have to support older windows
 versions, but always also compile with --enable-conpty to ensure you use the pseudo console interface on
 recent Windows versions.
+
+Let me also be very clear about wide character support. If you target older Windows versions, don't build
+and use the wide character versions of ncurses! The reason is, that the MSVCRT runtime used on these older
+versions has no support for UTF-8 locales. The use of wide character I/O in such an environment produces
+unexpected results and a limited user experience. If you want Unicode support, build the wide version of
+ncurses with UCRT support. UCRT fully supports UTF-8 locales and the ncurses implementation on Windows
+enforces the setting of an UTF-8 locale when starting ncurses program to ensure a smooth and consistent
+behavior of ncurses.
 
 The following example demonstrates the configuration command line which I am using 
 at the moment, assuming you are in your ncurses source directory. I assume you have 
@@ -196,9 +212,9 @@ $ mkdir -p inst/mingw64
 $ pushd build
 $ ../configure \
 	--srcdir=.. \
-	--prefix=/mingw64 \
+	--prefix=/ucrt64 \
 	--with-default-terminfo-dir=/mingw64/share/terminfo \
-	--host=x86_64-w64-mingw32 \
+	--host=x86_64-w64-mingw32ucrt \
 	--build=x86_64-pc-linux-gnu \
 	--without-cxx \
 	--without-ada \
@@ -221,10 +237,10 @@ $ ../configure \
 	--without-shared \
 	--without-manpages \
 	--without-libtool \
-	--enable-win-console \
+	--disable-win-console \
 	--enable-conpty \
 	--without-pkg-config \
-	--with-fallbacks=ms-terminal \
+	--with-fallbacks=ms-terminal,xterm-256color,xterm,ansi,vt100 \
 	--disable-reentrant \
 	--without-pthread \
 	--enable-widec \
@@ -250,7 +266,7 @@ traditional 8-bit only build.
 If you target msvcrt, I do not recommend to use --enable-widec, but to stay with
 the ASCII codepages provided by Windows (various 8-Bit OEM codepages based on your
 locale). The reason is, that msvcrt doesn't have suport for UTF-8 locales and the
-ncurses wide-character implementation is built which such support in mind. The 
+ncurses wide-character implementation is built with such support in mind. The 
 opposite recommendation holds if you target UCRT: there, I strongly recommend to
 use --enable-widec and use ncurses with UTF-8 whenever possible, because that's the
 native environment of the system (which is also true for most modern UNIXes). 
