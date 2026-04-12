@@ -2672,13 +2672,13 @@ extern NCURSES_EXPORT_VAR(ScreenBufferedConsoleInterface *) _nc_SCREENBUFFEREDCO
 #if USE_CONPTY
 
 #if !defined(POLLIN)
-
-# define POLLIN  0x0001  // Input available (for stdin/pipe)
-# define POLLOUT 0x0004  // Output available (for stdout/pipe, optional)
-# define POLLERR 0x0008  // Error condition (for stdin/pipe)
-# define POLLHUP  0x0010  // Hang up (for stdin/pipe)
-# define POLLNVAL 0x0020  // Invalid request: fd not open (for stdin/pipe)
-
+/* For our simulation we don't need them all, but we define them in case they are used */
+# define POLLIN   0x0001  /* Input available (for stdin/pipe) */
+# define POLLPRI  0x0002  /* Priority input available (for stdin/pipe, optional) */
+# define POLLOUT  0x0004  /* Output available (for stdout/pipe, optional) */
+# define POLLERR  0x0008  /* Error condition (for stdin/pipe) */
+# define POLLHUP  0x0010  /* Hang up (for stdin/pipe) */
+# define POLLNVAL 0x0020  /* Invalid request: fd not open (for stdin/pipe) */
 #endif /* !defined(POLLIN) */
 
 // --- Structure similar to UNIX ---
