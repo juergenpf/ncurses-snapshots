@@ -499,7 +499,9 @@ _nc_timed_wait(const SCREEN *sp MAYBE_UNUSED,
      * code everywhere.
      */
     if (result != 0) {
+#if USE_FUNC_POLL || USE_CONPTY
 	int valid_fds = result;
+#endif
 	if (result > 0) {
 	    result = 0;
 #if USE_FUNC_POLL || USE_CONPTY
