@@ -6,8 +6,8 @@
 # Report bugs and new terminal descriptions to
 #	bug-ncurses@gnu.org
 #
-#	$Revision: 1.1232 $
-#	$Date: 2026/03/14 22:37:57 $
+#	$Revision: 1.1237 $
+#	$Date: 2026/04/11 19:37:30 $
 #
 # The original header is preserved below for reference.  It is noted that there
 # is a "newer" version which differs in some cosmetic details (but actually
@@ -1018,6 +1018,10 @@ linux+sfkeys|shifted function-keys for Linux console,
 linux-m|Linux console no color,
 	colors@, pairs@,
 	setab@, setaf@, setb@, setf@, use=linux,
+
+# Linux 7.0 (expected in April 2026) supports alternate-screen switching.
+linux-alt1049|Linux console with alternate screen,
+	use=xterm+alt1049, use=linux,
 
 # release 1.3: 1995/06
 #
@@ -4406,11 +4410,12 @@ mintty+common|shared capabilities for mintty,
 	blink2=\E[6m, norm=\E[22m, opaq=\E[28m,
 	rv=\E\\[>77;[0-9];0c, smul2=\E[21m,
 	xr=\EP>\\|mintty ([1-9][.0-9]+)\E\\\\, use=linux+kbs,
-	use=ansi+rep, use=ecma+overline, use=ecma+strikeout,
-	use=ecma+index, use=mintty+keypad, use=vt420+lrmm,
-	use=xterm+focus, use=xterm+sm+1006, use=xterm+pcfkeys,
-	use=xterm+tmux, use=ecma+italics, use=xterm-basic,
-	use=bracketed+paste, use=report+version,
+	use=ansi+rep, use=dec+sl, use=ecma+overline,
+	use=ecma+strikeout, use=ecma+index, use=mintty+keypad,
+	use=vt420+lrmm, use=xterm+focus, use=xterm+sm+1006,
+	use=xterm+pcfkeys, use=xterm+tmux, use=ecma+italics,
+	use=xterm-basic, use=bracketed+paste,
+	use=report+version,
 mintty+keypad|mintty special numeric keypad,
 	kbeg=\EOE, kpADD=\EOk, kpDIV=\EOo, kpMUL=\EOj, kpSUB=\EOm,
 
@@ -5577,10 +5582,14 @@ iterm2-direct|iTerm2 with direct-color indexing,
 mlterm-direct|mlterm with direct-color indexing,
 	use=xterm+direct, use=mlterm,
 
-# Meanwhile, in KDE #107487, the patch submitter and the developer both saw
+# This variant uses xterm's original semicolon-separated form for direct-color
+# subparameters, retained as a legacy building-block for terminals which
+# implemented that syntax.
+#
+# In KDE #107487 (2006), the patch submitter and the developer both saw
 # that xterm's original implementation should have used colons for the
-# subparameter separators, but chose not to correct this in konsole.  As of
-# late 2017, konsole still accepts only the nonstandard semicolon delimiters.
+# subparameter separators, but chose not to correct this in konsole.  Until
+# mid-2022, konsole accepted only the nonstandard semicolon delimiters.
 xterm+indirect|xterm with direct-color indexing (old legacy building-block),
 	RGB,
 	colors#0x1000000, pairs#0x10000,
@@ -5591,7 +5600,7 @@ xterm+indirect|xterm with direct-color indexing (old legacy building-block),
 	      %/%{255}%&%d;%p1%{255}%&%d%;m,
 	setb@, setf@,
 konsole-direct|konsole with direct-color indexing,
-	use=xterm+indirect, use=konsole,
+	use=xterm+direct, use=konsole,
 st-direct|simpleterm with direct-color indexing,
 	use=xterm+indirect, use=st,
 vte-direct|VTE with direct-color indexing,
@@ -5860,12 +5869,12 @@ xterm+sl-alt|alternate access X title line,
 # controls used.
 #
 # DECSASD (select active status display)
-#	\E[0$}	Main display
+#	\E[0$}	Main display (default)
 #	\E[1$}	Status line
 #
 # DECSSDT (select status line type)
 #	\E[0$~	No status line
-#	\E[1$~	Indicator status line
+#	\E[1$~	Indicator status line (default)
 #	\E[2$~	Host-writable status line
 #
 # The building block assumes that the terminal always shows something at the
@@ -6631,6 +6640,10 @@ kvt|KDE terminal,
 #
 #    numeric keypad does neither normal or application mode.
 #
+# Updated for konsole 26.07.70 (early 2026):
+#    use xterm+direct in konsole-direct
+#    add E3, xterm+sm+1003, xterm+tmux, Smulx and kitty+setal
+#
 konsole-base|KDE console window (common),
 	bce, km@, npc, XT,
 	ncv@,
@@ -6641,14 +6654,16 @@ konsole-base|KDE console window (common),
 	rs2=\E7\E[r\E8\E[m\E[?7h\E[?1;3;4;6l\E[4l\E>\E[?1000l\E[?25h,
 	sgr=\E[0%?%p6%t;1%;%?%p2%t;4%;%?%p1%p3%|%t;7%;%?%p4%t;5%;%?
 	    %p5%t;2%;%?%p7%t;8%;m%?%p9%t\016%e\017%;,
-	sgr0=\E[0m\017, smam=\E[?7h, rv=\E\\[>1;115;0c,
-	xr=\EP>\\|Konsole ([1-9][.0-9])\E\\\\,
+	sgr0=\E[0m\017, smam=\E[?7h, E3=\E[3J, Se=\E[0 q,
+	Smulx=\E[4:%p1%dm, rv=\E\\[>1;115;0c,
+	xr=\EP>\\|Konsole ([1-9][.0-9])\E\\\\, use=ansi+enq,
 	use=ecma+overline, use=ecma+underline,
 	use=ecma+standout, use=ansi+rca2, use=ansi+sgrdim,
-	use=ecma+index, use=xterm+focus, use=xterm+sm+1006,
-	use=ecma+strikeout, use=ecma+italics, use=ecma+color,
-	use=xterm-r6, use=vt220+cvis, use=bracketed+paste,
-	use=report+version, use=xterm+pc+edit,
+	use=ecma+index, use=xterm+sm+1003, use=ecma+strikeout,
+	use=ecma+italics, use=ecma+color, use=xterm+tmux,
+	use=kitty+setal, use=xterm-r6, use=vt220+cvis,
+	use=bracketed+paste, use=report+version,
+	use=xterm+pc+edit,
 
 # The keytab feature was introduced in 0.9.12 (February 2000) with "linux" and
 # "vt100" key-table files along with a compiled-in default key-table.
@@ -8934,8 +8949,8 @@ screen4.xterm-new|screen.xterm-xfree86|screen4 customized for modern xterm,
 	use=xterm+keypad, use=xterm-basic,
 
 screen5.xterm-new|screen5 customized for modern xterm,
-	rv=\E\\[>83;5[0-9][0-9][0-9];0c, use=ecma+italics,
-	use=screen.xterm-new,
+	rep@, rv=\E\\[>83;5[0-9][0-9][0-9];0c,
+	use=ecma+italics, use=screen.xterm-new,
 
 screen.xterm-new|screen customized for modern xterm,
 	use=screen4.xterm-new,
@@ -8968,13 +8983,16 @@ screen.Eterm|screen in Eterm,
 screen.mrxvt|screen in mrxvt,
 	use=xterm+x11mouse, use=screen+fkeys, use=mrxvt,
 screen.vte|screen in any VTE-based terminal,
-	use=xterm+x11mouse, use=screen+italics,
+	bce@,
+	rep@, use=xterm+x11mouse, use=screen+italics,
 	use=screen+fkeys, use=no+brackets, use=vte,
 screen.gnome|screen in GNOME Terminal,
-	use=xterm+x11mouse, use=screen+italics,
+	bce@,
+	rep@, use=xterm+x11mouse, use=screen+italics,
 	use=screen+fkeys, use=no+brackets, use=gnome,
 screen.konsole|screen in KDE console window,
-	XR@, use=xterm+x11mouse, use=screen+italics,
+	bce@,
+	rep@, XR@, use=xterm+x11mouse, use=screen+italics,
 	use=screen+fkeys, use=no+brackets, use=konsole,
 # fix the backspace key
 screen.linux|screen.linux-s|screen in Linux console,
@@ -8982,11 +9000,13 @@ screen.linux|screen.linux-s|screen in Linux console,
 	kcbt@, use=linux+sfkeys, use=xterm+x11mouse,
 	use=screen+fkeys, use=screen,
 screen.mlterm|screen in mlterm,
-	XR@, use=xterm+x11mouse, use=screen+fkeys,
+	bce@,
+	rep@, XR@, use=xterm+x11mouse, use=screen+fkeys,
 	use=no+brackets, use=mlterm,
 screen.putty|screen in putty,
-	use=xterm+x11mouse, use=screen+fkeys, use=no+brackets,
-	use=putty,
+	bce@,
+	rep@, use=xterm+x11mouse, use=screen+fkeys,
+	use=no+brackets, use=putty,
 
 # The default "screen" entry is reasonably portable, but not optimal for the
 # most widely-used terminal emulators.  The "bce" capability is supported in
@@ -28171,5 +28191,18 @@ v3220|LANPAR Vision II model 3220/3221/3222,
 #
 # 2026-03-14
 #	+ fixes for pangoterm and wezterm, from tic warnings -TD
+#
+# 2026-03-21
+#	+ use xterm+direct in konsole-direct, add several features to
+#	  konsole (report by Xu Che)
+#
+# 2026-03-28
+#	+ use dec+sl in mintty (prompted by Thomas Wolff) -TD
+#
+# 2026-04-04
+#	+ add linux-alt1049 (report by Sebastien Hinderer) -TD
+#
+# 2026-04-11
+#	+ cancel bce and rep in some screen.X's -TD
 #
 ######## SHANTIH!  SHANTIH!  SHANTIH!
