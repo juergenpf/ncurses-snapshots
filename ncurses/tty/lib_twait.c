@@ -81,7 +81,7 @@
 #endif
 #undef CUR
 
-MODULE_ID("$Id: lib_twait.c,v 1.87 2026/04/11 19:58:42 tom Exp $")
+MODULE_ID("$Id: lib_twait.c,v 1.88 2026/04/18 22:18:52 tom Exp $")
 
 /*
  * Returns an elapsed time, in milliseconds (if possible).
@@ -501,7 +501,7 @@ _nc_timed_wait(const SCREEN *sp MAYBE_UNUSED,
     if (result != 0) {
 #if USE_FUNC_POLL || USE_CONPTY
 	int valid_fds = result;
-#endif
+	(void) valid_fds;
 	if (result > 0) {
 	    result = 0;
 #if USE_FUNC_POLL || USE_CONPTY
