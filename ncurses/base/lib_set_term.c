@@ -57,7 +57,7 @@
 #undef CUR
 #define CUR SP_TERMTYPE
 
-MODULE_ID("$Id: lib_set_term.c,v 1.201 2026/04/25 16:48:57 tom Exp $")
+MODULE_ID("$Id: lib_set_term.c,v 1.203 2026/05/16 22:30:07 tom Exp $")
 
 #if USE_SCREENBUFFERED_CONSOLE
 #define MaxColors      (ScreenIsBufferedConsole(SP_PARM) ? AsScreenBufferedConsole(SP_PARM)->info.maxcolors : max_colors)

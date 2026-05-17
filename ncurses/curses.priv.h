@@ -35,7 +35,7 @@
  ****************************************************************************/
 
 /*
- * $Id: curses.priv.h,v 1.747 2026/04/04 22:09:24 tom Exp $
+ * $Id: curses.priv.h,v 1.751 2026/05/16 23:36:17 tom Exp $
  *
  *	curses.priv.h
  *
@@ -1210,6 +1210,9 @@ typedef struct screen {
 	ripoff_t	*rsp;
 
 	int		_legacy_coding;	/* see use_legacy_coding() */
+
+	bool		cookie_initialized;
+	bool		cookie_active;
 
 #if NCURSES_NO_PADDING
 	bool		_no_padding;	/* flag to set if padding disabled  */
@@ -2798,6 +2801,10 @@ extern NCURSES_EXPORT(NCURSES_CONST char *) _nc_unctrl (SCREEN *, chtype);
 extern NCURSES_EXPORT(int) _nc_conv_to_utf8(unsigned char *, unsigned, unsigned);
 extern NCURSES_EXPORT(int) _nc_conv_to_utf32(unsigned *, const char *, unsigned);
 #endif
+
+extern NCURSES_EXPORT(bool)     _nc_cookie_allowed(const SCREEN *sp);
+extern NCURSES_EXPORT(void)     _nc_cookie_init(SCREEN *sp);
+extern NCURSES_EXPORT(void)     _nc_cookie_updates(SCREEN *sp);
 
 
 #ifdef __cplusplus
