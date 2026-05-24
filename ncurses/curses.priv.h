@@ -1314,13 +1314,6 @@ typedef struct screen {
 	/* provide for screen-specific WACS_xxx values.
 	 */
 	cchar_t		*_wacs_map;
-	/* This will always point to the global static _nc_wacs array, if at all.
-	 * So it MUST NOT be freed if the screen got deleted.
-	 * It simply provides a smoother programming model if we pretend this is
-	 * a per-screen data, and it allows the possibility of a future extension 
-	 * where each screen could have its own ACS mapping.
-	*/
-	cchar_t*		_wacs_map;
 #endif
 
 #if NCURSES_EXT_FUNCS && NCURSES_EXT_COLORS
