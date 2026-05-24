@@ -91,7 +91,7 @@
 #endif
 #endif
 
-MODULE_ID("$Id: tty_update.c,v 1.324 2026/05/16 22:53:53 tom Exp $")
+MODULE_ID("$Id: tty_update.c,v 1.325 2026/05/23 21:00:18 tom Exp $")
 
 /*
  * This define controls the line-breakout optimization.  Every once in a

@@ -57,7 +57,7 @@
 #undef CUR
 #define CUR SP_TERMTYPE
 
-MODULE_ID("$Id: lib_set_term.c,v 1.203 2026/05/16 22:30:07 tom Exp $")
+MODULE_ID("$Id: lib_set_term.c,v 1.205 2026/05/23 23:12:01 tom Exp $")
 
 #if USE_SCREENBUFFERED_CONSOLE
 #define MaxColors      (ScreenIsBufferedConsole(SP_PARM) ? AsScreenBufferedConsole(SP_PARM)->info.maxcolors : max_colors)
@@ -89,6 +89,7 @@ set_term(SCREEN *screenp)
 	stdscr = StdScreen(newSP);
 	COLORS = newSP->_color_count;
 	COLOR_PAIRS = newSP->_pair_count;
+	SetWacsMap(newSP->_wacs_map);
 #endif
     } else {
 	set_curterm(NULL);
@@ -98,6 +99,7 @@ set_term(SCREEN *screenp)
 	stdscr = NULL;
 	COLORS = 0;
 	COLOR_PAIRS = 0;
+	SetWacsMap(NULL);
 #endif
     }
 
@@ -237,6 +239,7 @@ delscreen(SCREEN *sp)
 	    stdscr = NULL;
 	    COLORS = 0;
 	    COLOR_PAIRS = 0;
+	    SetWacsMap(NULL);
 #endif
 	    _nc_set_screen(NULL);
 #if USE_WIDEC_SUPPORT
@@ -622,9 +625,10 @@ NCURSES_SP_NAME(_nc_setupscreen)(
     NCURSES_SP_NAME(_nc_init_acs)(NCURSES_SP_ARG);
 #if USE_WIDEC_SUPPORT
     sp->_screen_unicode = _nc_unicode_locale();
-    _nc_init_wacs(sp);
-
-    if (sp->_wacs_map == NULL) {
+    if (_nc_wacs == NULL) {
+	_nc_init_wacs(sp);
+    }
+    if (_nc_wacs == NULL) {
 	ReturnScreenError();
     }
 

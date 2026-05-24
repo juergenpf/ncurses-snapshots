@@ -35,7 +35,7 @@
  ****************************************************************************/
 
 /*
- * $Id: curses.priv.h,v 1.751 2026/05/16 23:36:17 tom Exp $
+ * $Id: curses.priv.h,v 1.753 2026/05/23 23:10:49 tom Exp $
  *
  *	curses.priv.h
  *
@@ -1315,6 +1315,9 @@ typedef struct screen {
 	 */
 	bool		_screen_acs_fix;
 	bool		_screen_unicode;
+	/* provide for screen-specific WACS_xxx values.
+	 */
+	cchar_t		*_wacs_map;
 	/* This will always point to the global static _nc_wacs array, if at all.
 	 * So it MUST NOT be freed if the screen got deleted.
 	 * It simply provides a smoother programming model if we pretend this is
@@ -1587,6 +1590,7 @@ extern NCURSES_EXPORT_VAR(SIG_ATOMIC_T) _nc_have_sigwinch;
 			     _nc_is_charable(CharOf(ch)))
 
 #define L(ch)		L ## ch
+#define SetWacsMap(n)	_nc_wacs = (n)
 #else /* }{ */
 #define CharOf(c)	ChCharOf(c)
 #define AttrOf(c)	ChAttrOf(c)
@@ -1616,6 +1620,7 @@ extern NCURSES_EXPORT_VAR(SIG_ATOMIC_T) _nc_have_sigwinch;
 
 #define Charable(ch)	(CharOf(ch) >= ' ' && CharOf(ch) <= '~')
 #define L(ch)		ch
+#define SetWacsMap(n)	/* nothing */
 #endif /* } */
 
 #define AttrOfD(ch)	AttrOf(CHDEREF(ch))
