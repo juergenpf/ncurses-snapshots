@@ -441,6 +441,10 @@ typedef TRIES {
 # define USE_CONSOLE_API 0
 #endif
 
+#if USE_SCREENBUFFERED_CONSOLE && USE_WIDEC_SUPPORT && !defined(_UCRT)
+# warning Wide character suport under MSVCRT with classical console API is not recommended.
+#endif
+
 #if defined(NC_WINDOWS_NATIVE) && !USE_CONSOLE_API
 # error Unsupported configuration: native Windows builds must use either ConPTY or Windows Console API
 #endif
@@ -2669,7 +2673,7 @@ extern NCURSES_EXPORT_VAR(ScreenBufferedConsoleInterface *) _nc_SCREENBUFFEREDCO
 #define DefaultScreenBufferedConsole() ((ScreenBufferedConsoleInterface*)(DefaultConsole()))
 
 #define MouseFifoHasEvent(sp) (sp->_console_mouse_head < sp->_console_mouse_tail)
-#define IsMouseActive(sp) (sp->_mouse_active)
+#define IsMouseActive(sp) (sp->_mouse_active == true)
 #define CONSOLE_TERM_NAME "#win32_console"
 #endif /* USE_SCREENBUFFERED_CONSOLE */
 

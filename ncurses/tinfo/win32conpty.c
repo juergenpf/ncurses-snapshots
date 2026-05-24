@@ -164,7 +164,7 @@ METHOD(termname, char*) (void)
  * especially the terminfo layer to function properly. */
 METHOD(init, bool) (int fdOut, int fdIn)
 {
-    bool result = false;
+    bool result = FALSE;
 
     T((T_METHOD(init,"(fdOut=%d, fdIn=%d)"), fdOut, fdIn));
 
@@ -196,20 +196,20 @@ METHOD(init, bool) (int fdOut, int fdIn)
 
 	if (fdIn != -1) {
 	    T(("In the first call fdIn is expected to be -1."));
-	    returnBool(false);
+	    returnBool(FALSE);
 	}
 
 	if (stdout_hdl == INVALID_HANDLE_VALUE || GetConsoleMode(stdout_hdl,
 								 &dwFlag) == 0) {
 	    T(("Output handle is not a pseudo-console"));
-	    returnBool(false);
+	    returnBool(FALSE);
 	}
 	defaultCONPTY.core.ConsoleHandleOut = stdout_hdl;
 
 	if (stdin_hdl == INVALID_HANDLE_VALUE || GetConsoleMode(stdin_hdl,
 								&dwFlag) == 0) {
 	    T(("StdIn handle is not a pseudo-console"));
-	    returnBool(false);
+	    returnBool(FALSE);
 	}
 	defaultCONPTY.core.ConsoleHandleIn = stdin_hdl;
 
@@ -219,7 +219,7 @@ METHOD(init, bool) (int fdOut, int fdIn)
 	 * of the console. */
 	if (GetConsoleMode(stdout_hdl, &dwFlagOut) == 0) {
 	    T(("GetConsoleMode() failed for stdout"));
-	    returnBool(false);
+	    returnBool(FALSE);
 	}
 	defaultCONPTY.core.ttyflags.dwFlagOut = dwFlagOut;
 
@@ -229,14 +229,14 @@ METHOD(init, bool) (int fdOut, int fdIn)
 	 * of the console. */
 	if (GetConsoleMode(stdin_hdl, &dwFlagIn) == 0) {
 	    T(("GetConsoleMode() failed for stdin"));
-	    returnBool(false);
+	    returnBool(FALSE);
 	}
 	defaultCONPTY.core.ttyflags.dwFlagIn = dwFlagIn;
 	MarkConsoleInitialized(&MYSELF.core);
-	result = true;
+	result = TRUE;
     } else {
 	T(("Console already initialized, skipping initialization"));
-	result = true;
+	result = TRUE;
     }
     returnBool(result);
 }
@@ -285,7 +285,7 @@ METHOD(size_changed, bool) (void)
     static struct timeval lastCheck = {0, 0};
     struct timeval now;
     int current_lines, current_cols;
-    bool resized = false;
+    bool resized = FALSE;
 
     T((T_METHOD(size_changed,"()")));
 
@@ -294,7 +294,7 @@ METHOD(size_changed, bool) (void)
     gettimeofday(&now, NULL);
 
     if (_nc_timeval_diff_in_ms(lastCheck, now) < RESIZE_CHECK_THROTTLING_MS)
-	returnBool(false);
+	returnBool(FALSE);
 
     DispatchMethod(size) (&current_lines, &current_cols);
 
@@ -308,7 +308,7 @@ METHOD(size_changed, bool) (void)
 
 	    _nc_globals.have_sigwinch = 1;
 
-	    resized = true;
+	    resized = TRUE;
 	}
     }
     gettimeofday(&lastCheck, NULL);
@@ -467,12 +467,12 @@ ringbuffer_read(InputBuffer * pbuf, uint8_t *byte)
     if (((pbuf->head - pbuf->tail + INPUT_BUFFER_SIZE) % INPUT_BUFFER_SIZE)
 	== 0) {
 	LeaveCriticalSection(&pbuf->lock);
-	returnBool(false);
+	returnBool(FALSE);
     }
     *byte = pbuf->buf[pbuf->tail];
     pbuf->tail = (pbuf->tail + 1) % INPUT_BUFFER_SIZE;
     LeaveCriticalSection(&pbuf->lock);
-    returnBool(true);
+    returnBool(TRUE);
 }
 
 /* This function is the entry point for the input thread. It continuously waits for 

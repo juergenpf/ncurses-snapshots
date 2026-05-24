@@ -76,11 +76,11 @@ get_real_windows_version(DWORD *major, DWORD *minor, DWORD *build)
 				*major = osvi.dwMajorVersion;
 				*minor = osvi.dwMinorVersion;
 				*build = osvi.dwBuildNumber;
-				return true;
+				return TRUE;
 			}
 		}
 	}
-	return false;
+	return FALSE;
 }
 
 #if USE_SCREENBUFFERED_CONSOLE || !USE_WIDEC_SUPPORT
@@ -100,7 +100,7 @@ static bool isNT10OrBetter(void)
 	if (!get_real_windows_version(&major, &minor, &build))
 	{
 		T(("RtlGetVersion failed"));
-		return false;
+		return FALSE;
 	}
 	return (major >= 10);
 }
@@ -124,7 +124,7 @@ static bool isNT10OrBetter(void)
 static bool
 conpty_supported(void)
 {
-	bool result = false;
+	bool result = FALSE;
 	DWORD major, minor, build;
 
 	T((T_CALLED("lib_win32concore::conpty_supported")));
@@ -132,7 +132,7 @@ conpty_supported(void)
 	if (!get_real_windows_version(&major, &minor, &build))
 	{
 		T(("RtlGetVersion failed"));
-		returnBool(false);
+		returnBool(FALSE);
 	}
 	else
 	{
@@ -145,18 +145,18 @@ conpty_supported(void)
 			if (((minor == REQUIRED_MINOR_V) &&
 				 (build >= REQUIRED_BUILD)) ||
 				((minor > REQUIRED_MINOR_V)))
-				result = true;
+				result = TRUE;
 		}
 		else
-			result = true;
+			result = TRUE;
 	}
-	if (result == true)
+	if (result == TRUE)
 	{
 		HANDLE hOut = GetStdHandle(STD_OUTPUT_HANDLE);
 		if (hOut == INVALID_HANDLE_VALUE)
 		{
 			T(("GetStdHandle failed with error %lu", GetLastError()));
-			result = false;
+			result = FALSE;
 		}
 		else
 		{
@@ -164,7 +164,7 @@ conpty_supported(void)
 			if (GetConsoleMode(hOut, &dwFlag) == 0)
 			{
 				T(("Output handle is not a pseudo-console"));
-				result = false;
+				result = FALSE;
 			}
 			else
 			{
@@ -174,7 +174,7 @@ conpty_supported(void)
 					if (SetConsoleMode(hOut, dwFlag) == 0)
 					{
 						T(("SetConsoleMode failed with error %lu", GetLastError()));
-						result = false;
+						result = FALSE;
 					}
 				}
 			}
@@ -206,10 +206,10 @@ core_get_sbi(CONSOLE_SCREEN_BUFFER_INFO *csbi)
 		hdl = test_handles[i];
 		if (hdl != INVALID_HANDLE_VALUE && GetConsoleScreenBufferInfo(hdl, csbi))
 		{
-			return true;
+			return TRUE;
 		}
 	}
-	return false;
+	return FALSE;
 }
 
 /* This function flushes the console input buffer. It is called by the main thread when it
@@ -301,9 +301,9 @@ core_setmode(int fd GCC_UNUSED, const TTY * arg)
 {
     HANDLE input_target = INVALID_HANDLE_VALUE;
     HANDLE output_target = INVALID_HANDLE_VALUE;
-    bool input_ok = false;
-    bool output_ok = false;
-    bool isConPTY = false;
+    bool input_ok = FALSE;
+    bool output_ok = FALSE;
+    bool isConPTY = FALSE;
 
     T((T_CALLED("lib_win32concore::core_setmode(fd=%d, TTY*=%p)"), fd, arg));
 
@@ -499,7 +499,7 @@ encoding_init(void)
 NCURSES_EXPORT(bool)
 _nc_console_setup(void)
 {
-	bool res = false;
+	bool res = FALSE;
 	DWORD status = 0;
 
 	T((T_CALLED("lib_win32concore::_nc_console_setup()")));
@@ -576,7 +576,7 @@ _nc_console_setup(void)
 		DefaultConsole()->defmode = core_defmode;
 		DefaultConsole()->setmode = core_setmode;
 
-		res = true;
+		res = TRUE;
 	}
 	returnBool(res);
 }

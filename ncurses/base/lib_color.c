@@ -307,7 +307,7 @@ init_direct_colors(NCURSES_SP_DCL0)
 static bool
 reset_color_pair(NCURSES_SP_DCL0)
 {
-    bool result = false;
+    bool result = FALSE;
 #if USE_SCREENBUFFERED_CONSOLE
     if (ScreenIsBufferedConsole(SP_PARM)) {
 	return AsScreenBufferedConsole(SP_PARM)->reset_color_pair();
@@ -317,7 +317,7 @@ reset_color_pair(NCURSES_SP_DCL0)
     (void) SP_PARM;
     if (orig_pair != NULL) {
 	(void) NCURSES_PUTP2("orig_pair", orig_pair);
-	result = true;
+	result = TRUE;
     }
     return result;
 }

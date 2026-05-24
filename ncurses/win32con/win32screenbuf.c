@@ -278,7 +278,7 @@ AnsiKey(WORD vKey)
 static bool
 get_SBI(void)
 {
-	bool rc = false;
+	bool rc = FALSE;
 	if (MYSELF.core.getSBI(&(MYSELF.SBI)))
 	{
 		T(("GetConsoleScreenBufferInfo"));
@@ -296,7 +296,7 @@ get_SBI(void)
 		   MYSELF.SBI.srWindow.Bottom,
 		   MYSELF.SBI.srWindow.Left,
 		   MYSELF.SBI.srWindow.Right));
-		rc = true;
+		rc = TRUE;
 	}
 	else
 	{
@@ -384,7 +384,7 @@ _nc_screenbuffered_console_init(void)
 
 METHOD(adjust_size, bool)(void)
 {
-	bool res = false;
+	bool res = FALSE;
 	COORD newSize;
 	CONSOLE_SCREEN_BUFFER_INFO csbi;
 
@@ -621,20 +621,20 @@ METHOD(init_acs, void)(chtype *real_map)
 
 METHOD(reset_color_pair, bool)(void)
 {
-	bool res = false;
+	bool res = FALSE;
 	WORD a = FOREGROUND_BLUE | FOREGROUND_RED | FOREGROUND_GREEN;
 
 	AssertScreenBufferedConsole();
 
 	SetConsoleTextAttribute(MYSELF.core.ConsoleHandleOut, a);
 	get_SBI();
-	res = true;
+	res = TRUE;
 	return res;
 }
 
 METHOD(reset_colors, bool)(void)
 {
-	bool res = false;
+	bool res = FALSE;
 	return res;
 }
 
@@ -766,7 +766,7 @@ static bool
 handle_mouse(SCREEN *sp, MOUSE_EVENT_RECORD mer)
 {
 	MEVENT work;
-	bool result = false;
+	bool result = FALSE;
 
 	assert(sp);
 
@@ -776,11 +776,11 @@ handle_mouse(SCREEN *sp, MOUSE_EVENT_RECORD mer)
 	if (!IsMouseActive(sp))
 	{
 		T(("... mouse is not active, ignoring event"));
-		returnBool(false);
+		returnBool(FALSE);
 	}
 #ifdef NO_MOUSE_SUPPORT
 	T(("... mouse support is disabled, ignoring event"));
-	returnBool(false);
+	returnBool(FALSE);
 #endif
 
 	sp->_console_mouse_old_buttons = sp->_console_mouse_new_buttons;
@@ -806,7 +806,7 @@ handle_mouse(SCREEN *sp, MOUSE_EVENT_RECORD mer)
 			T(("... button state cleared, reporting release"));
 			/* cf: BUTTON_PRESSED, BUTTON_RELEASED */
 			work.bstate |= (filter_button_events(sp, sp->_console_mouse_old_buttons) >> 1);
-			result = true;
+			result = TRUE;
 		}
 
 		work.x = mer.dwMousePosition.X;
@@ -825,13 +825,13 @@ handle_mouse(SCREEN *sp, MOUSE_EVENT_RECORD mer)
 		{
 			T(("... bstate %08x not in _mouse_mask2 %08x, dropping",
 			   (unsigned)work.bstate, (unsigned)sp->_mouse_mask2));
-			returnBool(false);
+			returnBool(FALSE);
 		}
 
 		if (sp->_console_mouse_tail < 0 || sp->_console_mouse_tail >= FIFO_SIZE)
 		{
 			T(("... mouse FIFO overflow, dropping event"));
-			returnBool(false);
+			returnBool(FALSE);
 		}
 		assert(sp->_console_mouse_tail >= 0);
 		assert(sp->_console_mouse_tail < FIFO_SIZE);
@@ -1033,7 +1033,7 @@ METHOD(twait,int)(int mode, int milliseconds, int *timeleft EVENTLIST_2nd(_nc_ev
 		goto end;
 	}
 
-	while (true)
+	while (TRUE)
 	{
 		if (!isNoDelay)
 		{
@@ -1144,7 +1144,7 @@ METHOD(twait,int)(int mode, int milliseconds, int *timeleft EVENTLIST_2nd(_nc_ev
 								/* Key-down but TW_INPUT not requested: may be needed
 								 * by a later call -- stop scanning without consuming */
 								T(("twait: KEY_EVENT not in mode, stopping scan"));
-								stop_scan = true;
+								stop_scan = TRUE;
 							}
 						}
 						else
@@ -1206,7 +1206,7 @@ METHOD(twait,int)(int mode, int milliseconds, int *timeleft EVENTLIST_2nd(_nc_ev
 							/* Mouse event but TW_MOUSE not requested: may be needed
 							 * by a later call -- stop scanning without consuming */
 							T(("twait: MOUSE_EVENT not in mode, stopping scan"));
-							stop_scan = true;
+							stop_scan = TRUE;
 						}
 						break;
 
@@ -1295,7 +1295,7 @@ METHOD(size, void)(int *Lines, int *Cols)
 
 METHOD(size_changed, bool)(void)
 {
-	bool resized = false;
+	bool resized = FALSE;
 	T((T_METHOD(size_changed,"()")));
 
 	AssertScreenBufferedConsole();
@@ -1303,7 +1303,7 @@ METHOD(size_changed, bool)(void)
 	if (HasConsolePendingResize(&MYSELF.core))
 	{
 		T(("Resize event pending, returning TRUE"));
-		resized = true;
+		resized = TRUE;
 		ClearConsoleResizeLimitations(&MYSELF.core);
 		_nc_globals.have_sigwinch = 1;
 	}
@@ -1328,7 +1328,7 @@ METHOD(termname, char*)(void)
  * */
 METHOD(init, bool)(int fdOut, int fdIn)
 {
-	bool result = false;
+	bool result = FALSE;
 
 	T((T_METHOD(init,"(fdOut=%d, fdIn=%d)"), fdOut, fdIn));
 
@@ -1356,7 +1356,7 @@ METHOD(init, bool)(int fdOut, int fdIn)
 																	&dwFlag) == 0)
 		{
 			T(("Output handle is not a console"));
-			returnBool(false);
+			returnBool(FALSE);
 		}
 		MYSELF.core.ConsoleHandleOut = stdout_handle;
 
@@ -1364,7 +1364,7 @@ METHOD(init, bool)(int fdOut, int fdIn)
 																   &dwFlag) == 0)
 		{
 			T(("StdIn handle is not a console"));
-			returnBool(false);
+			returnBool(FALSE);
 		}
 		MYSELF.core.ConsoleHandleIn = stdin_handle;
 
@@ -1375,7 +1375,7 @@ METHOD(init, bool)(int fdOut, int fdIn)
 		if (GetConsoleMode(stdout_handle, &dwFlagOut) == 0)
 		{
 			T(("GetConsoleMode() failed for stdout"));
-			returnBool(false);
+			returnBool(FALSE);
 		}
 		MYSELF.core.ttyflags.dwFlagOut = dwFlagOut;
 
@@ -1387,7 +1387,7 @@ METHOD(init, bool)(int fdOut, int fdIn)
 		if (GetConsoleMode(stdin_handle, &dwFlagIn) == 0)
 		{
 			T(("GetConsoleMode() failed for stdin"));
-			returnBool(false);
+			returnBool(FALSE);
 		}
 		MYSELF.core.ttyflags.dwFlagIn = dwFlagIn;
 
@@ -1409,15 +1409,15 @@ METHOD(init, bool)(int fdOut, int fdIn)
 		if (MYSELF.hProgMode == INVALID_HANDLE_VALUE || GetConsoleMode(MYSELF.hProgMode, &dwFlagOut) == 0)
 		{
 			T(("Output handle is not a console"));
-			returnBool(false);
+			returnBool(FALSE);
 		}
 
 		MarkConsoleInitialized(&MYSELF.core);
-		result = true;
+		result = TRUE;
 	} else
 	{
 		T(("Console already initialized"));
-		result = true;
+		result = TRUE;
 	}
 	returnBool(result);
 }
