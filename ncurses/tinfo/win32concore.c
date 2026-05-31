@@ -79,7 +79,6 @@ get_real_windows_version(DWORD * major, DWORD * minor, DWORD * build)
     return FALSE;
 }
 
-#if USE_SCREENBUFFERED_CONSOLE || !USE_WIDEC_SUPPORT
 /* Windows version prior to version 10 have mixed behaviour when it comes to console resizing.
  * In some versions, the console can be resized freely, but the application is not notified of
  * the resize events, which means that ncurses cannot update its internal state to reflect the
@@ -100,8 +99,6 @@ isNT10OrBetter(void)
     }
     return (major >= 10);
 }
-
-#endif /* USE_SCREENBUFFERED_CONSOLE */
 
 /* Check if the current Windows version supports ConPTY.
  * We check for Windows 10 version 1809 or higher, which is the first version that introduced ConPTY.
