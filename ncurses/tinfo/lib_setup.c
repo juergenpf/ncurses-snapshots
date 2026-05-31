@@ -272,12 +272,12 @@ use_tioctl(bool f)
 }
 #endif
 
-#if USE_CONSOLE_API 
+#if USE_CONSOLE_API
 /* By design, the CONSOLE always provides a default size */
 #define _nc_default_screensize(termp, linep, colp) DefaultConsole()->size(linep, colp);
 #endif
 
-#if !USE_CONSOLE_API 
+#if !USE_CONSOLE_API
 static void
 _nc_default_screensize(TERMINAL *termp, int *linep, int *colp)
 {
@@ -474,20 +474,20 @@ _nc_get_screensize(SCREEN *sp,
     bool useTioctl = _nc_prescreen.use_tioctl;
 
     assert(linep != NULL && colp != NULL);
-#if USE_SCREENBUFFERED_CONSOLE    
+#if USE_SCREENBUFFERED_CONSOLE
     if (ScreenIsBufferedConsole(sp)) {
 	my_tabsize = AsScreenBufferedConsole(sp)->info.tabsize;
 #if USE_REENTRANT
-        if (sp != NULL) {
+	if (sp != NULL) {
 	    sp->_TABSIZE = my_tabsize;
-        }
+	}
 #else
-        (void) sp;
-        TABSIZE = my_tabsize;
+	(void) sp;
+	TABSIZE = my_tabsize;
 #endif
-        T(("TABSIZE = %d", my_tabsize));
-        DefaultConsole()->size(linep, colp);
-        returnVoid
+	T(("TABSIZE = %d", my_tabsize));
+	DefaultConsole()->size(linep, colp);
+	returnVoid
     }
 #endif /* !USE_SCREENBUFFERED_CONSOLE */
 
@@ -636,10 +636,10 @@ _nc_update_screensize(SCREEN *sp)
 	// JPF TODO FIXME : Not sure we can let run that through for legacy console... need to check.
     } else {
 #endif
-       old_lines = lines;
-       old_cols = columns;
+	old_lines = lines;
+	old_cols = columns;
 #if USE_SCREENBUFFERED_CONSOLE
-   }
+    }
 #endif
 
     if (sp != NULL) {
@@ -824,9 +824,9 @@ _nc_locale_breaks_acs(TERMINAL *termp)
 
 NCURSES_EXPORT(int)
 _nc_setupterm(const char *tname,
-		 int Filedes,
-		 int *errret,
-		 int reuse)
+	      int Filedes,
+	      int *errret,
+	      int reuse)
 {
     TERMINAL *termp;
     SCREEN *sp = NULL;
@@ -844,22 +844,23 @@ _nc_setupterm(const char *tname,
     if (!DefaultConsole()->init(Filedes, -1)) {
 	code = ERR;
 	ret_error0(TGETENT_ERR,
-	    CONSOLE_INIT_FAILURE_MSG);
+		   CONSOLE_INIT_FAILURE_MSG);
     }
 #endif
 
     if (tname == NULL) {
 	tname = _nc_term_select();
-	
+
 #if USE_SCREENBUFFERED_CONSOLE
-    if (ScreenIsBufferedConsole(sp)) {
-	tname = CONSOLE_TERM_NAME;
-    } else {
-	if (!VALID_TERM_ENV(tname, NO_TERMINAL)) {
-	    T(("Failure with TERM=%s", NonNull(tname)));
-	    ret_error0(TGETENT_ERR, "TERM environment variable not set.\n");
+	if (ScreenIsBufferedConsole(sp)) {
+	    tname = CONSOLE_TERM_NAME;
+	} else {
+	    if (!VALID_TERM_ENV(tname, NO_TERMINAL)) {
+		T(("Failure with TERM=%s", NonNull(tname)));
+		ret_error0(TGETENT_ERR,
+			   "TERM environment variable not set.\n");
+	    }
 	}
-   }
 #else
 	if (!NonEmpty(tname)) {
 	    T(("Failure with TERM=%s", NonNull(tname)));
@@ -967,7 +968,8 @@ _nc_setupterm(const char *tname,
 		del_curterm(termp);
 		if (status == TGETENT_ERR) {
 		    free(myname);
-		    ret_error0(status, "terminals database is inaccessible\n");
+		    ret_error0(status,
+			       "terminals database is inaccessible\n");
 		} else if (status == TGETENT_NO) {
 		    ret_error1(status, "unknown terminal type.\n",
 			       myname, free(myname));
@@ -1038,7 +1040,7 @@ _nc_setupterm(const char *tname,
 #if USE_CONSOLE_API
     DefaultConsole()->sp = sp;
     if (sp)
-	sp->_console = DefaultConsole(); // 1-1 relationship between console and screen
+	sp->_console = DefaultConsole();	// 1-1 relationship between console and screen
 #endif
     free(myname);
     returnCode(code);

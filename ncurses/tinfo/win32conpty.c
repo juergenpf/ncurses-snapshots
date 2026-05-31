@@ -50,18 +50,18 @@ MODULE_ID("$Id$")
 #define DispatchMethod(name) pty_##name
 #define Dispatch(name) .name = DispatchMethod(name)
 #define NoDispatch(name) .name = NULL
-#define METHOD(name,type) static type DispatchMethod(name)
+#define METHOD(name, type)static type DispatchMethod(name)
 #define T_METHOD(name,fmt) "called {lib_win32conpty::pty_" #name fmt
 
 // Prototypes of static function we want to use in initializers
-METHOD(termname,char*) (void);
-METHOD(init, bool) (int fdOut, int fdIn);
-METHOD(size, void) (int *Lines, int *Cols);
-METHOD(size_changed, bool) (void);
-METHOD(togglemode,void)(void);
-METHOD(read, int) (int fd, void *result, size_t count);
-METHOD(write, int) (int fd, const void *buf, size_t count);
-METHOD(poll, int) (struct pty_pollfd * fds, nfds_t nfds, int timeout_ms);
+METHOD(termname, char*)(void);
+METHOD(init, bool)(int fdOut, int fdIn);
+METHOD(size, void)(int *Lines, int *Cols);
+METHOD(size_changed, bool)(void);
+METHOD(togglemode, void)(void);
+METHOD(read, int)(int fd, void *result, size_t count);
+METHOD(write, int)(int fd, const void *buf, size_t count);
+METHOD(poll, int)(struct pty_pollfd *fds, nfds_t nfds, int timeout_ms);
 
 static int pty_start_input_subsystem(void);
 static int pty_stop_input_subsystem(void);
@@ -73,12 +73,13 @@ static int pty_stop_input_subsystem(void);
  * static structure. */
 static ConPtyInterface defaultCONPTY =
 {
-    .core = {
-	    Dispatch(termname),
- 	    Dispatch(init),
-    	    Dispatch(size),
-            Dispatch(size_changed),
-	    Dispatch(togglemode)
+    .core =
+    {
+	Dispatch(termname),
+	Dispatch(init),
+	Dispatch(size),
+	Dispatch(size_changed),
+	Dispatch(togglemode)
     },
     Dispatch(read),
     Dispatch(write),
@@ -144,8 +145,7 @@ static HANDLE g_shutdown_event = NULL;	// Signal: "Shutdown system"
 static unsigned __stdcall input_thread(LPVOID param);
 
 // ---------------------------------------------------------------------------------------
-METHOD(termname, char*) (void)
-{
+METHOD(termname, char*)(void) {
     return CONPTY_TERM_ENV;
 }
 
@@ -162,11 +162,10 @@ METHOD(termname, char*) (void)
  * which is a requirement for the Windows Console backend of ncurses. This is because without
  * ConPTY, the Windows Console does not provide the necessary capabilities for ncurses and
  * especially the terminfo layer to function properly. */
-METHOD(init, bool) (int fdOut, int fdIn)
-{
+METHOD(init, bool)(int fdOut, int fdIn) {
     bool result = FALSE;
 
-    T((T_METHOD(init,"(fdOut=%d, fdIn=%d)"), fdOut, fdIn));
+    T((T_METHOD(init, "(fdOut=%d, fdIn=%d)"), fdOut, fdIn));
 
     AssertIsConPTY();
 
@@ -191,8 +190,8 @@ METHOD(init, bool) (int fdOut, int fdIn)
 	 * console I/O operations. Essentially, this are pseudo-console handles that ConPTY gives 
 	 * us, which we can read from and write to, and ConPTY will forward the data to the actual 
 	 * console. This allows us to stay in the pipe I/O model. */
-	HANDLE stdin_hdl  = GetDirectHandle("CONIN$" , FILE_SHARE_READ);
-	HANDLE stdout_hdl = GetDirectHandle("CONOUT$", FILE_SHARE_WRITE);	
+	HANDLE stdin_hdl = GetDirectHandle("CONIN$", FILE_SHARE_READ);
+	HANDLE stdout_hdl = GetDirectHandle("CONOUT$", FILE_SHARE_WRITE);
 
 	if (fdIn != -1) {
 	    T(("In the first call fdIn is expected to be -1."));
@@ -241,7 +240,6 @@ METHOD(init, bool) (int fdOut, int fdIn)
     returnBool(result);
 }
 
-
 /* Get the current size of the Windows Console in lines and columns.
  * This method must not alter the cached values stored in ConsoleInfo.
  * It should report the result from the GetConsoleScreenBufferInfo
@@ -250,9 +248,8 @@ METHOD(init, bool) (int fdOut, int fdIn)
  * API context.
  * This method can be safely called before the Console is initialized,
  * because we can fallback to query the standard handles. */
- METHOD(size, void) (int *Lines, int *Cols)
-{
-    T((T_METHOD(size,"(lines=%p, cols=%p)"), Lines, Cols));
+METHOD(size, void)(int *Lines, int *Cols) {
+    T((T_METHOD(size, "(lines=%p, cols=%p)"), Lines, Cols));
 
     AssertIsConPTY();
 
@@ -280,14 +277,14 @@ METHOD(init, bool) (int fdOut, int fdIn)
  * time frame, we simply return FALSE without checking. This allows us to avoid unnecessary
  * calls to GetConsoleScreenBufferInfo while still detecting resizes in a timely manner when
  * they occur. */
-METHOD(size_changed, bool) (void)
-{
-    static struct timeval lastCheck = {0, 0};
+METHOD(size_changed, bool)(void) {
+    static struct timeval lastCheck =
+    {0, 0};
     struct timeval now;
     int current_lines, current_cols;
     bool resized = FALSE;
 
-    T((T_METHOD(size_changed,"()")));
+    T((T_METHOD(size_changed, "()")));
 
     AssertIsConPTY();
 
@@ -300,11 +297,11 @@ METHOD(size_changed, bool) (void)
 
     if (MYSELF.core.sbi_lines == -1 || MYSELF.core.sbi_cols == -1) {
 	MYSELF.core.sbi_lines = current_lines;
-	MYSELF.core.sbi_cols  = current_cols;
+	MYSELF.core.sbi_cols = current_cols;
     } else {
 	if (current_lines != MYSELF.core.sbi_lines || current_cols != MYSELF.core.sbi_cols) {
 	    MYSELF.core.sbi_lines = current_lines;
-	    MYSELF.core.sbi_cols  = current_cols;
+	    MYSELF.core.sbi_cols = current_cols;
 
 	    _nc_globals.have_sigwinch = 1;
 
@@ -321,7 +318,7 @@ METHOD(size_changed, bool) (void)
  * control over the console input and use our own input thread and buffer to manage console
  * input. We initialize the necessary synchronization primitives and start the input thread,
  * which will block on reading from the console input handle. */
-static int 
+static int
 pty_start_input_subsystem(void)
 {
     T((T_CALLED("libwin32conpty::pty_start_input_subsystem()")));
@@ -372,14 +369,15 @@ pty_start_input_subsystem(void)
  * thread is currently blocked on reading from the console, to ensure that it can exit promptly.
  * We then wait for the thread to exit. Finally, we clean up all the resources and reset the
  * global variables to their initial state. */
-static int pty_stop_input_subsystem(void)
+static int
+pty_stop_input_subsystem(void)
 {
     T((T_CALLED("libwin32conpty::pty_stop_input_subsystem()")));
 
     AssertIsConPTY();
 
     if (g_input_thread == NULL)
-	returnCode(OK); // not running, nothing to do
+	returnCode(OK);		// not running, nothing to do
 
     SetEvent(g_shutdown_event);
 
@@ -398,7 +396,7 @@ static int pty_stop_input_subsystem(void)
     }
 
     CloseHandle(g_input_thread);
-    g_input_thread = NULL; // IMPORTANT!!
+    g_input_thread = NULL;	// IMPORTANT!!
 
     CloseHandle(g_read_request_event);
     g_read_request_event = NULL;
@@ -604,16 +602,16 @@ poll_input(DWORD timeout_ms)
  * mechanism in a way that is consistent with the rest of the Windows Console backend design.
  *
  * The basic assumption is, that this will only be called when in prog mode. */
-METHOD(poll, int) (struct pty_pollfd * fds, nfds_t nfds, int timeout_ms)
-{
+METHOD(poll, int)(struct pty_pollfd
+			 * fds, nfds_t nfds, int timeout_ms) {
     int code = -1;
 
-    T((T_METHOD(poll,"(fds=%p, nfds=%u, timeout_ms=%d)"),
+    T((T_METHOD(poll, "(fds=%p, nfds=%u, timeout_ms=%d)"),
        fds, (unsigned) nfds, timeout_ms));
 
     AssertIsConPTY();
 
-    if (nfds==0) {
+    if (nfds == 0) {
 	// pure wait, o we don't actually poll and don't need to assert the input system is up.
 	Sleep((DWORD) timeout_ms);
 	returnCode(0);
@@ -643,12 +641,12 @@ METHOD(poll, int) (struct pty_pollfd * fds, nfds_t nfds, int timeout_ms)
  * error, it returns -1.
  *
  * The basic assumption is, that this will only be called when in prog mode. */
-METHOD(read, int) (int fd GCC_UNUSED, void *result, size_t count)
-{
+METHOD(read, int)(int fd GCC_UNUSED, void
+			 *result, size_t count) {
     int byte;
     size_t i;
 
-    T((T_METHOD(read,"(fd=%d, result=%p)"), fd, result));
+    T((T_METHOD(read, "(fd=%d, result=%p)"), fd, result));
 
     AssertIsConPTY();
     assert(g_input_thread != NULL && g_stdin_handle != INVALID_HANDLE_VALUE);
@@ -664,7 +662,7 @@ METHOD(read, int) (int fd GCC_UNUSED, void *result, size_t count)
 	byte = get_byte_blocking();
 	if (byte == -1)
 	    returnCode((int) i);	// Return the number of bytes read so far, which may be 0 if we fail on the first byte
-	((unsigned char *)result)[i] = (unsigned char) byte;
+	((unsigned char *) result)[i] = (unsigned char) byte;
     }
     returnCode((int) count);
 }
@@ -677,12 +675,12 @@ METHOD(read, int) (int fd GCC_UNUSED, void *result, size_t count)
  * that is consistent with the rest of the Windows Console backend design, and it also ensures
  * that we can take advantage of any features provided by ConPTY, such as proper handling of
  * UTF-8 output and support for virtual terminal sequences. */
-METHOD(write, int) (int fd GCC_UNUSED, const void *buf, size_t count)
-{
+METHOD(write, int)(int fd
+			  GCC_UNUSED, const void *buf, size_t count) {
     HANDLE hOut = defaultCONPTY.core.ConsoleHandleOut;
     DWORD written = 0;
 
-    T((T_METHOD(write,"(fd=%d, buf=%p, count=%u)"), fd, buf, (unsigned) count));
+    T((T_METHOD(write, "(fd=%d, buf=%p, count=%u)"), fd, buf, (unsigned) count));
 
     AssertIsConPTY();
 
@@ -700,13 +698,12 @@ METHOD(write, int) (int fd GCC_UNUSED, const void *buf, size_t count)
     returnCode((int) written);
 }
 
-METHOD(togglemode, void) (void)
-{
-	if (IsConsoleProgMode(&MYSELF.core)) {
-		pty_start_input_subsystem ();
-	} else {
-		pty_stop_input_subsystem ();
-	}
+METHOD(togglemode, void)(void) {
+    if (IsConsoleProgMode(&MYSELF.core)) {
+	pty_start_input_subsystem();
+    } else {
+	pty_stop_input_subsystem();
+    }
 }
 
 #endif /* USE_CONPTY */

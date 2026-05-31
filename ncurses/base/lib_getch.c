@@ -146,11 +146,13 @@ check_mouse_activity(SCREEN *sp, int delay EVENTLIST_2nd(_nc_eventlist * evl))
     if (ScreenIsBufferedConsole(sp)) {
 	SCREEN *spc = ConsoleScreen(DefaultConsole());
 	assert(spc);
-	assert(sp==spc);
-	return(MouseFifoHasEvent(spc) 
-		? 
-		TW_MOUSE : 
-		AsScreenBufferedConsole(sp)->twait(TWAIT_MASK, delay, (int*)0 EVENTLIST_2nd(evl)));
+	assert(sp == spc);
+	return (MouseFifoHasEvent(spc)
+		?
+		TW_MOUSE :
+		AsScreenBufferedConsole(sp)->twait(TWAIT_MASK, delay,
+						   (int *) 0
+						   EVENTLIST_2nd(evl)));
     }
 #endif /* !USE_SCREENBUFFERED_CONSOLE */
 # if USE_SYSMOUSE
@@ -287,13 +289,13 @@ fifo_push(SCREEN *sp EVENTLIST_2nd(_nc_eventlist * evl))
 	    ch = buf;
 	} else {
 #endif /* USE_SCREENBUFFERED_CONSOLE */
-	unsigned char c2 = 0;
+	    unsigned char c2 = 0;
 
-	_nc_set_read_thread(TRUE);
-	n = (int) NC_READ(sp,sp->_ifd, &c2, (size_t) 1);
-	_nc_set_read_thread(FALSE);
-	ch = c2;
-    }
+	    _nc_set_read_thread(TRUE);
+	    n = (int) NC_READ(sp, sp->_ifd, &c2, (size_t) 1);
+	    _nc_set_read_thread(FALSE);
+	    ch = c2;
+	}
 #if USE_SCREENBUFFERED_CONSOLE
     }
 #endif /* USE_SCREENBUFFERED_CONSOLE */
@@ -558,7 +560,7 @@ _nc_wgetch(WINDOW *win,
     if (ScreenConsole(sp)->size_changed()) {
 	/* Resize detected - preserve the triggering character */
 	safe_ungetch(sp, ch);
-	ch = ERR; // Fake an error to trigger the resize handling below
+	ch = ERR;		// Fake an error to trigger the resize handling below
     }
 #endif
 

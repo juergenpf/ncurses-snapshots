@@ -150,8 +150,8 @@ NCURSES_SP_NAME(_nc_init_acs)(NCURSES_SP_DCL0)
 
 #if USE_SCREENBUFFERED_CONSOLE
     if (ScreenIsBufferedConsole(SP_PARM)) {
-        AsScreenBufferedConsole(SP_PARM)->init_acs(real_map);
-        return;
+	AsScreenBufferedConsole(SP_PARM)->init_acs(real_map);
+	return;
     }
 #endif
     if (ena_acs != NULL) {

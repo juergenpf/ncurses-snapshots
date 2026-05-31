@@ -465,7 +465,6 @@ enable_xterm_mouse(SCREEN *sp, bool enable)
     sp->_mouse_active = enable;
 }
 
-
 #if USE_GPM_SUPPORT
 static bool
 allow_gpm_mouse(SCREEN *sp GCC_UNUSED)
@@ -760,17 +759,17 @@ initialize_mousetype(SCREEN *sp)
     if (ScreenIsBufferedConsole(sp)) {
 	sp->_mouse_type = M_WINDOWS_CONSOLE;
 	returnVoid;
-    } 
+    }
 #endif
 #if USE_CONPTY
     /* we know how to recognize mouse events under "xterm" */
     if (NonEmpty(key_mouse)) {
 	init_xterm_mouse(sp);
     } else if (SP_TERMTYPE term_names != NULL
-	        && strstr(SP_TERMTYPE term_names, "xterm") != NULL) {
+	       && strstr(SP_TERMTYPE term_names, "xterm") != NULL) {
 	if (_nc_add_to_try(&(sp->_keytry), xterm_kmous, KEY_MOUSE) == OK)
 	    init_xterm_mouse(sp);
-    }    
+    }
 #endif /* USE_CONPTY */
 #endif /* USE_CONSOLE_API */
 
@@ -824,7 +823,7 @@ _nc_mouse_event(SCREEN *sp)
 	{
 	    char kbuf[3];
 
-	    int i, res = NC_READ(sp,M_FD(sp), &kbuf, 3);	/* Eat the prefix */
+	    int i, res = NC_READ(sp, M_FD(sp), &kbuf, 3);	/* Eat the prefix */
 	    if (res != 3)
 		printf("Got %d chars instead of 3 for prefix.\n", res);
 	    for (i = 0; i < res; i++) {
@@ -933,7 +932,7 @@ _nc_mouse_event(SCREEN *sp)
 #endif
 
     case M_NONE:
-	(void)eventp;
+	(void) eventp;
 	break;
     }
 

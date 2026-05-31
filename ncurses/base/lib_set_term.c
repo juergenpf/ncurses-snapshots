@@ -405,18 +405,18 @@ NCURSES_SP_NAME(_nc_setupscreen)(
 	    AsScreenBufferedConsole(sp)->setfilter();
 	} else {
 #endif
-	/* *INDENT-EQLS* */
-	clear_screen     = ABSENT_STRING;
-	cursor_address   = ABSENT_STRING;
-	cursor_down      = ABSENT_STRING;
-	cursor_up        = ABSENT_STRING;
-	parm_down_cursor = ABSENT_STRING;
-	parm_up_cursor   = ABSENT_STRING;
-	row_address      = ABSENT_STRING;
-	cursor_home      = carriage_return;
+	    /* *INDENT-EQLS* */
+	    clear_screen     = ABSENT_STRING;
+	    cursor_address   = ABSENT_STRING;
+	    cursor_down      = ABSENT_STRING;
+	    cursor_up        = ABSENT_STRING;
+	    parm_down_cursor = ABSENT_STRING;
+	    parm_up_cursor   = ABSENT_STRING;
+	    row_address      = ABSENT_STRING;
+	    cursor_home      = carriage_return;
 
-	if (back_color_erase)
-	    clr_eos = ABSENT_STRING;
+	    if (back_color_erase)
+		clr_eos = ABSENT_STRING;
 #if USE_SCREENBUFFERED_CONSOLE
 	}
 #endif
@@ -611,7 +611,7 @@ NCURSES_SP_NAME(_nc_setupscreen)(
     }
 
     /* initialize normal acs before wide, since we use mapping in the latter */
-    #if !USE_WIDEC_SUPPORT
+#if !USE_WIDEC_SUPPORT
     if (_nc_unicode_locale() && _nc_locale_breaks_acs(sp->_term)) {
 	/* *INDENT-EQLS* */
 	acs_chars              = NULL;
@@ -676,8 +676,7 @@ NCURSES_SP_NAME(_nc_setupscreen)(
      * unless we use the term-driver.
      */
     if (cur_term != NULL &&
-	!memcmp(&cur_term->Ottyb, &null_TTY, sizeof(TTY)))
-    {
+	!memcmp(&cur_term->Ottyb, &null_TTY, sizeof(TTY))) {
 	NCURSES_SP_NAME(def_shell_mode)(NCURSES_SP_ARG);
 	NCURSES_SP_NAME(def_prog_mode)(NCURSES_SP_ARG);
     }

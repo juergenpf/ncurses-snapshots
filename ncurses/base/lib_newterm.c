@@ -315,31 +315,31 @@ NCURSES_SP_NAME(newterm)(NCURSES_SP_DCLx
 		AsScreenBufferedConsole(SP_PARM)->screen_init();
 	    } else {
 #endif
-	    /* compute movement costs so we can do better move optimization */
-	    /*
-	     * Check for mismatched graphic-rendition capabilities.  Most SVr4
-	     * terminfo trees contain entries that have rmul or rmso equated to
-	     * sgr0 (Solaris curses copes with those entries).  We do this only
-	     * for curses, since many termcap applications assume that
-	     * smso/rmso and smul/rmul are paired, and will not function
-	     * properly if we remove rmso or rmul.  Curses applications
-	     * shouldn't be looking at this detail.
-	     */
+		/* compute movement costs so we can do better move optimization */
+		/*
+		 * Check for mismatched graphic-rendition capabilities.  Most SVr4
+		 * terminfo trees contain entries that have rmul or rmso equated to
+		 * sgr0 (Solaris curses copes with those entries).  We do this only
+		 * for curses, since many termcap applications assume that
+		 * smso/rmso and smul/rmul are paired, and will not function
+		 * properly if we remove rmso or rmul.  Curses applications
+		 * shouldn't be looking at this detail.
+		 */
 #define SGR0_TEST(mode) (mode != NULL) && (exit_attribute_mode == NULL || strcmp(mode, exit_attribute_mode))
-	    SP_PARM->_use_rmso = SGR0_TEST(exit_standout_mode);
-	    SP_PARM->_use_rmul = SGR0_TEST(exit_underline_mode);
+		SP_PARM->_use_rmso = SGR0_TEST(exit_standout_mode);
+		SP_PARM->_use_rmul = SGR0_TEST(exit_underline_mode);
 #if USE_ITALIC
-	    SP_PARM->_use_ritm = SGR0_TEST(exit_italics_mode);
+		SP_PARM->_use_ritm = SGR0_TEST(exit_italics_mode);
 #endif
 
-	    /* compute movement costs so we can do better move optimization */
-	    _nc_mvcur_init();
+		/* compute movement costs so we can do better move optimization */
+		_nc_mvcur_init();
 
-	    /* initialize terminal to a sane state */
-	    _nc_screen_init();
+		/* initialize terminal to a sane state */
+		_nc_screen_init();
 #if USE_SCREENBUFFERED_CONSOLE
 	    }
-#endif	    
+#endif
 	    /* Initialize the terminal line settings. */
 	    _nc_initscr(NCURSES_SP_ARG);
 
@@ -348,7 +348,7 @@ NCURSES_SP_NAME(newterm)(NCURSES_SP_DCLx
 #if USE_CONSOLE_API
 	    DefaultConsole()->sp = SP_PARM;
 	    assert(DefaultConsole()->sp != 0);
-	    SP_PARM->_console = DefaultConsole(); // 1-1 relationship between screen and console interface
+	    SP_PARM->_console = DefaultConsole();	// 1-1 relationship between screen and console interface
 #endif
 	}
     }

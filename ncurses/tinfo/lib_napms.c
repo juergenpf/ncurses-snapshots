@@ -64,7 +64,9 @@ NCURSES_SP_NAME(napms)(NCURSES_SP_DCLx int ms)
 
 #if USE_SCREENBUFFERED_CONSOLE
     if (ScreenIsBufferedConsole(SP_PARM))
-        returnCode(AsScreenBufferedConsole(SP_PARM)->twait(TW_NONE, ms, (int *) 0 EVENTLIST_2nd(NULL)));
+	returnCode(AsScreenBufferedConsole(SP_PARM)->twait(TW_NONE, ms,
+							   (int *) 0
+							   EVENTLIST_2nd(NULL)));
 #endif
 #if NCURSES_SP_FUNCS
     (void) sp;

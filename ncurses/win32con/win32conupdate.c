@@ -49,41 +49,32 @@ MODULE_ID("$Id$")
 static int
 find_end_of_change(SCREEN *sp, int row, int col)
 {
-	int result = col;
-	struct ldat *curdat = CurScreen(sp)->_line + row;
-	struct ldat *newdat = NewScreen(sp)->_line + row;
+    int result = col;
+    struct ldat *curdat = CurScreen(sp)->_line + row;
+    struct ldat *newdat = NewScreen(sp)->_line + row;
 
-	while (col <= newdat->lastchar)
-	{
+    while (col <= newdat->lastchar) {
 #if USE_WIDEC_SUPPORT
-		if (isWidecExt(curdat->text[col]) ||
-			isWidecExt(newdat->text[col]))
-		{
-			result = col;
-		}
-		else if (memcmp(&curdat->text[col],
-						&newdat->text[col],
-						sizeof(curdat->text[0])))
-		{
-			result = col;
-		}
-		else
-		{
-			break;
-		}
-#else
-		if (curdat->text[col] != newdat->text[col])
-		{
-			result = col;
-		}
-		else
-		{
-			break;
-		}
-#endif
-		++col;
+	if (isWidecExt(curdat->text[col]) ||
+	    isWidecExt(newdat->text[col])) {
+	    result = col;
+	} else if (memcmp(&curdat->text[col],
+			  &newdat->text[col],
+			  sizeof(curdat->text[0]))) {
+	    result = col;
+	} else {
+	    break;
 	}
-	return result;
+#else
+	if (curdat->text[col] != newdat->text[col]) {
+	    result = col;
+	} else {
+	    break;
+	}
+#endif
+	++col;
+    }
+    return result;
 }
 
 /*
@@ -93,35 +84,30 @@ find_end_of_change(SCREEN *sp, int row, int col)
 static int
 find_next_change(SCREEN *sp, int row, int col)
 {
-	struct ldat *curdat = CurScreen(sp)->_line + row;
-	struct ldat *newdat = NewScreen(sp)->_line + row;
-	int result = newdat->lastchar + 1;
+    struct ldat *curdat = CurScreen(sp)->_line + row;
+    struct ldat *newdat = NewScreen(sp)->_line + row;
+    int result = newdat->lastchar + 1;
 
-	while (++col <= newdat->lastchar)
-	{
+    while (++col <= newdat->lastchar) {
 #if USE_WIDEC_SUPPORT
-		if (isWidecExt(curdat->text[col]) !=
-			isWidecExt(newdat->text[col]))
-		{
-			result = col;
-			break;
-		}
-		else if (memcmp(&curdat->text[col],
-						&newdat->text[col],
-						sizeof(curdat->text[0])))
-		{
-			result = col;
-			break;
-		}
-#else
-		if (curdat->text[col] != newdat->text[col])
-		{
-			result = col;
-			break;
-		}
-#endif
+	if (isWidecExt(curdat->text[col]) !=
+	    isWidecExt(newdat->text[col])) {
+	    result = col;
+	    break;
+	} else if (memcmp(&curdat->text[col],
+			  &newdat->text[col],
+			  sizeof(curdat->text[0]))) {
+	    result = col;
+	    break;
 	}
-	return result;
+#else
+	if (curdat->text[col] != newdat->text[col]) {
+	    result = col;
+	    break;
+	}
+#endif
+    }
+    return result;
 }
 
 #define EndChange(first) \
@@ -136,151 +122,137 @@ find_next_change(SCREEN *sp, int row, int col)
 	win->_line[row].lastchar = _NOCHANGE
 
 NCURSES_EXPORT(int)
-_nc_win32con_doupdate (SCREEN *sp)
+_nc_win32con_doupdate(SCREEN *sp)
 {
-	int result = ERR;
-	int y, nonempty, n, x0, x1, Width, Height;
+    int result = ERR;
+    int y, nonempty, n, x0, x1, Width, Height;
 
-	T((T_CALLED("_nc_win32con_doupdate(%p)"), (void *) sp));
+    T((T_CALLED("_nc_win32con_doupdate(%p)"), (void *) sp));
 
-	assert(ScreenIsBufferedConsole(sp));
+    assert(ScreenIsBufferedConsole(sp));
 
-	Width = screen_columns(sp);
-	Height = screen_lines(sp);
-	nonempty = Min(Height, NewScreen(sp)->_maxy + 1);
+    Width = screen_columns(sp);
+    Height = screen_lines(sp);
+    nonempty = Min(Height, NewScreen(sp)->_maxy + 1);
 
-	T(("... %dx%d clear cur:%d new:%d",
-	   Height, Width,
-	   CurScreen(sp)->_clear,
-	   NewScreen(sp)->_clear));
+    T(("... %dx%d clear cur:%d new:%d",
+       Height, Width,
+       CurScreen(sp)->_clear,
+       NewScreen(sp)->_clear));
 
-	if (SP_PARM->_endwin == ewSuspend)
-	{
+    if (SP_PARM->_endwin == ewSuspend) {
 
-		T(("coming back from shell mode"));
-		NCURSES_SP_NAME(reset_prog_mode)(NCURSES_SP_ARG);
+	T(("coming back from shell mode"));
+	NCURSES_SP_NAME(reset_prog_mode)(NCURSES_SP_ARG);
 
-		NCURSES_SP_NAME(_nc_mvcur_resume)(NCURSES_SP_ARG);
-		NCURSES_SP_NAME(_nc_screen_resume)(NCURSES_SP_ARG);
-		SP_PARM->_mouse_resume(SP_PARM);
+	NCURSES_SP_NAME(_nc_mvcur_resume)(NCURSES_SP_ARG);
+	NCURSES_SP_NAME(_nc_screen_resume)(NCURSES_SP_ARG);
+	SP_PARM->_mouse_resume(SP_PARM);
 
-		SP_PARM->_endwin = ewRunning;
-	}
+	SP_PARM->_endwin = ewRunning;
+    }
 
-	if ((CurScreen(sp)->_clear || NewScreen(sp)->_clear))
-	{
-		int x;
+    if ((CurScreen(sp)->_clear || NewScreen(sp)->_clear)) {
+	int x;
 #if USE_WIDEC_SUPPORT
-		MakeArray(empty, cchar_t, Width);
-		wchar_t blank[2] =
-			{
-				L' ', L'\0'};
+	MakeArray(empty, cchar_t, Width);
+	wchar_t blank[2] =
+	{
+	    L' ', L'\0'};
 
-		for (x = 0; x < Width; x++)
-			setcchar(&empty[x], blank, 0, 0, NULL);
+	for (x = 0; x < Width; x++)
+	    setcchar(&empty[x], blank, 0, 0, NULL);
 #else
-		MakeArray(empty, chtype, Width);
+	MakeArray(empty, chtype, Width);
 
-		for (x = 0; x < Width; x++)
-			empty[x] = ' ';
+	for (x = 0; x < Width; x++)
+	    empty[x] = ' ';
 #endif
 
-		for (y = 0; y < nonempty; y++)
-		{
-			AsScreenBufferedConsole(sp)->writeat(y, 0, empty, Width);
-			memcpy(empty,
-				   CurScreen(sp)->_line[y].text,
-				   (size_t)Width * sizeof(empty[0]));
-		}
-		CurScreen(sp)->_clear = FALSE;
-		NewScreen(sp)->_clear = FALSE;
-		touchwin(NewScreen(sp));
-		T(("... cleared %dx%d lines @%d of screen", nonempty, Width,
-		   AdjustY()));
+	for (y = 0; y < nonempty; y++) {
+	    AsScreenBufferedConsole(sp)->writeat(y, 0, empty, Width);
+	    memcpy(empty,
+		   CurScreen(sp)->_line[y].text,
+		   (size_t) Width * sizeof(empty[0]));
 	}
+	CurScreen(sp)->_clear = FALSE;
+	NewScreen(sp)->_clear = FALSE;
+	touchwin(NewScreen(sp));
+	T(("... cleared %dx%d lines @%d of screen", nonempty, Width,
+	   AdjustY()));
+    }
 
-	for (y = 0; y < nonempty; y++)
-	{
-		x0 = NewScreen(sp)->_line[y].firstchar;
-		if (x0 != _NOCHANGE)
-		{
+    for (y = 0; y < nonempty; y++) {
+	x0 = NewScreen(sp)->_line[y].firstchar;
+	if (x0 != _NOCHANGE) {
 #if EXP_OPTIMIZE
-			int x2;
-			int limit = NewScreen(sp)->_line[y].lastchar;
-			while ((x1 = EndChange(x0)) <= limit)
-			{
-				while ((x2 = NextChange(x1)) <=
-						   limit &&
-					   x2 <= (x1 + 2))
-				{
-					x1 = x2;
-				}
-				n = x1 - x0 + 1;
-				memcpy(&CurScreen(sp)->_line[y].text[x0],
-					   &NewScreen(sp)->_line[y].text[x0],
-					   n * sizeof(CurScreen(sp)->_line[y].text[x0]));
-				AsScreenBufferedConsole(sp)->writeat(y,
-						  x0,
-						  &CurScreen(sp)->_line[y].text[x0], n);
-				x0 = NextChange(x1);
-			}
-
-			/* mark line changed successfully */
-			if (y <= NewScreen(sp)->_maxy)
-			{
-				MARK_NOCHANGE(NewScreen(sp), y);
-			}
-			if (y <= CurScreen(sp)->_maxy)
-			{
-				MARK_NOCHANGE(CurScreen(sp), y);
-			}
-#else
-			x1 = NewScreen(sp)->_line[y].lastchar;
-			n = x1 - x0 + 1;
-			if (n > 0)
-			{
-				memcpy(&CurScreen(sp)->_line[y].text[x0],
-					   &NewScreen(sp)->_line[y].text[x0],
-					   (size_t)n *
-						   sizeof(CurScreen(sp)->_line[y].text[x0]));
-				AsScreenBufferedConsole(sp)->writeat(y,
-						  x0,
-						  &CurScreen(sp)->_line[y].text[x0], n);
-
-				/* mark line changed successfully */
-				if (y <= NewScreen(sp)->_maxy)
-				{
-					MARK_NOCHANGE(NewScreen(sp), y);
-				}
-				if (y <= CurScreen(sp)->_maxy)
-				{
-					MARK_NOCHANGE(CurScreen(sp), y);
-				}
-			}
-#endif
+	    int x2;
+	    int limit = NewScreen(sp)->_line[y].lastchar;
+	    while ((x1 = EndChange(x0)) <= limit) {
+		while ((x2 = NextChange(x1)) <=
+		       limit &&
+		       x2 <= (x1 + 2)) {
+		    x1 = x2;
 		}
-	}
+		n = x1 - x0 + 1;
+		memcpy(&CurScreen(sp)->_line[y].text[x0],
+		       &NewScreen(sp)->_line[y].text[x0],
+		       n * sizeof(CurScreen(sp)->_line[y].text[x0]));
+		AsScreenBufferedConsole(sp)->writeat(y,
+						     x0,
+						     &CurScreen(sp)->_line[y].text[x0], n);
+		x0 = NextChange(x1);
+	    }
 
-	/* put everything back in sync */
-	for (y = nonempty; y <= NewScreen(sp)->_maxy; y++)
-	{
+	    /* mark line changed successfully */
+	    if (y <= NewScreen(sp)->_maxy) {
 		MARK_NOCHANGE(NewScreen(sp), y);
-	}
-	for (y = nonempty; y <= CurScreen(sp)->_maxy; y++)
-	{
+	    }
+	    if (y <= CurScreen(sp)->_maxy) {
 		MARK_NOCHANGE(CurScreen(sp), y);
-	}
+	    }
+#else
+	    x1 = NewScreen(sp)->_line[y].lastchar;
+	    n = x1 - x0 + 1;
+	    if (n > 0) {
+		memcpy(&CurScreen(sp)->_line[y].text[x0],
+		       &NewScreen(sp)->_line[y].text[x0],
+		       (size_t) n *
+		       sizeof(CurScreen(sp)->_line[y].text[x0]));
+		AsScreenBufferedConsole(sp)->writeat(y,
+						     x0,
+						     &CurScreen(sp)->_line[y].text[x0], n);
 
-	if (!NewScreen(sp)->_leaveok)
-	{
-		CurScreen(sp)->_curx = NewScreen(sp)->_curx;
-		CurScreen(sp)->_cury = NewScreen(sp)->_cury;
-		AsScreenBufferedConsole(sp)->mvcur(0, 0, CurScreen(sp)->_cury, CurScreen(sp)->_curx);
+		/* mark line changed successfully */
+		if (y <= NewScreen(sp)->_maxy) {
+		    MARK_NOCHANGE(NewScreen(sp), y);
+		}
+		if (y <= CurScreen(sp)->_maxy) {
+		    MARK_NOCHANGE(CurScreen(sp), y);
+		}
+	    }
+#endif
 	}
-	// selectActiveHandle();
-	result = OK;
+    }
 
-	returnCode(result);
+    /* put everything back in sync */
+    for (y = nonempty; y <= NewScreen(sp)->_maxy; y++) {
+	MARK_NOCHANGE(NewScreen(sp), y);
+    }
+    for (y = nonempty; y <= CurScreen(sp)->_maxy; y++) {
+	MARK_NOCHANGE(CurScreen(sp), y);
+    }
+
+    if (!NewScreen(sp)->_leaveok) {
+	CurScreen(sp)->_curx = NewScreen(sp)->_curx;
+	CurScreen(sp)->_cury = NewScreen(sp)->_cury;
+	AsScreenBufferedConsole(sp)->mvcur(0, 0, CurScreen(sp)->_cury,
+					   CurScreen(sp)->_curx);
+    }
+    // selectActiveHandle();
+    result = OK;
+
+    returnCode(result);
 }
 
 #endif /* USE_SCREENBUFFERED_CONSOLE */

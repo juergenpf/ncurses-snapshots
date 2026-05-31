@@ -69,7 +69,6 @@ MODULE_ID("$Id: lib_color.c,v 1.158 2026/05/30 22:10:47 tom Exp $")
 #define UseHlsPalette  (hue_lightness_saturation)
 #endif
 
-
 /*
  * These should be screen structure members.  They need to be globals for
  * historical reasons.  So we assign them in start_color() and also in
@@ -308,13 +307,13 @@ static bool
 reset_color_pair(NCURSES_SP_DCL0)
 {
     bool result = FALSE;
+    (void) SP_PARM;
 #if USE_SCREENBUFFERED_CONSOLE
     if (ScreenIsBufferedConsole(SP_PARM)) {
-	return AsScreenBufferedConsole(SP_PARM)->reset_color_pair();
-    }
+	result = AsScreenBufferedConsole(SP_PARM)->reset_color_pair();
+    } else
 #endif
 
-    (void) SP_PARM;
     if (orig_pair != NULL) {
 	(void) NCURSES_PUTP2("orig_pair", orig_pair);
 	result = TRUE;
@@ -339,8 +338,8 @@ NCURSES_SP_NAME(_nc_reset_colors)(NCURSES_SP_DCL0)
 	result = TRUE;
 #if USE_SCREENBUFFERED_CONSOLE
     if (ScreenIsBufferedConsole(SP_PARM)) {
-	returnBool(AsScreenBufferedConsole(SP_PARM)->reset_colors());
-    }
+	result = AsScreenBufferedConsole(SP_PARM)->reset_colors();
+    } else
 #endif
     if (orig_colors != NULL) {
 	NCURSES_PUTP2("orig_colors", orig_colors);
@@ -747,11 +746,11 @@ _nc_init_color(SCREEN *sp, int color, int r, int g, int b)
 	if (ScreenIsBufferedConsole(sp)) {
 	    AsScreenBufferedConsole(sp)->initcolor(color, r, g, b);
 	} else {
-#endif	
-	NCURSES_PUTP2("initialize_color",
-		      TIPARM_4(initialize_color, color, r, g, b));
+#endif
+	    NCURSES_PUTP2("initialize_color",
+			  TIPARM_4(initialize_color, color, r, g, b));
 #if USE_SCREENBUFFERED_CONSOLE
-	}	
+	}
 #endif
 	sp->_color_defs = Max(color + 1, sp->_color_defs);
 
@@ -814,15 +813,14 @@ NCURSES_SP_NAME(has_colors)(NCURSES_SP_DCL0)
 #if USE_SCREENBUFFERED_CONSOLE
 	if (ScreenIsBufferedConsole(SP_PARM)) {
 	    code = AsScreenBufferedConsole(SP_PARM)->info.hascolor;
-	    returnBool(code);
-	}
+	} else
 #endif
-	code = ((VALID_NUMERIC(max_colors) && VALID_NUMERIC(max_pairs)
-		 && (((set_foreground != NULL)
-		      && (set_background != NULL))
-		     || ((set_a_foreground != NULL)
-			 && (set_a_background != NULL))
-		     || set_color_pair)) ? TRUE : FALSE);
+	    code = ((VALID_NUMERIC(max_colors) && VALID_NUMERIC(max_pairs)
+		     && (((set_foreground != NULL)
+			  && (set_background != NULL))
+			 || ((set_a_foreground != NULL)
+			     && (set_a_background != NULL))
+			 || set_color_pair)) ? TRUE : FALSE);
     }
     returnBool(code);
 }

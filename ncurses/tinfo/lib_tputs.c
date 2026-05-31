@@ -150,7 +150,7 @@ NCURSES_SP_NAME(_nc_flush)(NCURSES_SP_DCL0)
 		     * so the number of bytes written is greater than the amount requested. In that case, 
 		     * we must not subtract the number of bytes written from the amount, because that would
 		     * produce an underflow effect. */
-		    if ((size_t)res > amount) 
+		    if ((size_t) res > amount)
 			break;
 		    /* if the write was incomplete, try again */
 		    amount -= (size_t) res;

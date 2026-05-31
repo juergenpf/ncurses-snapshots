@@ -208,9 +208,9 @@ GoTo(NCURSES_SP_DCLx int const row, int const col)
 		   SP_PARM->_curscol, "GoTo");
 
     NCURSES_SP_NAME(_nc_mvcur)(NCURSES_SP_ARGx
-		SP_PARM->_cursrow,
-		SP_PARM->_curscol,
-		row, col);
+			       SP_PARM->_cursrow,
+			       SP_PARM->_curscol,
+			       row, col);
     position_check(NCURSES_SP_ARGx
 		   SP_PARM->_cursrow,
 		   SP_PARM->_curscol, "GoTo2");
@@ -2252,10 +2252,10 @@ NCURSES_SP_NAME(_nc_screen_wrap)(NCURSES_SP_DCL0)
 	    SP_PARM->_default_color = FALSE;
 
 	    NCURSES_SP_NAME(_nc_mvcur)(NCURSES_SP_ARGx
-			SP_PARM->_cursrow,
-			SP_PARM->_curscol,
-			screen_lines(SP_PARM) - 1,
-			0);
+				       SP_PARM->_cursrow,
+				       SP_PARM->_curscol,
+				       screen_lines(SP_PARM) - 1,
+				       0);
 
 	    ClrToEOL(NCURSES_SP_ARGx blank, TRUE);
 	}

@@ -185,7 +185,7 @@ _nc_timed_wait(const SCREEN *sp MAYBE_UNUSED,
 # if USE_CONPTY
     GCC_UNUSED
 # endif
-    int fd;
+	int fd;
 #endif
 
 #ifdef NCURSES_WGETCH_EVENTS
@@ -499,7 +499,7 @@ _nc_timed_wait(const SCREEN *sp MAYBE_UNUSED,
      * code everywhere.
      */
     if (result != 0) {
-	
+
 	int valid_fds = result;
 	(void) valid_fds;
 	if (result > 0) {

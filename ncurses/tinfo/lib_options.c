@@ -256,7 +256,7 @@ typeahead(int fd)
 */
 
 #if NCURSES_EXT_FUNCS
-static bool
+static int
 has_key_internal(int keycode, TRIES * tp)
 {
     if (tp == NULL)
@@ -336,8 +336,8 @@ _nc_keypad(SCREEN *sp, bool flag)
 #endif
 	{
 #if USE_SCREENBUFFERED_CONSOLE
-	    if (ScreenIsBufferedConsole(sp)) 
-		return(AsScreenBufferedConsole(sp)->keypad(flag));
+	    if (ScreenIsBufferedConsole(sp))
+		return (AsScreenBufferedConsole(sp)->keypad(flag));
 #endif
 	    if (flag) {
 		(void) NCURSES_PUTP2_FLUSH("keypad_xmit", keypad_xmit);

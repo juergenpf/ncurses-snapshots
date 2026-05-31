@@ -280,7 +280,7 @@ NCURSES_SP_NAME(savetty)(NCURSES_SP_DCL0)
     T((T_CALLED("savetty(%p)"), (void *) SP_PARM));
 
     tty = saved_tty(NCURSES_SP_ARG);
-    code = NCURSES_SP_NAME(_nc_get_tty_mode) (NCURSES_SP_ARGx tty);
+    code = NCURSES_SP_NAME(_nc_get_tty_mode)(NCURSES_SP_ARGx tty);
 #if USE_CONSOLE_API
     if (code == OK)
 	code = ScreenConsole(SP_PARM)->defmode(tty, TTY_MODE_AUTO);
