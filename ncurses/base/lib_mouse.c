@@ -84,7 +84,7 @@
 #define CUR SP_TERMTYPE
 #endif
 
-MODULE_ID("$Id: lib_mouse.c,v 1.229 2026/04/18 00:14:14 tom Exp $")
+MODULE_ID("$Id: lib_mouse.c,v 1.230 2026/05/30 20:48:17 tom Exp $")
 
 #include <tic.h>
 

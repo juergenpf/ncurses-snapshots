@@ -1,5 +1,5 @@
 /****************************************************************************
- * Copyright 2018-2024,2025 Thomas E. Dickey                                *
+ * Copyright 2018-2025,2026 Thomas E. Dickey                                *
  * Copyright 2017 Free Software Foundation, Inc.                            *
  *                                                                          *
  * Permission is hereby granted, free of charge, to any person obtaining a  *
@@ -34,7 +34,7 @@
 #define NEW_PAIR_INTERNAL 1
 #include <curses.priv.h>
 
-MODULE_ID("$Id: report_offsets.c,v 1.32 2025/12/27 12:34:03 tom Exp $")
+MODULE_ID("$Id: report_offsets.c,v 1.33 2026/05/30 20:48:17 tom Exp $")
 
 #define show_size(type) \
 	flag = NULL; \

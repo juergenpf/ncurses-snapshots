@@ -1,5 +1,5 @@
 /****************************************************************************
- * Copyright 2020-2024,2025 Thomas E. Dickey                                *
+ * Copyright 2020-2025,2026 Thomas E. Dickey                                *
  * Copyright 1998-2013,2014 Free Software Foundation, Inc.                  *
  *                                                                          *
  * Permission is hereby granted, free of charge, to any person obtaining a  *
@@ -44,7 +44,7 @@
 #define CUR SP_TERMTYPE
 #endif
 
-MODULE_ID("$Id: lib_slkrefr.c,v 1.35 2025/12/27 12:41:23 tom Exp $")
+MODULE_ID("$Id: lib_slkrefr.c,v 1.36 2026/05/30 22:10:47 tom Exp $")
 
 #if USE_SCREENBUFFERED_CONSOLE
 #define NumLabels      (ScreenIsBufferedConsole(SP_PARM) ? AsScreenBufferedConsole(SP_PARM)->info.numlabels : num_labels)
@@ -149,7 +149,7 @@ slk_intern_refresh(SCREEN *sp)
  * Refresh the soft labels.
  */
 NCURSES_EXPORT(int)
-NCURSES_SP_NAME(slk_noutrefresh) (NCURSES_SP_DCL0)
+NCURSES_SP_NAME(slk_noutrefresh)(NCURSES_SP_DCL0)
 {
     T((T_CALLED("slk_noutrefresh(%p)"), (void *) SP_PARM));
 
@@ -166,7 +166,7 @@ NCURSES_SP_NAME(slk_noutrefresh) (NCURSES_SP_DCL0)
 NCURSES_EXPORT(int)
 slk_noutrefresh(void)
 {
-    return NCURSES_SP_NAME(slk_noutrefresh) (CURRENT_SCREEN);
+    return NCURSES_SP_NAME(slk_noutrefresh)(CURRENT_SCREEN);
 }
 #endif
 
@@ -174,7 +174,7 @@ slk_noutrefresh(void)
  * Refresh the soft labels.
  */
 NCURSES_EXPORT(int)
-NCURSES_SP_NAME(slk_refresh) (NCURSES_SP_DCL0)
+NCURSES_SP_NAME(slk_refresh)(NCURSES_SP_DCL0)
 {
     T((T_CALLED("slk_refresh(%p)"), (void *) SP_PARM));
 
@@ -191,6 +191,6 @@ NCURSES_SP_NAME(slk_refresh) (NCURSES_SP_DCL0)
 NCURSES_EXPORT(int)
 slk_refresh(void)
 {
-    return NCURSES_SP_NAME(slk_refresh) (CURRENT_SCREEN);
+    return NCURSES_SP_NAME(slk_refresh)(CURRENT_SCREEN);
 }
 #endif

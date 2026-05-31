@@ -1,5 +1,5 @@
 /****************************************************************************
- * Copyright 2018-2024,2025 Thomas E. Dickey                                *
+ * Copyright 2018-2025,2026 Thomas E. Dickey                                *
  * Copyright 1998-2016,2017 Free Software Foundation, Inc.                  *
  *                                                                          *
  * Permission is hereby granted, free of charge, to any person obtaining a  *
@@ -52,7 +52,7 @@
 #include <termcap.h>		/* ospeed */
 #include <tic.h>
 
-MODULE_ID("$Id: lib_tputs.c,v 1.116 2025/01/12 00:41:56 tom Exp $")
+MODULE_ID("$Id: lib_tputs.c,v 1.117 2026/05/30 22:10:47 tom Exp $")
 
 NCURSES_EXPORT_VAR(char) PC = 0;              /* used by termcap library */
 NCURSES_EXPORT_VAR(NCURSES_OSPEED) ospeed = 0;        /* used by termcap library */
@@ -91,7 +91,7 @@ static NCURSES_SP_OUTC static_outch = NCURSES_SP_NAME(_nc_outch);
 #endif
 
 NCURSES_EXPORT(int)
-NCURSES_SP_NAME(delay_output) (NCURSES_SP_DCLx int ms)
+NCURSES_SP_NAME(delay_output)(NCURSES_SP_DCLx int ms)
 {
     T((T_CALLED("delay_output(%p,%d)"), (void *) SP_PARM, ms));
 
@@ -102,7 +102,7 @@ NCURSES_SP_NAME(delay_output) (NCURSES_SP_DCLx int ms)
 	returnCode(ERR);
 
     if (no_pad_char) {
-	NCURSES_SP_NAME(_nc_flush) (NCURSES_SP_ARG);
+	NCURSES_SP_NAME(_nc_flush)(NCURSES_SP_ARG);
 	napms(ms);
     } else {
 	NCURSES_SP_OUTC my_outch = GetOutCh();
@@ -112,7 +112,7 @@ NCURSES_SP_NAME(delay_output) (NCURSES_SP_DCLx int ms)
 	for (_nc_nulls_sent += nullcount; nullcount > 0; nullcount--)
 	    my_outch(NCURSES_SP_ARGx PC);
 	if (my_outch == NCURSES_SP_NAME(_nc_outch))
-	    NCURSES_SP_NAME(_nc_flush) (NCURSES_SP_ARG);
+	    NCURSES_SP_NAME(_nc_flush)(NCURSES_SP_ARG);
     }
 
     returnCode(OK);
@@ -122,12 +122,12 @@ NCURSES_SP_NAME(delay_output) (NCURSES_SP_DCLx int ms)
 NCURSES_EXPORT(int)
 delay_output(int ms)
 {
-    return NCURSES_SP_NAME(delay_output) (CURRENT_SCREEN, ms);
+    return NCURSES_SP_NAME(delay_output)(CURRENT_SCREEN, ms);
 }
 #endif
 
 NCURSES_EXPORT(void)
-NCURSES_SP_NAME(_nc_flush) (NCURSES_SP_DCL0)
+NCURSES_SP_NAME(_nc_flush)(NCURSES_SP_DCL0)
 {
     T((T_CALLED("_nc_flush(%p)"), (void *) SP_PARM));
     if (SP_PARM != NULL && SP_PARM->_ofd >= 0) {
@@ -182,12 +182,12 @@ NCURSES_SP_NAME(_nc_flush) (NCURSES_SP_DCL0)
 NCURSES_EXPORT(void)
 _nc_flush(void)
 {
-    NCURSES_SP_NAME(_nc_flush) (CURRENT_SCREEN);
+    NCURSES_SP_NAME(_nc_flush)(CURRENT_SCREEN);
 }
 #endif
 
 NCURSES_EXPORT(int)
-NCURSES_SP_NAME(_nc_outch) (NCURSES_SP_DCLx int ch)
+NCURSES_SP_NAME(_nc_outch)(NCURSES_SP_DCLx int ch)
 {
     int rc = OK;
 
@@ -197,7 +197,7 @@ NCURSES_SP_NAME(_nc_outch) (NCURSES_SP_DCLx int ch)
 	&& SP_PARM != NULL) {
 	if (SP_PARM->out_buffer != NULL) {
 	    if (SP_PARM->out_inuse + 1 >= SP_PARM->out_limit)
-		NCURSES_SP_NAME(_nc_flush) (NCURSES_SP_ARG);
+		NCURSES_SP_NAME(_nc_flush)(NCURSES_SP_ARG);
 	    SP_PARM->out_buffer[SP_PARM->out_inuse++] = (char) ch;
 	} else {
 	    char tmp = (char) ch;
@@ -221,7 +221,7 @@ NCURSES_SP_NAME(_nc_outch) (NCURSES_SP_DCLx int ch)
 NCURSES_EXPORT(int)
 _nc_outch(int ch)
 {
-    return NCURSES_SP_NAME(_nc_outch) (CURRENT_SCREEN, ch);
+    return NCURSES_SP_NAME(_nc_outch)(CURRENT_SCREEN, ch);
 }
 #endif
 
@@ -229,7 +229,7 @@ _nc_outch(int ch)
  * This is used for the putp special case.
  */
 NCURSES_EXPORT(int)
-NCURSES_SP_NAME(_nc_putchar) (NCURSES_SP_DCLx int ch)
+NCURSES_SP_NAME(_nc_putchar)(NCURSES_SP_DCLx int ch)
 {
     (void) SP_PARM;
     return putchar(ch);
@@ -250,17 +250,17 @@ _nc_putchar(int ch)
  * from within the library.
  */
 NCURSES_EXPORT(int)
-NCURSES_SP_NAME(putp) (NCURSES_SP_DCLx const char *string)
+NCURSES_SP_NAME(putp)(NCURSES_SP_DCLx const char *string)
 {
-    return NCURSES_SP_NAME(tputs) (NCURSES_SP_ARGx
-				   string, 1, NCURSES_SP_NAME(_nc_putchar));
+    return NCURSES_SP_NAME(tputs)(NCURSES_SP_ARGx
+				  string, 1, NCURSES_SP_NAME(_nc_putchar));
 }
 
 #if NCURSES_SP_FUNCS
 NCURSES_EXPORT(int)
 putp(const char *string)
 {
-    return NCURSES_SP_NAME(putp) (CURRENT_SCREEN, string);
+    return NCURSES_SP_NAME(putp)(CURRENT_SCREEN, string);
 }
 #endif
 
@@ -268,16 +268,16 @@ putp(const char *string)
  * Use these entrypoints rather than "putp" within the library.
  */
 NCURSES_EXPORT(int)
-NCURSES_SP_NAME(_nc_putp) (NCURSES_SP_DCLx
-			   const char *name GCC_UNUSED,
-			   const char *string)
+NCURSES_SP_NAME(_nc_putp)(NCURSES_SP_DCLx
+			  const char *name GCC_UNUSED,
+			  const char *string)
 {
     int rc = ERR;
 
     if (string != NULL) {
 	TPUTS_TRACE(name);
-	rc = NCURSES_SP_NAME(tputs) (NCURSES_SP_ARGx
-				     string, 1, NCURSES_SP_NAME(_nc_outch));
+	rc = NCURSES_SP_NAME(tputs)(NCURSES_SP_ARGx
+				    string, 1, NCURSES_SP_NAME(_nc_outch));
     }
     return rc;
 }
@@ -286,15 +286,15 @@ NCURSES_SP_NAME(_nc_putp) (NCURSES_SP_DCLx
 NCURSES_EXPORT(int)
 _nc_putp(const char *name, const char *string)
 {
-    return NCURSES_SP_NAME(_nc_putp) (CURRENT_SCREEN, name, string);
+    return NCURSES_SP_NAME(_nc_putp)(CURRENT_SCREEN, name, string);
 }
 #endif
 
 NCURSES_EXPORT(int)
-NCURSES_SP_NAME(tputs) (NCURSES_SP_DCLx
-			const char *string,
-			int affcnt,
-			NCURSES_SP_OUTC outc)
+NCURSES_SP_NAME(tputs)(NCURSES_SP_DCLx
+		       const char *string,
+		       int affcnt,
+		       NCURSES_SP_OUTC outc)
 {
     NCURSES_SP_OUTC my_outch = GetOutCh();
     bool always_delay = FALSE;
@@ -431,7 +431,7 @@ NCURSES_SP_NAME(tputs) (NCURSES_SP_DCLx
 		    && (always_delay
 			|| normal_delay
 			|| mandatory))
-		    NCURSES_SP_NAME(delay_output) (NCURSES_SP_ARGx number / 10);
+		    NCURSES_SP_NAME(delay_output)(NCURSES_SP_ARGx number / 10);
 
 	    }			/* endelse (*string == '<') */
 	}			/* endelse (*string == '$') */
@@ -448,7 +448,7 @@ NCURSES_SP_NAME(tputs) (NCURSES_SP_DCLx
      */
     if (trailpad > 0
 	&& (always_delay || normal_delay))
-	NCURSES_SP_NAME(delay_output) (NCURSES_SP_ARGx trailpad / 10);
+	NCURSES_SP_NAME(delay_output)(NCURSES_SP_ARGx trailpad / 10);
 #endif /* BSD_TPUTS */
 
     SetOutCh(my_outch);
@@ -470,6 +470,6 @@ NCURSES_EXPORT(int)
 tputs(const char *string, int affcnt, int (*outc) (int))
 {
     SetSafeOutcWrapper(outc);
-    return NCURSES_SP_NAME(tputs) (NCURSES_SP_ARGx string, affcnt, _nc_outc_wrapper);
+    return NCURSES_SP_NAME(tputs)(NCURSES_SP_ARGx string, affcnt, _nc_outc_wrapper);
 }
 #endif
