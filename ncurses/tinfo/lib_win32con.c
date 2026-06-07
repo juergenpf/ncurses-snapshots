@@ -1,5 +1,5 @@
 /****************************************************************************
- * Copyright 2020-2024,2025 Thomas E. Dickey                                *
+ * Copyright 2020-2025,2026 Thomas E. Dickey                                *
  * Copyright 1998-2009,2010 Free Software Foundation, Inc.                  *
  *                                                                          *
  * Permission is hereby granted, free of charge, to any person obtaining a  *
@@ -44,7 +44,7 @@
 #define _O_BINARY 0		/* FIXME: not defined in MSYS2 base */
 #endif
 
-MODULE_ID("$Id: lib_win32con.c,v 1.50 2025/12/27 21:49:45 tom Exp $")
+MODULE_ID("$Id: lib_win32con.c,v 1.52 2026/05/30 20:48:17 tom Exp $")
 
 #if defined(_NC_WINDOWS)
 
@@ -665,21 +665,21 @@ handle_mouse(SCREEN *sp, MOUSE_EVENT_RECORD mer)
 
     assert(sp);
 
-    sp->_drv_mouse_old_buttons = sp->_drv_mouse_new_buttons;
-    sp->_drv_mouse_new_buttons = mer.dwButtonState & BUTTON_MASK;
+    sp->_console_mouse_old_buttons = sp->_console_mouse_new_buttons;
+    sp->_console_mouse_new_buttons = mer.dwButtonState & BUTTON_MASK;
 
     /*
      * We're only interested if the button is pressed or released.
      * FIXME: implement continuous event-tracking.
      */
-    if (sp->_drv_mouse_new_buttons != sp->_drv_mouse_old_buttons) {
+    if (sp->_console_mouse_new_buttons != sp->_console_mouse_old_buttons) {
 	memset(&work, 0, sizeof(work));
 
-	if (sp->_drv_mouse_new_buttons) {
-	    work.bstate |= decode_mouse(sp, sp->_drv_mouse_new_buttons);
+	if (sp->_console_mouse_new_buttons) {
+	    work.bstate |= decode_mouse(sp, sp->_console_mouse_new_buttons);
 	} else {
 	    /* cf: BUTTON_PRESSED, BUTTON_RELEASED */
-	    work.bstate |= (decode_mouse(sp, sp->_drv_mouse_old_buttons)
+	    work.bstate |= (decode_mouse(sp, sp->_console_mouse_old_buttons)
 			    >> 1);
 	    result = TRUE;
 	}
@@ -687,8 +687,8 @@ handle_mouse(SCREEN *sp, MOUSE_EVENT_RECORD mer)
 	work.x = mer.dwMousePosition.X;
 	work.y = mer.dwMousePosition.Y - AdjustY();
 
-	sp->_drv_mouse_fifo[sp->_drv_mouse_tail] = work;
-	sp->_drv_mouse_tail += 1;
+	sp->_console_mouse_fifo[sp->_console_mouse_tail] = work;
+	sp->_console_mouse_tail += 1;
     }
     return result;
 }
@@ -850,7 +850,7 @@ _nc_console_twait(
 
     memset(&inp_rec, 0, sizeof(inp_rec));
 
-    while (true) {
+    while (TRUE) {
 	if (!isNoDelay) {
 	    GetSystemTimeAsFileTime(&fstart);
 	    rc = WaitForSingleObject(hdl, (DWORD) milliseconds);
@@ -992,7 +992,7 @@ _nc_console_testmouse(
 
     assert(sp);
 
-    if (sp->_drv_mouse_head < sp->_drv_mouse_tail) {
+    if (sp->_console_mouse_head < sp->_console_mouse_tail) {
 	rc = TW_MOUSE;
     } else {
 	rc = _nc_console_twait(sp,
@@ -1171,8 +1171,8 @@ _nc_console_checkinit(bool assumeTermInfo)
 	    WINCONSOLE.numButtons = 1;
 	}
 
-	a = _nc_console_MapColor(true, COLOR_WHITE) |
-	    _nc_console_MapColor(false, COLOR_BLACK);
+	a = _nc_console_MapColor(TRUE, COLOR_WHITE) |
+	    _nc_console_MapColor(FALSE, COLOR_BLACK);
 	for (i = 0; i < CON_NUMPAIRS; i++)
 	    WINCONSOLE.pairs[i] = a;
 

@@ -49,7 +49,7 @@
 #include <parametrized.h>
 #include <transform.h>
 
-MODULE_ID("$Id: tic.c,v 1.339 2026/03/07 23:34:12 tom Exp $")
+MODULE_ID("$Id: tic.c,v 1.343 2026/06/06 09:59:40 tom Exp $")
 
 #define STDIN_NAME "<stdin>"
 
@@ -202,9 +202,6 @@ static void
 write_it(ENTRY * ep)
 {
     unsigned n;
-    int ch;
-    char *s, *d;
-    const char *t;
     char result[MAX_ENTRY_SIZE];
 
     /*
@@ -212,11 +209,14 @@ write_it(ENTRY * ep)
      * which is shorter and runs a little faster.
      */
     for (n = 0; n < STRCOUNT; n++) {
-	s = ep->tterm.Strings[n];
+	size_t limit;
+	char *s = ep->tterm.Strings[n];
 	if (VALID_STRING(s)
+	    && (limit = strlen(s)) < sizeof(result) - 1
 	    && strchr(s, L_BRACE) != NULL) {
-	    d = result;
-	    t = s;
+	    int ch;
+	    char *d = result;
+	    const char *t = s;
 	    while ((ch = *t++) != 0) {
 		*d++ = (char) ch;
 		if (ch == '\\') {
@@ -228,10 +228,8 @@ write_it(ENTRY * ep)
 		    long value = strtol(t + 1, &v, 0);
 		    if (v != NULL
 			&& *v == R_BRACE
-			&& value > 0
-			&& value != '\\'	/* FIXME */
-			&& value < 127
-			&& isprint(UChar(value))) {
+			&& value != 0
+			&& value < 256) {
 			*d++ = S_QUOTE;
 			*d++ = (char) value;
 			*d++ = S_QUOTE;
@@ -240,8 +238,9 @@ write_it(ENTRY * ep)
 		}
 	    }
 	    *d = 0;
-	    if (strlen(result) < strlen(s))
-		_nc_STRCPY(s, result, strlen(s) + 1);
+	    if ((size_t) (d - result) < limit) {
+		_nc_STRCPY(s, result, limit + 1);
+	    }
 	}
     }
 
@@ -1222,7 +1221,8 @@ same_color(NCURSES_CONST char *oldcap, NCURSES_CONST char *newcap, int limit)
 	for (n = same = 0; n < limit; ++n) {
 	    char *oldvalue = safe_strdup(TIPARM_1(oldcap, n));
 	    char *newvalue = safe_strdup(TIPARM_1(newcap, n));
-	    same += !strcmp(oldvalue, newvalue);
+	    if (oldvalue != NULL && newvalue != NULL)
+		same += !strcmp(oldvalue, newvalue);
 	    free(oldvalue);
 	    free(newvalue);
 	}
@@ -2349,7 +2349,7 @@ parse_delay_value(const char *src, double *delays, int *always)
 	    break;
 	if (*src++ == '*') {
 	    star = 1;
-	} else {
+	} else if (always != NULL) {
 	    *always = 1;
 	}
     }
@@ -3193,8 +3193,8 @@ check_user_6789(const TERMTYPE2 *tp)
 
 #define PAIRED_USER_STRS(set, reset) \
 	do {  \
-	    char *set = tigetstr(#set);  \
-	    char *reset = tigetstr(#reset);  \
+	    const char *set = tigetstr(#set);  \
+	    const char *reset = tigetstr(#reset);  \
 	    PAIRED(set,reset);  \
 	} while (0)
 

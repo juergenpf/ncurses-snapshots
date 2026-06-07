@@ -1,6 +1,5 @@
 /****************************************************************************
- * Copyright 2019-2025,2026 Thomas E. Dickey                                *
- * Copyright 1998-2012,2014 Free Software Foundation, Inc.                  *
+ * Copyright 2026 Thomas E. Dickey                                          *
  *                                                                          *
  * Permission is hereby granted, free of charge, to any person obtaining a  *
  * copy of this software and associated documentation files (the            *
@@ -28,76 +27,67 @@
  ****************************************************************************/
 
 /****************************************************************************
- *  Author: Thomas E. Dickey                        1997-on                 *
- *     and: Juergen Pfeifer                         2009                    *
+ *  Author: Thomas E. Dickey                                                *
  ****************************************************************************/
 
 #include <curses.priv.h>
+#include <tic.h>
 
-MODULE_ID("$Id: keyok.c,v 1.20 2026/05/30 22:10:47 tom Exp $")
+#ifndef CUR
+#define CUR SP_TERMTYPE
+#endif
 
-/*
- * Enable (or disable) ncurses' interpretation of a keycode by adding (or
- * removing) the corresponding 'tries' entry.
- *
- * Do this by storing a second tree of tries, which records the disabled keys.
- * The simplest way to copy is to make a function that returns the string (with
- * nulls set to 0200), then use that to reinsert the string into the
- * corresponding tree.
- */
+MODULE_ID("$Id: cookie_updates.c,v 1.4 2026/05/16 23:40:00 tom Exp $")
 
-NCURSES_EXPORT(int)
-NCURSES_SP_NAME(keyok)(NCURSES_SP_DCLx int c, bool flag)
+static bool
+check_attrs(const SCREEN *sp, WINDOW *win)
 {
-    int code = ERR;
-
-    if (HasTerminal(SP_PARM)) {
-	T((T_CALLED("keyok(%p, %d,%d)"), (void *) SP_PARM, c, flag));
-#if USE_TERM_DRIVER
-	code = CallDriver_2(sp, td_kyOk, c, flag);
-#else
-	if (c >= 0) {
-	    int count = 0;
-	    char *s;
-	    unsigned ch = (unsigned) c;
-
-	    if (flag) {
-		while ((s = _nc_expand_try(SP_PARM->_key_ok,
-					   ch, &count, (size_t) 0)) != NULL) {
-		    if (_nc_remove_key(&(SP_PARM->_key_ok), ch)) {
-			code = _nc_add_to_try(&(SP_PARM->_keytry), s, ch);
-			free(s);
-			count = 0;
-			if (code != OK)
-			    break;
-		    } else {
-			free(s);
-		    }
-		}
-	    } else {
-		while ((s = _nc_expand_try(SP_PARM->_keytry,
-					   ch, &count, (size_t) 0)) != NULL) {
-		    if (_nc_remove_key(&(SP_PARM->_keytry), ch)) {
-			code = _nc_add_to_try(&(SP_PARM->_key_ok), s, ch);
-			free(s);
-			count = 0;
-			if (code != OK)
-			    break;
-		    } else {
-			free(s);
-		    }
+    bool found = FALSE;
+    if (win != NULL) {
+	int row;
+	for (row = 0; row < sp->_lines; ++row) {
+	    NCURSES_CH_T *text = win->_line[row].text;
+	    int col;
+	    for (col = 0; col < sp->_columns; ++col) {
+		attr_t attr = AttrOf(text[col]);
+		/*
+		 * Note: magic cookies predate hardware support for dim,
+		 * italics, and (likely) alternate character set.
+		 */
+		if ((attr & (A_STANDOUT |
+			     A_UNDERLINE |
+			     A_REVERSE |
+			     A_BLINK |
+			     A_DIM |
+			     A_BOLD)) != 0) {
+		    found = TRUE;
+		    break;
 		}
 	    }
+	    if (found)
+		break;
 	}
-#endif
     }
-    returnCode(code);
+    return found;
 }
 
-#if NCURSES_SP_FUNCS
-NCURSES_EXPORT(int)
-keyok(int c, bool flag)
+NCURSES_EXPORT(void)
+_nc_cookie_updates(SCREEN *sp)
 {
-    return NCURSES_SP_NAME(keyok)(CURRENT_SCREEN, c, flag);
+    if (magic_cookie_glitch >= 0 &&
+	sp != NULL &&
+	!sp->cookie_initialized) {
+	if (_nc_cookie_allowed(sp)) {
+	    bool found = (check_attrs(sp, sp->_curscr) ||
+			  check_attrs(sp, sp->_newscr) ||
+			  check_attrs(sp, sp->_stdscr));
+	    if (found) {
+		_nc_cookie_init(sp);
+		sp->cookie_active = TRUE;
+	    }
+	} else {
+	    sp->cookie_initialized = TRUE;
+	    magic_cookie_glitch = ABSENT_NUMERIC;
+	}
+    }
 }
-#endif

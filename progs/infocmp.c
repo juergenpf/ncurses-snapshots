@@ -43,7 +43,7 @@
 
 #include <dump_entry.h>
 
-MODULE_ID("$Id: infocmp.c,v 1.180 2026/03/04 21:16:45 tom Exp $")
+MODULE_ID("$Id: infocmp.c,v 1.182 2026/06/06 09:59:40 tom Exp $")
 
 #ifndef ACTUAL_TIC
 #define ACTUAL_TIC "tic"
@@ -1378,13 +1378,23 @@ safe_name(const char *format, const char *prefix, const char *name)
 {
     static char *result;
     static size_t need;
+    size_t want;
     char *s;
 
+    /*
+     * Leave room for the optional "ti_" prefix, optional leading '_',
+     * the formatted name, and the trailing NUL.
+     */
+    want = strlen(prefix) + strlen(name) + strlen(format) + 5;
+    if (want > need) {
+	char *next = (char *) realloc(result, want);
+	if (next == NULL)
+	    failed("safe_name");
+	result = next;
+	need = want;
+    }
     if (result == NULL) {
-	need = (strlen(prefix)
-		+ strlen(name)
-		+ strlen(format));
-	result = (char *) malloc(need + 1);
+	result = (char *) malloc(need);
 	if (result == NULL)
 	    failed("safe_name");
     }
@@ -1400,7 +1410,7 @@ safe_name(const char *format, const char *prefix, const char *name)
     *s = 0;
     if (isdigit(UChar(*name)) && !*prefix)
 	*s++ = '_';
-    _nc_SPRINTF(s, _nc_SLIMIT(need) format, name);
+    _nc_SPRINTF(s, _nc_SLIMIT(need - (size_t) (s - result)) format, name);
     return result;
 }
 
@@ -1505,7 +1515,8 @@ dump_initializers(const TERMTYPE2 *term)
 
     for_each_string(n, term) {
 	if (VALID_STRING(term->Strings[n])) {
-	    char buf[MAX_STRING], *sp, *tp;
+	    char buf[MAX_STRING], *tp;
+	    const char *sp;
 
 	    tp = buf;
 #define TP_LIMIT	((MAX_STRING - 6) - (size_t)(tp - buf))

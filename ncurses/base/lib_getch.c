@@ -44,7 +44,7 @@
 #define NEED_KEY_EVENT
 #include <curses.priv.h>
 
-MODULE_ID("$Id: lib_getch.c,v 1.156 2026/03/28 19:51:59 tom Exp $")
+MODULE_ID("$Id: lib_getch.c,v 1.160 2026/06/06 09:59:40 tom Exp $")
 
 #include <fifo_defs.h>
 
@@ -68,7 +68,7 @@ NCURSES_EXPORT_VAR(int) ESCDELAY = 1000;
 
 #if NCURSES_EXT_FUNCS
 NCURSES_EXPORT(int)
-NCURSES_SP_NAME(set_escdelay) (NCURSES_SP_DCLx int value)
+NCURSES_SP_NAME(set_escdelay)(NCURSES_SP_DCLx int value)
 {
     int code = OK;
     if (value < 0) {
@@ -97,7 +97,7 @@ set_escdelay(int value)
 	code = ERR;
     } else {
 #if USE_REENTRANT
-	code = NCURSES_SP_NAME(set_escdelay) (CURRENT_SCREEN, value);
+	code = NCURSES_SP_NAME(set_escdelay)(CURRENT_SCREEN, value);
 #else
 	ESCDELAY = value;
 	code = OK;
@@ -110,7 +110,7 @@ set_escdelay(int value)
 
 #if NCURSES_EXT_FUNCS
 NCURSES_EXPORT(int)
-NCURSES_SP_NAME(get_escdelay) (NCURSES_SP_DCL0)
+NCURSES_SP_NAME(get_escdelay)(NCURSES_SP_DCL0)
 {
 #if !USE_REENTRANT
     (void) SP_PARM;
@@ -122,7 +122,7 @@ NCURSES_SP_NAME(get_escdelay) (NCURSES_SP_DCL0)
 NCURSES_EXPORT(int)
 get_escdelay(void)
 {
-    return NCURSES_SP_NAME(get_escdelay) (CURRENT_SCREEN);
+    return NCURSES_SP_NAME(get_escdelay)(CURRENT_SCREEN);
 }
 #endif
 #endif /* NCURSES_EXT_FUNCS */
@@ -274,7 +274,7 @@ fifo_push(SCREEN *sp EVENTLIST_2nd(_nc_eventlist * evl))
 #endif
 #if USE_TERM_DRIVER
 	if ((sp->_mouse_type == M_TERM_DRIVER)
-	    && (sp->_drv_mouse_head < sp->_drv_mouse_tail)) {
+	    && (sp->_console_mouse_head < sp->_console_mouse_tail)) {
 	sp->_mouse_event(sp);
 	ch = KEY_MOUSE;
 	n = 1;
@@ -407,7 +407,7 @@ recur_wgetnstr(WINDOW *win, char *buf)
 #endif
 	{
 	    sp->_called_wgetch = TRUE;
-	    rc = wgetnstr(win, buf, MAXCOLUMNS);
+	    rc = wgetnstr(win, buf, MAXCOLUMNS - 1);
 	    sp->_called_wgetch = FALSE;
 	}
     } else {
@@ -460,7 +460,8 @@ _nc_wgetch(WINDOW *win,
 	!IsRaw(sp) &&
 	!IsCbreak(sp) &&
 	!sp->_called_wgetch) {
-	char buf[MAXCOLUMNS], *bufp;
+	char buf[MAXCOLUMNS];
+	const char *bufp;
 
 	TR(TRACE_IEVENT, ("filling queue in cooked mode"));
 

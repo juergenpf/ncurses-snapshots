@@ -6,8 +6,8 @@
 # Report bugs and new terminal descriptions to
 #	bug-ncurses@gnu.org
 #
-#	$Revision: 1.1232 $
-#	$Date: 2026/03/14 22:37:57 $
+#	$Revision: 1.1250 $
+#	$Date: 2026/05/09 23:25:16 $
 #
 # The original header is preserved below for reference.  It is noted that there
 # is a "newer" version which differs in some cosmetic details (but actually
@@ -1018,6 +1018,10 @@ linux+sfkeys|shifted function-keys for Linux console,
 linux-m|Linux console no color,
 	colors@, pairs@,
 	setab@, setaf@, setb@, setf@, use=linux,
+
+# Linux 7.0 (expected in April 2026) supports alternate-screen switching.
+linux-alt1049|Linux console with alternate screen,
+	use=xterm+alt1049, use=linux,
 
 # release 1.3: 1995/06
 #
@@ -4406,11 +4410,12 @@ mintty+common|shared capabilities for mintty,
 	blink2=\E[6m, norm=\E[22m, opaq=\E[28m,
 	rv=\E\\[>77;[0-9];0c, smul2=\E[21m,
 	xr=\EP>\\|mintty ([1-9][.0-9]+)\E\\\\, use=linux+kbs,
-	use=ansi+rep, use=ecma+overline, use=ecma+strikeout,
-	use=ecma+index, use=mintty+keypad, use=vt420+lrmm,
-	use=xterm+focus, use=xterm+sm+1006, use=xterm+pcfkeys,
-	use=xterm+tmux, use=ecma+italics, use=xterm-basic,
-	use=bracketed+paste, use=report+version,
+	use=ansi+rep, use=dec+sl, use=ecma+overline,
+	use=ecma+strikeout, use=ecma+index, use=mintty+keypad,
+	use=vt420+lrmm, use=xterm+focus, use=xterm+sm+1006,
+	use=xterm+pcfkeys, use=xterm+tmux, use=ecma+italics,
+	use=xterm-basic, use=bracketed+paste,
+	use=report+version,
 mintty+keypad|mintty special numeric keypad,
 	kbeg=\EOE, kpADD=\EOk, kpDIV=\EOo, kpMUL=\EOj, kpSUB=\EOm,
 
@@ -5577,10 +5582,14 @@ iterm2-direct|iTerm2 with direct-color indexing,
 mlterm-direct|mlterm with direct-color indexing,
 	use=xterm+direct, use=mlterm,
 
-# Meanwhile, in KDE #107487, the patch submitter and the developer both saw
+# This variant uses xterm's original semicolon-separated form for direct-color
+# subparameters, retained as a legacy building-block for terminals which
+# implemented that syntax.
+#
+# In KDE #107487 (2006), the patch submitter and the developer both saw
 # that xterm's original implementation should have used colons for the
-# subparameter separators, but chose not to correct this in konsole.  As of
-# late 2017, konsole still accepts only the nonstandard semicolon delimiters.
+# subparameter separators, but chose not to correct this in konsole.  Until
+# mid-2022, konsole accepted only the nonstandard semicolon delimiters.
 xterm+indirect|xterm with direct-color indexing (old legacy building-block),
 	RGB,
 	colors#0x1000000, pairs#0x10000,
@@ -5591,7 +5600,7 @@ xterm+indirect|xterm with direct-color indexing (old legacy building-block),
 	      %/%{255}%&%d;%p1%{255}%&%d%;m,
 	setb@, setf@,
 konsole-direct|konsole with direct-color indexing,
-	use=xterm+indirect, use=konsole,
+	use=xterm+direct, use=konsole,
 st-direct|simpleterm with direct-color indexing,
 	use=xterm+indirect, use=st,
 vte-direct|VTE with direct-color indexing,
@@ -5698,19 +5707,18 @@ xterm+tmux2|advanced xterm features used in tmux,
 #	CSI	\E [	\233
 #
 xterm-8bit|xterm terminal emulator 8-bit controls (X Window System),
-	OTbs, am, bce, km, mc5i, mir, msgr, npc, xenl, AX,
-	colors#8, cols#80, it#8, lines#24, pairs#64,
-	bel=^G, blink=\2335m, bold=\2331m, cbt=\233Z,
-	civis=\233?25l, clear=\233H\2332J,
-	cnorm=\233?25l\233?25h, cr=\r, csr=\233%i%p1%d;%p2%dr,
-	cub=\233%p1%dD, cub1=^H, cud=\233%p1%dB, cud1=\n,
+	OTbs, bce, km, mc5i, mir, npc, xenl, AX,
+	colors#8, pairs#64,
+	blink=\2335m, bold=\2331m, cbt=\233Z, civis=\233?25l,
+	clear=\233H\2332J, cnorm=\233?25l\233?25h,
+	csr=\233%i%p1%d;%p2%dr, cub=\233%p1%dD, cud=\233%p1%dB,
 	cuf=\233%p1%dC, cuf1=\233C, cup=\233%i%p1%d;%p2%dH,
 	cuu=\233%p1%dA, cuu1=\233A, cvvis=\233?12;25h,
 	dch=\233%p1%dP, dch1=\233P, dl=\233%p1%dM, dl1=\233M,
 	ech=\233%p1%dX, ed=\233J, el=\233K, el1=\2331K,
 	flash=\233?5h$<100/>\233?5l, home=\233H,
-	hpa=\233%i%p1%dG, ht=^I, hts=\210, ich=\233%p1%d@,
-	il=\233%p1%dL, il1=\233L, ind=\n, invis=\2338m,
+	hpa=\233%i%p1%dG, hts=\210, ich=\233%p1%d@,
+	il=\233%p1%dL, il1=\233L, invis=\2338m,
 	is2=\E[62"p\E\sG\233m\233?7h\E>\E7\233?1;3;4;6l\2334l\233r
 	    \E8,
 	ka1=\217w, ka3=\217u, kb2=\217y, kbeg=\217E, kc1=\217q,
@@ -5739,7 +5747,7 @@ xterm-8bit|xterm terminal emulator 8-bit controls (X Window System),
 	smir=\2334h, smkx=\233?1h\E=, smso=\2337m, smul=\2334m,
 	tbc=\2333g, u6=\233[%i%d;%dR, u8=\233[?%[;0123456789]c,
 	vpa=\233%i%p1%dd, use=ansi+enq, use=xterm+acs,
-	use=xterm+kbs,
+	use=xterm+kbs, use=vt100+4bsd,
 
 # Note: normally xterm supports modified function-keys as described in
 #	XTerm - "Other" modified keys
@@ -5814,7 +5822,11 @@ xterm|xterm terminal emulator (X Window System),
 # This entry assumes that xterm's handling of VT100 SI/SO is disabled by
 # setting the vt100Graphics resource to false.
 xterm-utf8|xterm with no VT100 line-drawing in UTF-8 mode,
-	U8#1, use=xterm,
+	U8#1,
+	acsc@, enacs@, rmacs@,
+	sgr=\E[0%?%p6%t;1%;%?%p5%t;2%;%?%p2%t;4%;%?%p1%p3%|%t;7%;%?
+	    %p4%t;5%;%?%p7%t;8%;m,
+	sgr0=\E[m, smacs@, use=xterm,
 
 # These building-blocks allow access to the X titlebar and icon name as a
 # status line.  There are a few problems in using them in entries:
@@ -5860,12 +5872,12 @@ xterm+sl-alt|alternate access X title line,
 # controls used.
 #
 # DECSASD (select active status display)
-#	\E[0$}	Main display
+#	\E[0$}	Main display (default)
 #	\E[1$}	Status line
 #
 # DECSSDT (select status line type)
 #	\E[0$~	No status line
-#	\E[1$~	Indicator status line
+#	\E[1$~	Indicator status line (default)
 #	\E[2$~	Host-writable status line
 #
 # The building block assumes that the terminal always shows something at the
@@ -6631,6 +6643,10 @@ kvt|KDE terminal,
 #
 #    numeric keypad does neither normal or application mode.
 #
+# Updated for konsole 26.07.70 (early 2026):
+#    use xterm+direct in konsole-direct
+#    add E3, xterm+sm+1003, xterm+tmux, Smulx and kitty+setal
+#
 konsole-base|KDE console window (common),
 	bce, km@, npc, XT,
 	ncv@,
@@ -6641,14 +6657,16 @@ konsole-base|KDE console window (common),
 	rs2=\E7\E[r\E8\E[m\E[?7h\E[?1;3;4;6l\E[4l\E>\E[?1000l\E[?25h,
 	sgr=\E[0%?%p6%t;1%;%?%p2%t;4%;%?%p1%p3%|%t;7%;%?%p4%t;5%;%?
 	    %p5%t;2%;%?%p7%t;8%;m%?%p9%t\016%e\017%;,
-	sgr0=\E[0m\017, smam=\E[?7h, rv=\E\\[>1;115;0c,
-	xr=\EP>\\|Konsole ([1-9][.0-9])\E\\\\,
+	sgr0=\E[0m\017, smam=\E[?7h, E3=\E[3J, Se=\E[0 q,
+	Smulx=\E[4:%p1%dm, rv=\E\\[>1;115;0c,
+	xr=\EP>\\|Konsole ([1-9][.0-9])\E\\\\, use=ansi+enq,
 	use=ecma+overline, use=ecma+underline,
 	use=ecma+standout, use=ansi+rca2, use=ansi+sgrdim,
-	use=ecma+index, use=xterm+focus, use=xterm+sm+1006,
-	use=ecma+strikeout, use=ecma+italics, use=ecma+color,
-	use=xterm-r6, use=vt220+cvis, use=bracketed+paste,
-	use=report+version, use=xterm+pc+edit,
+	use=ecma+index, use=xterm+sm+1003, use=ecma+strikeout,
+	use=ecma+italics, use=ecma+color, use=xterm+tmux,
+	use=kitty+setal, use=xterm-r6, use=vt220+cvis,
+	use=bracketed+paste, use=report+version,
+	use=xterm+pc+edit,
 
 # The keytab feature was introduced in 0.9.12 (February 2000) with "linux" and
 # "vt100" key-table files along with a compiled-in default key-table.
@@ -6803,7 +6821,7 @@ mlterm3|multi lingual terminal emulator 3.x,
 	sgr=\E[0%?%p6%t;1%;%?%p2%t;4%;%?%p4%t;5%;%?%p1%p3%|%t;7%;%?
 	    %p7%t;8%;m%?%p9%t\E(0%e\E(B%;,
 	rv=\E\\[>24;279;0c,
-	xr=\EP>\\|mlterm\\([0-9][.0-9](-.*)?\\)?\E\\\\,
+	xr=\EP>\\|mlterm\\([0-9][.0-9]+\\)\E\\\\,
 	use=ansi+enq, use=ansi+rep, use=ecma+italics,
 	use=ecma+strikeout, use=xterm+app, use=xterm+pcf2,
 	use=xterm+pcc2, use=xterm+pce2, use=xterm+meta,
@@ -7930,6 +7948,21 @@ rio-direct|rio with direct-colors,
 #	http://lists.gnu.org/archive/html/bug-ncurses/2018-09/msg00005.html
 #	https://github.com/kovidgoyal/kitty/issues/879
 #
+# Version 0.46.1 (Debian testing)
+# Version 0.43.1 (Fedora rawhide)
+# Tested 2026/05/09
+# Notes:
+#	Generally kitty presents a nonstandard window size, e.g. 71x20.
+#	Its manual documents a keyboard resize window function which does
+#	not work in in either Fedora or Debian.  In the latter, the window
+#	manager can resize the window.
+#
+# vttest
+#	blink works
+# tack
+#	some modified function-keys, e.g., kf15 have changed.
+#	italics do not work with Fedora rawhide, work with Debian testing.
+#
 # Version 0.21.2 (June 28, 2021)
 # changes since 0.19.1
 # Notes:
@@ -8035,17 +8068,19 @@ kitty+common|KovId's TTY common properties,
 	cols#80, lines#24,
 	acsc=++\,\,--..00``aaffgghhiijjkkllmmnnooppqqrrssttuuvvwwxxy
 	     yzz{{||}}~~,
-	bel=^G, bold=\E[1m, clear=\E[H\E[2J, cr=\r, cub1=^H, cud1=\n,
-	dch=\E[%p1%dP, dch1=\E[P, dim=\E[2m, ech=\E[%p1%dX,
-	ed=\E[J, el=\E[K, el1=\E[1K, flash=\E[?5h$<100/>\E[?5l,
-	ich=\E[%p1%d@, ind=\n, kBEG=\E[1;2E, kbeg=\EOE, kcbt=\E[Z,
-	op=\E[39;49m, rev=\E[7m, ri=\EM, rmacs=\E(B, rmam=\E[?7l,
-	rmir=\E[4l, rmkx=\E[?1l, rs1=\E]\E\\\Ec,
-	sgr=%?%p9%t\E(0%e\E(B%;\E[0%?%p6%t;1%;%?%p5%t;2%;%?%p2%t;4%;
-	    %?%p1%p3%|%t;7%;m,
+	bel=^G, blink=\E[5m, bold=\E[1m, clear=\E[H\E[2J, cr=\r,
+	cub1=^H, cud1=\n, dch=\E[%p1%dP, dch1=\E[P, dim=\E[2m,
+	dsl=\E]2;\E\\, ech=\E[%p1%dX, ed=\E[J, el=\E[K, el1=\E[1K,
+	flash=\E[?5h$<100/>\E[?5l, ich=\E[%p1%d@, ind=\n,
+	kBEG=\E[1;2E, kbeg=\EOE, kcbt=\E[Z, kf15=\E[13;2~,
+	kf27=\E[13;5~, kf39=\E[13;6~, kf51=\E[13;3~,
+	kf63=\E[13;4~, op=\E[39;49m, rev=\E[7m, ri=\EM, rmacs=\E(B,
+	rmam=\E[?7l, rmir=\E[4l, rmkx=\E[?1l, rs1=\E]\E\\\Ec,
+	sgr=%?%p9%t\E(0%e\E(B%;\E[0%?%p6%t;1%;%?%p2%t;4%;%?%p1%p3%|
+	    %t;7%;%?%p4%t;5%;%?%p7%t;8%;%?%p5%t;2%;m,
 	sgr0=\E(B\E[m, smacs=\E(0, smam=\E[?7h, smir=\E[4h,
-	smkx=\E[?1h, Smulx=\E[4:%p1%dm,
-	rv=\E\\[>1;4[0-9][0-9][0-9];41c,
+	smkx=\E[?1h, Ms=\E]52;%p1%s;%p2%s\E\\, Se=\E[0 q,
+	Smulx=\E[4:%p1%dm, rv=\E\\[>1;4[0-9][0-9][0-9];41c,
 	xr=\EP>\\|kitty\\([0-9]+\\.[0-9]+\\.[0-9]+\\)\E\\
 	   \\,
 	use=ansi+csr, use=ansi+cup, use=ansi+enq, use=ansi+idl,
@@ -8060,6 +8095,58 @@ kitty+common|KovId's TTY common properties,
 kitty+setal|set underline colors (nonstandard),
 	setal=\E[58:2::%p1%{65536}%/%d:%p1%{256}%/%{255}%&%d:%p1
 	      %{255}%&%dm,
+
+#### Warp
+# https://github.com/warpdotdev/Warp
+#
+# The actual terminal emulator is a small fraction of the source code
+# (even the part under app/src/terminal is mostly not relevant to terminal
+# emulation, rather it is concerned with the "agentic" interface).
+#
+# Initially a little over 900,000 lines of rust source code, it grew to 1.25
+# million lines during the week after release.
+#
+# The Git repo lacks history before the public release in April 2026; comments
+# in the source code indicate that features were copied from several other
+# terminals, but the timeline, scope of copying, and motivation is obscured.
+#
+# Testing with vttest and tack:
+# + DA response is \E[?62c, asserting that it is a VT220.  It is not.
+#   For instance, it does not support DECSCA.
+# + DA2 response is \E[>0;95;0c, which is misattributed to iTerm2.
+#   That was from a 2017 comment in vim's source code, mentioning workarounds
+#   which some developers have used to pretend their programs are xterm.
+#   The corresponding code in iTerm2 was revised in 2020 to use a more
+#   elaborate workaround.
+# + ISO-6429 cursor-movement works
+# + xterm-style window reporting for sizes (chars, pixels) works
+# + none of the tab-stop tests in vttest work.
+# + the bce test for ECH/indexing fails.
+# + control-modifier does not work with function-keys, although shift- and alt-
+#   modifiers imitate xterm, so the "xterm+pcfkeys" block is incomplete.
+# + SD works, SU, SL, SR do not.
+# + no left/right margin
+# + no blinking text
+# + no cvvis, etc
+# + no flash
+# + no meta mode (an escape-prefix is not the same thing)
+# + no X11 mouse, but SGR mouse works
+# + no application keypad mode
+#
+# Other comments
+# + works only with specific shells (no bash, yes zsh)
+# + cursor-right does not work reliably
+# + sets TERM to xterm-256color, which is a poor match.
+# + supports XTVERSION, unlike alacritty
+warp|warp terminal,
+	bce@,
+	civis@, cnorm@, cvvis@, kcbt=\E[Z, RV=\E[>c, XF@, XR=\E[>0q, XT@,
+	rv=\E\\[>0;95;0c,
+	xr=\EP>\\|Warp\\(([[:alnum:]._]+)\\)\E\\\\,
+	use=ansi+rep, use=bracketed+paste, use=ecma+italics,
+	use=xterm+sm+1006, use=xterm+pcfkeys,
+	use=ecma+strikeout, use=xterm+tmux, use=xterm+256color,
+	use=xterm-basic,
 
 ######## WAYLAND CLIENTS
 
@@ -8105,14 +8192,13 @@ foot-direct|foot with direct color indexing,
 	use=xterm+direct, use=foot+base,
 
 foot+base|foot base fragment,
-	am, bce, bw, mir, msgr, npc, xenl, AX, XT,
-	cols#80, it#8, lines#24,
-	bel=^G, clear=\E[H\E[2J, cr=\r, cub1=^H, cud1=\n, dim=\E[2m,
+	bce, bw, mir, npc, xenl, AX, XT,
+	clear=\E[H\E[2J, cub1=^H, cud1=\n, dim=\E[2m,
 	ech=\E[%p1%dX, ed=\E[J, el=\E[K, el1=\E[1K,
-	flash=\E]555\E\\, ind=\n, is2=\E[!p\E[4l\E>, kbs=^?,
-	kcbt=\E[Z, nel=\EE, oc=\E]104\E\\, op=\E[39;49m, ri=\EM,
-	rmam=\E[?7l, rmkx=\E[?1l\E>, rmm=\E[?1036h\E[?1034l,
-	rs1=\Ec, rs2=\E[!p\E[4l\E>,
+	flash=\E]555\E\\, is2=\E[!p\E[4l\E>, kbs=^?, kcbt=\E[Z,
+	nel=\EE, oc=\E]104\E\\, op=\E[39;49m, ri=\EM, rmam=\E[?7l,
+	rmkx=\E[?1l\E>, rmm=\E[?1036h\E[?1034l, rs1=\Ec,
+	rs2=\E[!p\E[4l\E>,
 	sgr=%?%p9%t\E(0%e\E(B%;\E[0%?%p6%t;1%;%?%p5%t;2%;%?%p2%t;4%;
 	    %?%p1%p3%|%t;7%;%?%p4%t;5%;%?%p7%t;8%;m,
 	sgr0=\E(B\E[m, smam=\E[?7h, smkx=\E[?1h\E=,
@@ -8127,7 +8213,7 @@ foot+base|foot base fragment,
 	use=xterm+acs, use=xterm+alt+title, use=xterm+pcfkeys,
 	use=xterm+sm+1006, use=xterm+tmux2, use=xterm+sl-alt,
 	use=bracketed+paste, use=report+version,
-	use=xterm+focus,
+	use=xterm+focus, use=vt100+4bsd,
 
 ######## WEB CLIENTS
 
@@ -8259,14 +8345,14 @@ domterm|DomTerm web client,
 # - has italics
 # - has strike-out mode
 pangoterm|terminal using libvterm,
-	am, bce, mir, msgr, npc, xenl, AX, XT,
-	colors#8, cols#80, lines#24, pairs#64,
-	bel=^G, blink@, clear=\E[H\E[2J, cr=\r, cub1=^H, cud1=\n,
-	dch=\E[%p1%dP, dch1=\E[P, ech=\E[%p1%dX, ed=\E[J, el=\E[K,
-	el1=\E[1K, flash=\E[?5h$<100/>\E[?5l, ich=\E[%p1%d@,
-	ind=\n, invis@, is2=\E[!p, kbs=^?, kcbt=\E[Z, nel=\EE,
-	op=\E[39;49m, ri=\EM, rmam=\E[?7l, rmir=\E[4l, rmkx=\E[?1l,
-	rs1=\Ec, rs2=\E[!p, setab=\E[4%p1%dm, setaf=\E[3%p1%dm,
+	bce, mir, npc, xenl, AX, XT,
+	colors#8, pairs#64,
+	blink@, clear=\E[H\E[2J, cub1=^H, cud1=\n, dch=\E[%p1%dP,
+	dch1=\E[P, ech=\E[%p1%dX, ed=\E[J, el=\E[K, el1=\E[1K,
+	flash=\E[?5h$<100/>\E[?5l, ich=\E[%p1%d@, invis@,
+	is2=\E[!p, kbs=^?, kcbt=\E[Z, nel=\EE, op=\E[39;49m, ri=\EM,
+	rmam=\E[?7l, rmir=\E[4l, rmkx=\E[?1l, rs1=\Ec, rs2=\E[!p,
+	setab=\E[4%p1%dm, setaf=\E[3%p1%dm,
 	sgr=%?%p9%t\E(0%e\E(B%;\E[0%?%p6%t;1%;%?%p2%t;4%;%?%p1%p3%|
 	    %t;7%;m,
 	sgr0=\E(B\E[m, smam=\E[?7h, smir=\E[4h, smkx=\E[?1h,
@@ -8278,7 +8364,7 @@ pangoterm|terminal using libvterm,
 	use=ansi+cup, use=ansi+enq, use=ansi+idl,
 	use=ansi+inittabs, use=ansi+local, use=ansi+rca2,
 	use=ansi+sgrbold, use=xterm+alt+title, use=att610+cvis,
-	use=xterm+acs,
+	use=xterm+acs, use=vt100+4bsd,
 
 pangoterm-256color|pangoterm with 256-colors,
 	use=xterm+256setaf2, use=pangoterm,
@@ -8401,6 +8487,14 @@ wezterm-direct16|Wez's Terminal Emulator with direct colors (16 indexed),
 # - cannot run, because the package is not signed.
 #
 # Fedora rawhide
+# contour-terminal-0.6.3.8249-2.fc45.x86_64
+# - function keys match xterm
+# - passes vttest for SL, SR, CBT, CHT
+# - cursor position is incorrect in vttest alternate screen tests
+# - REP and VPR still do not work in vttest
+# - left/right margins do not work in vttest, but does not dump core
+# - sitm/ritm (italics) still do not work.
+# - no improvements are seen with sixels
 # contour-terminal-0.6.1.7494-2.fc42.x86_64
 # - most core dumps are finally gone, works when 3D acceleration is disabled.
 # - fails mir and related "in" tests in tack.
@@ -8462,13 +8556,8 @@ contour|contour-latest|Contour Terminal Emulator,
 	bel=^G, clear=\E[H\E[2J, cr=\r, cub1=^H, cud1=\n, dim=\E[2m,
 	ech=\E[%p1%dX, el1=\E[1K, flash=\E[?5h$<100/>\E[?5l,
 	ind=\n, ka1=, ka3=, kbs=^?, kc1=, kc3=, kcbt=\E[Z, kend=\EOF,
-	kf13=\E[O2P, kf14=\E[O2Q, kf15=\E[O2R, kf16=\E[O2S,
-	kf25=\E[O5P, kf26=\E[O5Q, kf27=\E[O5R, kf28=\E[O5S,
-	kf37=\E[O6P, kf38=\E[O6Q, kf39=\E[O6R, kf40=\E[O6S,
-	kf49=\E[O3P, kf50=\E[O3Q, kf51=\E[O3R, kf52=\E[O3S,
-	kf61=\E[O4P, kf62=\E[O4Q, kf63=\E[O4R, khlp=, kmous=\E[M,
-	kund=, oc=\E]104\E\\, op=\E[39;49m, ri=\EM, rmam=\E[?7l,
-	rmkx=\E[?1l, rs1=\E]\E\\\Ec,
+	khlp=, kmous=\E[M, kund=, oc=\E]104\E\\, op=\E[39;49m,
+	ri=\EM, rmam=\E[?7l, rmkx=\E[?1l, rs1=\E]\E\\\Ec,
 	sgr=%?%p9%t\E(0%e\E(B%;\E[0%?%p6%t;1%;%?%p2%t;4%;%?%p5%t;2%;
 	    %?%p1%p3%|%t;7%;%?%p4%t;5%;%?%p7%t;8%;m,
 	sgr0=\E(B\E[m, smam=\E[?7h, smkx=\E[?1h,
@@ -8480,10 +8569,10 @@ contour|contour-latest|Contour Terminal Emulator,
 	use=ansi+enq, use=ansi+erase, use=ansi+idc, use=ansi+idl,
 	use=ansi+inittabs, use=ansi+local, use=ansi+rca2,
 	use=ansi+sgrbold, use=bracketed+paste, use=dec+sl,
-	use=ecma+index, use=ecma+overline, use=vt220+cvis,
-	use=ecma+strikeout, use=xterm+256color, use=xterm+acs,
-	use=xterm+alt1049, use=xterm+pcc2, use=xterm+pce2,
-	use=xterm+pcf2, use=report+version,
+	use=ecma+italics, use=ecma+index, use=ecma+overline,
+	use=vt220+cvis, use=ecma+strikeout, use=xterm+256color,
+	use=xterm+acs, use=xterm+alt1049, use=xterm+pcc2,
+	use=xterm+pce2, use=xterm+pcf2, use=report+version,
 
 contour-direct|Contour terminal with direct colors,
 	use=xterm+direct, use=contour,
@@ -8796,22 +8885,32 @@ screen-base|VT 100/ANSI X3.64 virtual terminal (base),
 	acsc=++\,\,--..00``aaffgghhiijjkkllmmnnooppqqrrssttuuvvwwxxy
 	     yzz{{||}}~~,
 	blink=\E[5m, bold=\E[1m, cub1=^H, cud1=\n,
-	cup=\E[%i%p1%d;%p2%dH, cuu1=\E[A, cvvis=\E[34l,
-	dch=\E[%p1%dP, dch1=\E[P, dim=\E[2m, ech=\E[%p1%dX,
-	el1=\E[1K, flash=\Eg, ich=\E[%p1%d@, indn=\E[%p1%dS,
-	is2=\E)0, kbs=^?, kcbt=\E[Z, khome=\E[1~, kmous=\E[M,
-	nel=\EE, rev=\E[7m, ri=\EM, rmir=\E[4l, rmkx=\E[?1l\E>,
-	rmso=\E[23m, rs2=\Ec\E[?1000l\E[?25h,
+	cup=\E[%i%p1%d;%p2%dH, cvvis=\E[34l, dch=\E[%p1%dP,
+	dch1=\E[P, dim=\E[2m, ech=\E[%p1%dX, el1=\E[1K, flash=\Eg,
+	ich=\E[%p1%d@, is2=\E)0, kbs=^?, kcbt=\E[Z, khome=\E[1~,
+	kmous=\E[M, nel=\EE, rev=\E[7m, ri=\EM, rmir=\E[4l,
+	rmkx=\E[?1l\E>, rmso=\E[23m, rs2=\Ec\E[?1000l\E[?25h,
 	sgr=\E[0%?%p6%t;1%;%?%p1%t;3%;%?%p2%t;4%;%?%p3%t;7%;%?%p4%t;
 	    5%;%?%p5%t;2%;m%?%p9%t\016%e\017%;,
 	sgr0=\E[m\017, smir=\E[4h, smkx=\E[?1h\E=, smso=\E[3m,
 	E0=\E(B, S0=\E(%p1%c, use=ecma+underline,
-	use=ansi+apparrows, use=ansi+csr, use=ansi+erase,
-	use=ansi+idl, use=ansi+inittabs, use=ansi+local,
-	use=ansi+rca2, use=bracketed+paste, use=ecma+color,
-	use=vt100+pf1-pf4, use=vt220+pcedit, use=xterm+alt1049,
-	use=xterm+kbs, use=vt100+enq, use=vt100+4bsd,
-	use=xterm+r5+fkeys, use=wyse+cvis,
+	use=ansi+apparrows, use=ansi+cpr, use=ansi+csr,
+	use=ansi+erase, use=ansi+idl, use=ansi+inittabs,
+	use=ansi+local, use=ansi+rca2, use=bracketed+paste,
+	use=ecma+color, use=ecma+index, use=vt100+pf1-pf4,
+	use=vt220+pcedit, use=xterm+alt1049, use=xterm+kbs,
+	use=vt100+enq, use=vt100+4bsd, use=xterm+r5+fkeys,
+	use=wyse+cvis,
+
+screen4+da2|secondary device attributes for screen4,
+	rv=\E\\[>83;4[0-9][0-9][0-9];0c, use=report+da2,
+screen5+da2|secondary device attributes for screen5,
+	rv=\E\\[>83;5[0-9][0-9][0-9];0c, use=report+da2,
+
+# "screen" and "screen+da2" are simple, to make it easy to script.
+
+screen+da2|secondary device attributes for screen,
+	use=screen4+da2,
 
 screen|VT 100/ANSI X3.64 virtual terminal,
 	use=screen4,
@@ -8927,18 +9026,18 @@ screen4.xterm-new|screen.xterm-xfree86|screen4 customized for modern xterm,
 	invis@, kIC@, kNXT@, kPRV@, kcbt=\E[Z, meml@, memu@, nel=\EE, rep@,
 	sgr=%?%p9%t\E(0%e\E(B%;\E[0%?%p6%t;1%;%?%p2%t;4%;%?%p1%p3%|
 	    %t;7%;%?%p4%t;5%;%?%p5%t;2%;m,
-	E3@, rv=\E\\[>83;4[0-9][0-9][0-9];0c, use=report+da2,
-	use=screen+italics, use=screen+fkeys,
+	E3@, rv=\E\\[>83;4[0-9][0-9][0-9][0-9];0c,
+	use=report+da2, use=screen+italics, use=screen+fkeys,
 	use=xterm+x11mouse, use=ecma+index, use=ansi+rep,
 	use=xterm+pcfkeys, use=xterm+focus, use=xterm+sm+1006,
 	use=xterm+keypad, use=xterm-basic,
 
 screen5.xterm-new|screen5 customized for modern xterm,
-	rv=\E\\[>83;5[0-9][0-9][0-9];0c, use=ecma+italics,
-	use=screen.xterm-new,
+	rep@, rv=\E\\[>83;5[0-9][0-9][0-9][0-9];0c,
+	use=ecma+italics, use=screen4.xterm-new,
 
 screen.xterm-new|screen customized for modern xterm,
-	use=screen4.xterm-new,
+	use=screen4.xterm-new, use=screen4+da2,
 
 # Don't use this, because not everyone has "screen.xterm-new":
 #:screen.xterm|screen for modern xterm,
@@ -8964,29 +9063,39 @@ screen.rxvt|screen in rxvt,
 	use=rxvt+pcfkeys, use=xterm+x11mouse, use=vt100+keypad,
 	use=screen,
 screen.Eterm|screen in Eterm,
-	use=xterm+x11mouse, use=screen+fkeys, use=Eterm,
+	use=xterm+x11mouse, use=screen+da2, use=screen+fkeys,
+	use=Eterm,
 screen.mrxvt|screen in mrxvt,
-	use=xterm+x11mouse, use=screen+fkeys, use=mrxvt,
+	use=xterm+x11mouse, use=screen+da2, use=screen+fkeys,
+	use=mrxvt,
 screen.vte|screen in any VTE-based terminal,
-	use=xterm+x11mouse, use=screen+italics,
-	use=screen+fkeys, use=no+brackets, use=vte,
+	bce@,
+	rep@, use=xterm+x11mouse, use=screen+da2,
+	use=screen+italics, use=screen+fkeys, use=no+brackets,
+	use=vte,
 screen.gnome|screen in GNOME Terminal,
-	use=xterm+x11mouse, use=screen+italics,
-	use=screen+fkeys, use=no+brackets, use=gnome,
+	bce@,
+	rep@, use=xterm+x11mouse, use=screen+da2,
+	use=screen+italics, use=screen+fkeys, use=no+brackets,
+	use=gnome,
 screen.konsole|screen in KDE console window,
-	XR@, use=xterm+x11mouse, use=screen+italics,
-	use=screen+fkeys, use=no+brackets, use=konsole,
+	bce@,
+	rep@, XR@, use=xterm+x11mouse, use=screen+da2,
+	use=screen+italics, use=screen+fkeys, use=no+brackets,
+	use=konsole,
 # fix the backspace key
 screen.linux|screen.linux-s|screen in Linux console,
 	bw,
-	kcbt@, use=linux+sfkeys, use=xterm+x11mouse,
-	use=screen+fkeys, use=screen,
+	kcbt@, use=screen+da2, use=linux+sfkeys,
+	use=xterm+x11mouse, use=screen+fkeys, use=screen,
 screen.mlterm|screen in mlterm,
-	XR@, use=xterm+x11mouse, use=screen+fkeys,
-	use=no+brackets, use=mlterm,
+	bce@,
+	rep@, XR@, use=xterm+x11mouse, use=screen+da2,
+	use=screen+fkeys, use=no+brackets, use=mlterm,
 screen.putty|screen in putty,
-	use=xterm+x11mouse, use=screen+fkeys, use=no+brackets,
-	use=putty,
+	bce@,
+	rep@, use=xterm+x11mouse, use=screen+da2,
+	use=screen+fkeys, use=no+brackets, use=putty,
 
 # The default "screen" entry is reasonably portable, but not optimal for the
 # most widely-used terminal emulators.  The "bce" capability is supported in
@@ -9057,7 +9166,7 @@ screen3|VT 100/ANSI X3.64 virtual terminal (old 3.x),
 # screen.xterm-new -- but see the discussion in
 #	https://invisible-island.net/gnu-patches/
 screen4|VT 100/ANSI X3.64 virtual terminal (4.x),
-	use=ecma+index, use=screen-base,
+	use=screen-base,
 
 # screen 5.0 was released in August 2024.  As of February 2026, a few systems
 # use it, but not Debian, Ubuntu or OpenSUSE.
@@ -9072,12 +9181,10 @@ screen4|VT 100/ANSI X3.64 virtual terminal (4.x),
 # This version has limited support for direct-colors, but does not use the
 # outer terminal's $TERM in deciding if or how to apply this.
 screen5|VT 100/ANSI X3.64 virtual terminal (5.x),
-	dim=\E[2m,
 	sgr=\E[0%?%p6%t;1%;%?%p2%t;4%;%?%p1%p3%|%t;7%;%?%p4%t;5%;%?
 	    %p5%t;2%;m%?%p9%t\016%e\017%;,
-	RV=\E[>c, rv=\E\\[>83;5[0-9][0-9][0-9];0c,
 	use=ecma+standout, use=ecma+italics, use=ecma+index,
-	use=screen-base,
+	use=screen5+da2, use=screen-base,
 
 #### Tmux
 
@@ -9096,8 +9203,8 @@ tmux|tmux terminal multiplexer,
 	E3=\E[3J, Smulx=\E[4:%p1%dm, use=ecma+standout,
 	use=ecma+italics, use=ecma+strikeout, use=xterm+edit,
 	use=xterm+pcfkeys, use=xterm+sl, use=xterm+tmux,
-	use=screen, use=bracketed+paste, use=report+version,
-	use=xterm+focus,
+	use=screen-base, use=bracketed+paste,
+	use=report+version, use=xterm+focus,
 
 tmux-256color|tmux with 256 colors,
 	use=xterm+256setaf, use=tmux,
@@ -28171,5 +28278,31 @@ v3220|LANPAR Vision II model 3220/3221/3222,
 #
 # 2026-03-14
 #	+ fixes for pangoterm and wezterm, from tic warnings -TD
+#
+# 2026-03-21
+#	+ use xterm+direct in konsole-direct, add several features to
+#	  konsole (report by Xu Che)
+#
+# 2026-03-28
+#	+ use dec+sl in mintty (prompted by Thomas Wolff) -TD
+#
+# 2026-04-04
+#	+ add linux-alt1049 (report by Sebastien Hinderer) -TD
+#
+# 2026-04-11
+#	+ cancel bce and rep in some screen.X's -TD
+#
+# 2026-04-25
+#	+ review screen4 vs screen5 -TD
+#	+ review some XR/xr pairs -TD
+#
+# 2026-05-02
+#	+ add warp -TD
+#
+# 2026-05-09
+#	+ cancel XF, XT in warp -TD
+#	+ review kitty -TD
+#	+ review contour -TD
+#	+ eliminate vt100-style line drawing from xterm-utf8 -TD
 #
 ######## SHANTIH!  SHANTIH!  SHANTIH!
