@@ -49,7 +49,7 @@
 #include <locale.h>
 #endif
 
-MODULE_ID("$Id: lib_setup.c,v 1.255 2026/05/30 21:17:40 tom Exp $")
+MODULE_ID("$Id: lib_setup.c,v 1.256 2026/06/27 20:42:09 tom Exp $")
 
 /****************************************************************************
  *
@@ -986,7 +986,7 @@ _nc_setupterm(const char *tname,
 	save_ttytype(termp);
 #endif
 
-	termp->Filedes = (short) Filedes;
+	termp->Filedes = Filedes;
 	termp->_termname = strdup(myname);
 
 	set_curterm(termp);
