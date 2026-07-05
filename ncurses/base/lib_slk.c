@@ -48,7 +48,7 @@
 #define CUR SP_TERMTYPE
 #endif
 
-MODULE_ID("$Id: lib_slk.c,v 1.53 2026/05/30 22:10:47 tom Exp $")
+MODULE_ID("$Id: lib_slk.c,v 1.54 2026/07/02 23:39:16 tom Exp $")
 
 #if USE_SCREENBUFFERED_CONSOLE
 #define NumLabels      (ScreenIsBufferedConsole(SP_PARM) ? AsScreenBufferedConsole(SP_PARM)->info.numlabels : num_labels)
@@ -215,7 +215,8 @@ _nc_slk_initialize(WINDOW *stwin, int cols)
 
     res = _nc_format_slks(NCURSES_SP_ARGx cols);
 
-    if ((SP_PARM->_slk->win = stwin) == NULL) {
+    if ((SP_PARM->_slk == NULL)
+	|| (SP_PARM->_slk->win = stwin) == NULL) {
 	returnCode(slk_failed(NCURSES_SP_ARG));
     }
 
