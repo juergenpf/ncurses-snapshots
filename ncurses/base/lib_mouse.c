@@ -147,6 +147,7 @@ make an error
 	| NCURSES_MOUSE_MASK(2, name) \
 	| NCURSES_MOUSE_MASK(3, name) \
 	| NCURSES_MOUSE_MASK(4, name) )
+#define MAX_BUTTONS 4
 
 #elif NCURSES_MOUSE_VERSION == 2
 
@@ -156,6 +157,7 @@ make an error
 	| NCURSES_MOUSE_MASK(3, name) \
 	| NCURSES_MOUSE_MASK(4, name) \
 	| NCURSES_MOUSE_MASK(5, name) )
+#define MAX_BUTTONS 5
 
 #elif NCURSES_MOUSE_VERSION == 3
 
@@ -171,6 +173,7 @@ make an error
 	| NCURSES_MOUSE_MASK(9, name) \
 	| NCURSES_MOUSE_MASK(10, name) \
 	| NCURSES_MOUSE_MASK(11, name) )
+#define MAX_BUTTONS 11
 
 #endif
 
