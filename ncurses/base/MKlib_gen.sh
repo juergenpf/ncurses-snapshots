@@ -2,7 +2,7 @@
 #
 # MKlib_gen.sh -- generate sources from curses.h macro definitions
 #
-# ($Id: MKlib_gen.sh,v 1.80 2026/01/15 00:40:09 tom Exp $)
+# ($Id: MKlib_gen.sh,v 1.83 2026/08/29 23:32:00 tom Exp $)
 #
 ##############################################################################
 # Copyright 2018-2025,2026 Thomas E. Dickey                                  #
@@ -293,11 +293,6 @@ $0 !~ /^P_/ {
 		dotrace = 0;
 	}
 
-	do_getstr = 0;
-	if ($myfunc ~ /get[n]?str/) {
-		do_getstr = 1;
-	}
-
 	call = "@@T((T_CALLED(\""
 	args = ""
 	comma = ""
@@ -334,12 +329,8 @@ $0 !~ /^P_/ {
 				call = call "%s"
 			} else if (pointer) {
 				if ( argtype == "char" ) {
-					if (do_getstr) {
-						call = call "%p"
-					} else {
-						call = call "%s"
-					}
-					comma = comma "_nc_visbuf2(" num ","
+					call = call "%p"
+					comma = comma "(const void *)("
 					pointer = 0;
 				} else {
 					call = call "%p"

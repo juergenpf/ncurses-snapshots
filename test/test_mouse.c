@@ -1,5 +1,5 @@
 /****************************************************************************
- * Copyright 2022-2024,2025 Thomas E. Dickey                                *
+ * Copyright 2022-2025,2026 Thomas E. Dickey                                *
  * Copyright 2022 Leonid S. Usov <leonid.s.usov at gmail.com>               *
  *                                                                          *
  * Permission is hereby granted, free of charge, to any person obtaining a  *
@@ -27,7 +27,7 @@
  * authorization.                                                           *
  ****************************************************************************/
 /*
- * $Id: test_mouse.c,v 1.38 2025/07/05 15:11:35 tom Exp $
+ * $Id: test_mouse.c,v 1.39 2026/08/29 22:56:31 tom Exp $
  *
  * Author: Leonid S Usov
  *
@@ -134,7 +134,9 @@ cooked_loop(char *my_environ, int interval)
 	    if (getmouse(&event) == OK) {
 		unsigned btn;
 		mmask_t events;
-#if NCURSES_MOUSE_VERSION > 1
+#if NCURSES_MOUSE_VERSION > 2
+		const unsigned max_btn = 11;
+#elif NCURSES_MOUSE_VERSION > 1
 		const unsigned max_btn = 5;
 #else
 		const unsigned max_btn = 4;

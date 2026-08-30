@@ -29,7 +29,7 @@ dnl***************************************************************************
 dnl
 dnl Author: Thomas E. Dickey 1995-on
 dnl
-dnl $Id: configure.in,v 1.836 2026/06/27 22:48:53 tom Exp $
+dnl $Id: configure.in,v 1.837 2026/08/29 21:22:01 tom Exp $
 dnl Process this file with autoconf to produce a configure script.
 dnl
 dnl For additional information, see
@@ -38,7 +38,7 @@ dnl     https://invisible-island.net/autoconf/my-autoconf.html
 dnl
 dnl ---------------------------------------------------------------------------
 AC_PREREQ(2.52.20210101)
-AC_REVISION($Revision: 1.836 $)
+AC_REVISION($Revision: 1.837 $)
 AC_INIT
 AC_CONFIG_SRCDIR([ncurses/base/lib_initscr.c])
 AC_CONFIG_HEADERS([include/ncurses_cfg.h:include/ncurses_cfg.hin])
@@ -1251,6 +1251,22 @@ elif test $with_ext_mouse2 = yes ; then
 else
 	NCURSES_MOUSE_VERSION=2
 fi
+
+# mouse version 3 needs 64-bits; version 2 works with 32-bits
+if test "$NCURSES_MOUSE_VERSION" -ge 3 ; then
+	cf_sizeof_mmask_t=8
+else
+	cf_sizeof_mmask_t=4
+fi
+AC_MSG_CHECKING(if mmask_t is at least $cf_sizeof_mmask_t bytes)
+AC_COMPILE_IFELSE([AC_LANG_PROGRAM([
+$ac_includes_default
+],[
+int _array_ [[((int) sizeof ($NCURSES_MMASK_T)) + 1 - $cf_sizeof_mmask_t]]; (void)_array_;
+])],
+[cf_cv_ok_mouse_version=yes],
+[cf_cv_ok_mouse_version=no])
+AC_MSG_RESULT($cf_cv_ok_mouse_version)
 
 AC_SUBST(NCURSES_MOUSE_VERSION)
 

@@ -1,5 +1,5 @@
 /****************************************************************************
- * Copyright 2020,2024 Thomas E. Dickey                                     *
+ * Copyright 2020-2024,2026 Thomas E. Dickey                                *
  * Copyright 1998-2012,2014 Free Software Foundation, Inc.                  *
  *                                                                          *
  * Permission is hereby granted, free of charge, to any person obtaining a  *
@@ -39,7 +39,7 @@
 
 #include <curses.priv.h>
 
-MODULE_ID("$Id: lib_tracemse.c,v 1.24 2024/12/07 20:06:49 tom Exp $")
+MODULE_ID("$Id: lib_tracemse.c,v 1.25 2026/08/29 14:35:37 tom Exp $")
 
 #ifdef TRACE
 
@@ -48,57 +48,41 @@ MODULE_ID("$Id: lib_tracemse.c,v 1.24 2024/12/07 20:06:49 tom Exp $")
 NCURSES_EXPORT(char *)
 _nc_trace_mmask_t(SCREEN *sp, mmask_t code)
 {
-#define SHOW(m, s) \
-    if ((code & m) == m) { \
+    int button;
+
+#define BUTTON_MASK(name) NCURSES_MOUSE_MASK(button, name)
+
+#define SHOW_BUTTON(name, show) \
+    if ((code & BUTTON_MASK(name)) == BUTTON_MASK(name)) { \
+	char my_button[10]; \
+	size_t n = strlen(my_buffer); \
+	sprintf(my_button, "-%d", button); \
+	if (n && (my_buffer[n-1] != '{')) \
+	_nc_STRCAT(my_buffer, ", ", sizeof(my_buffer)); \
+	_nc_STRCAT(my_buffer, show, sizeof(my_buffer)); \
+	_nc_STRCAT(my_buffer, my_button, sizeof(my_buffer)); \
+    }
+
+#define OTHER_MASK(name) NCURSES_MOUSE_MASK(MAX_BUTTON, name)
+
+#define SHOW(name, show) \
+    if ((code & OTHER_MASK(name)) == OTHER_MASK(name)) { \
 	size_t n = strlen(my_buffer); \
 	if (n && (my_buffer[n-1] != '{')) \
 	_nc_STRCAT(my_buffer, ", ", sizeof(my_buffer)); \
-	_nc_STRCAT(my_buffer, s, sizeof(my_buffer)); \
+	_nc_STRCAT(my_buffer, show, sizeof(my_buffer)); \
     }
 
-    SHOW(BUTTON1_RELEASED, "release-1");
-    SHOW(BUTTON1_PRESSED, "press-1");
-    SHOW(BUTTON1_CLICKED, "click-1");
-    SHOW(BUTTON1_DOUBLE_CLICKED, "doubleclick-1");
-    SHOW(BUTTON1_TRIPLE_CLICKED, "tripleclick-1");
+    for (button = 1; button <= MAX_BUTTON; ++button) {
+	SHOW_BUTTON(NCURSES_BUTTON_RELEASED, "release");
+	SHOW_BUTTON(NCURSES_BUTTON_PRESSED, "press-1");
+	SHOW_BUTTON(NCURSES_BUTTON_CLICKED, "clicked");
+	SHOW_BUTTON(NCURSES_DOUBLE_CLICKED, "doubleclick");
+	SHOW_BUTTON(NCURSES_TRIPLE_CLICKED, "tripleclick");
 #if NCURSES_MOUSE_VERSION == 1
-    SHOW(BUTTON1_RESERVED_EVENT, "reserved-1");
+	SHOW_BUTTON(NCURSES_RESERVED_EVENT, "reserved");
 #endif
-
-    SHOW(BUTTON2_RELEASED, "release-2");
-    SHOW(BUTTON2_PRESSED, "press-2");
-    SHOW(BUTTON2_CLICKED, "click-2");
-    SHOW(BUTTON2_DOUBLE_CLICKED, "doubleclick-2");
-    SHOW(BUTTON2_TRIPLE_CLICKED, "tripleclick-2");
-#if NCURSES_MOUSE_VERSION == 1
-    SHOW(BUTTON2_RESERVED_EVENT, "reserved-2");
-#endif
-
-    SHOW(BUTTON3_RELEASED, "release-3");
-    SHOW(BUTTON3_PRESSED, "press-3");
-    SHOW(BUTTON3_CLICKED, "click-3");
-    SHOW(BUTTON3_DOUBLE_CLICKED, "doubleclick-3");
-    SHOW(BUTTON3_TRIPLE_CLICKED, "tripleclick-3");
-#if NCURSES_MOUSE_VERSION == 1
-    SHOW(BUTTON3_RESERVED_EVENT, "reserved-3");
-#endif
-
-    SHOW(BUTTON4_RELEASED, "release-4");
-    SHOW(BUTTON4_PRESSED, "press-4");
-    SHOW(BUTTON4_CLICKED, "click-4");
-    SHOW(BUTTON4_DOUBLE_CLICKED, "doubleclick-4");
-    SHOW(BUTTON4_TRIPLE_CLICKED, "tripleclick-4");
-#if NCURSES_MOUSE_VERSION == 1
-    SHOW(BUTTON4_RESERVED_EVENT, "reserved-4");
-#endif
-
-#if NCURSES_MOUSE_VERSION == 2
-    SHOW(BUTTON5_RELEASED, "release-5");
-    SHOW(BUTTON5_PRESSED, "press-5");
-    SHOW(BUTTON5_CLICKED, "click-5");
-    SHOW(BUTTON5_DOUBLE_CLICKED, "doubleclick-5");
-    SHOW(BUTTON5_TRIPLE_CLICKED, "tripleclick-5");
-#endif
+    }
 
     SHOW(BUTTON_CTRL, "ctrl");
     SHOW(BUTTON_SHIFT, "shift");

@@ -84,7 +84,7 @@
 #define CUR SP_TERMTYPE
 #endif
 
-MODULE_ID("$Id: lib_mouse.c,v 1.232 2026/08/15 23:32:01 tom Exp $")
+MODULE_ID("$Id: lib_mouse.c,v 1.237 2026/08/29 22:54:06 tom Exp $")
 
 #include <tic.h>
 
@@ -142,29 +142,43 @@ make an error
 
 #if NCURSES_MOUSE_VERSION == 1
 
-#define BUTTON_CLICKED        (BUTTON1_CLICKED        | BUTTON2_CLICKED        | BUTTON3_CLICKED        | BUTTON4_CLICKED)
-#define BUTTON_PRESSED        (BUTTON1_PRESSED        | BUTTON2_PRESSED        | BUTTON3_PRESSED        | BUTTON4_PRESSED)
-#define BUTTON_RELEASED       (BUTTON1_RELEASED       | BUTTON2_RELEASED       | BUTTON3_RELEASED       | BUTTON4_RELEASED)
-#define BUTTON_DOUBLE_CLICKED (BUTTON1_DOUBLE_CLICKED | BUTTON2_DOUBLE_CLICKED | BUTTON3_DOUBLE_CLICKED | BUTTON4_DOUBLE_CLICKED)
-#define BUTTON_TRIPLE_CLICKED (BUTTON1_TRIPLE_CLICKED | BUTTON2_TRIPLE_CLICKED | BUTTON3_TRIPLE_CLICKED | BUTTON4_TRIPLE_CLICKED)
+#define MAX_MASK(name) \
+	( NCURSES_MOUSE_MASK(1, name) \
+	| NCURSES_MOUSE_MASK(2, name) \
+	| NCURSES_MOUSE_MASK(3, name) \
+	| NCURSES_MOUSE_MASK(4, name) )
 
-#define MAX_BUTTONS  4
+#elif NCURSES_MOUSE_VERSION == 2
 
-#else
+#define MAX_MASK(name) \
+	( NCURSES_MOUSE_MASK(1, name) \
+	| NCURSES_MOUSE_MASK(2, name) \
+	| NCURSES_MOUSE_MASK(3, name) \
+	| NCURSES_MOUSE_MASK(4, name) \
+	| NCURSES_MOUSE_MASK(5, name) )
 
-#define BUTTON_CLICKED        (BUTTON1_CLICKED        | BUTTON2_CLICKED        | BUTTON3_CLICKED        | BUTTON4_CLICKED        | BUTTON5_CLICKED)
-#define BUTTON_PRESSED        (BUTTON1_PRESSED        | BUTTON2_PRESSED        | BUTTON3_PRESSED        | BUTTON4_PRESSED        | BUTTON5_PRESSED)
-#define BUTTON_RELEASED       (BUTTON1_RELEASED       | BUTTON2_RELEASED       | BUTTON3_RELEASED       | BUTTON4_RELEASED       | BUTTON5_RELEASED)
-#define BUTTON_DOUBLE_CLICKED (BUTTON1_DOUBLE_CLICKED | BUTTON2_DOUBLE_CLICKED | BUTTON3_DOUBLE_CLICKED | BUTTON4_DOUBLE_CLICKED | BUTTON5_DOUBLE_CLICKED)
-#define BUTTON_TRIPLE_CLICKED (BUTTON1_TRIPLE_CLICKED | BUTTON2_TRIPLE_CLICKED | BUTTON3_TRIPLE_CLICKED | BUTTON4_TRIPLE_CLICKED | BUTTON5_TRIPLE_CLICKED)
+#elif NCURSES_MOUSE_VERSION == 3
 
-#if NCURSES_MOUSE_VERSION == 2
-#define MAX_BUTTONS  5
-#else
-#define MAX_BUTTONS  11
+#define MAX_MASK(name) \
+	( NCURSES_MOUSE_MASK(1, name) \
+	| NCURSES_MOUSE_MASK(2, name) \
+	| NCURSES_MOUSE_MASK(3, name) \
+	| NCURSES_MOUSE_MASK(4, name) \
+	| NCURSES_MOUSE_MASK(5, name) \
+	| NCURSES_MOUSE_MASK(6, name) \
+	| NCURSES_MOUSE_MASK(7, name) \
+	| NCURSES_MOUSE_MASK(8, name) \
+	| NCURSES_MOUSE_MASK(9, name) \
+	| NCURSES_MOUSE_MASK(10, name) \
+	| NCURSES_MOUSE_MASK(11, name) )
+
 #endif
 
-#endif
+#define BUTTON_CLICKED          MAX_MASK(NCURSES_BUTTON_CLICKED)
+#define BUTTON_PRESSED          MAX_MASK(NCURSES_BUTTON_PRESSED)
+#define BUTTON_RELEASED         MAX_MASK(NCURSES_BUTTON_RELEASED)
+#define BUTTON_DOUBLE_CLICKED   MAX_MASK(NCURSES_DOUBLE_CLICKED)
+#define BUTTON_TRIPLE_CLICKED   MAX_MASK(NCURSES_TRIPLE_CLICKED)
 
 #define INVALID_EVENT	-1
 #define NORMAL_EVENT	0
@@ -959,11 +973,54 @@ _nc_mouse_event(SCREEN *sp)
     } while (0)
 #endif
 
+/*
+ * Refer to XTerm Control Sequences "Mouse Tracking", as well as the
+ * mouse-codes script added in xterm patch #338 (2018).
+ */
 static bool
 handle_wheel(SCREEN *sp, MEVENT * eventp, int button, int wheel)
 {
     bool result = TRUE;
 
+#if NCURSES_MOUSE_VERSION == 3
+    (void) sp;
+    (void) wheel;
+    if (button > 191 || button < 0) {
+	result = FALSE;
+    } else {
+	int bbits = button;
+	int bcode = button % 4;
+
+	if (button >= 128) {	/* buttons 8-11 */
+	    bcode += 8;
+	} else if (button >= 64) {	/* buttons 4-7 */
+	    bcode += 4;
+	} else if ((button % 4) < 3) {	/* buttons 1-3, unmodified release */
+	    bcode += 1;
+	}
+	if (button == 64 || button == 65) {
+	    eventp->bstate = MASK_PRESS((button == 64) ? 4 : 5);
+	    bbits &= ~1;
+	} else if (button != 3) {
+	    PRESS_POSITION(bcode);
+	} else {
+	    eventp->bstate = REPORT_MOUSE_POSITION;
+	    result = FALSE;
+	}
+	/*
+	 * xterm does not produce the shift/control/alt modifiers, but someone
+	 * may have read the mouse protocol documentation.
+	 */
+	if (button > 3) {
+	    if (bbits & 1)
+		eventp->bstate |= BUTTON_SHIFT;
+	    if (bbits & 2)
+		eventp->bstate |= BUTTON_ALT;
+	    if (bbits & 4)
+		eventp->bstate |= BUTTON_CTRL;
+	}
+    }
+#else /* NCURSES_MOUSE_VERSION <= 2 */
     switch (button & 3) {
     case 0:
 	if (wheel) {
@@ -1011,6 +1068,10 @@ handle_wheel(SCREEN *sp, MEVENT * eventp, int button, int wheel)
 	result = FALSE;
 	break;
     }
+#endif
+    TR(TRACE_IEVENT,
+       ("handle_wheel %d: %d(%d) %d %lx",
+	result, button, button & 3, wheel, (unsigned long) eventp->bstate));
     return result;
 }
 
@@ -1033,9 +1094,9 @@ decode_X10_bstate(SCREEN *sp, MEVENT * eventp, unsigned intro)
 	button = (intro & 3);
     }
 
-    if (button > MAX_BUTTONS) {
+    if (button > MAX_BUTTON) {
 	eventp->bstate = REPORT_MOUSE_POSITION;
-    } else if (!handle_wheel(sp, eventp, (int) intro, wheel)) {
+    } else if (!handle_wheel(sp, eventp, (int) (intro) - 32, wheel)) {
 
 	/*
 	 * Release events aren't reported for individual buttons, just for
@@ -1048,7 +1109,7 @@ decode_X10_bstate(SCREEN *sp, MEVENT * eventp, unsigned intro)
 	    int b;
 
 	    eventp->bstate = BUTTON_RELEASED;
-	    for (b = 1; b <= MAX_BUTTONS; ++b) {
+	    for (b = 1; b <= MAX_BUTTON; ++b) {
 		if (!(sp->_mouse_bstate & MASK_PRESS(b)))
 		    eventp->bstate &= ~MASK_RELEASE(b);
 	    }
@@ -1310,7 +1371,7 @@ decode_xterm_SGR1006(SCREEN *sp, MEVENT * eventp)
 	int wheel = ((b & 64) == 64);
 
 	if (b >= 132) {
-	    b3 = MAX_BUTTONS + 1;
+	    b3 = MAX_BUTTON + 1;
 	} else if (b >= 128) {
 	    b3 = (b - 120);	/* buttons 8-11 */
 	} else if (b >= 64) {
@@ -1320,7 +1381,7 @@ decode_xterm_SGR1006(SCREEN *sp, MEVENT * eventp)
 	eventp->id = NORMAL_EVENT;
 	if (data.final == 'M') {
 	    (void) handle_wheel(sp, eventp, b, wheel);
-	} else if (b3 > MAX_BUTTONS) {
+	} else if (b3 > MAX_BUTTON) {
 	    eventp->bstate = REPORT_MOUSE_POSITION;
 	} else {
 	    mmask_t pressed = (mmask_t) NCURSES_MOUSE_MASK(b3, NCURSES_BUTTON_PRESSED);
@@ -1388,7 +1449,7 @@ _nc_mouse_inline(SCREEN *sp)
 	    if (eventp->bstate & BUTTON_PRESSED) {
 		int b;
 
-		for (b = 4; b <= MAX_BUTTONS; ++b) {
+		for (b = 4; b <= MAX_BUTTON; ++b) {
 		    if ((eventp->bstate & MASK_PRESS(b))) {
 			result = TRUE;
 			break;
@@ -1624,7 +1685,7 @@ _nc_mouse_parse(SCREEN *sp, int runcount)
 		&& (!(next->bstate & BUTTON_PRESSED))) {
 		bool changed = TRUE;
 
-		for (b = 1; b <= MAX_BUTTONS; ++b) {
+		for (b = 1; b <= MAX_BUTTON; ++b) {
 		    if (!MASK_CHANGED(b)) {
 			changed = FALSE;
 			break;
@@ -1633,7 +1694,7 @@ _nc_mouse_parse(SCREEN *sp, int runcount)
 
 		if (changed) {
 		    merge = FALSE;
-		    for (b = 1; b <= MAX_BUTTONS; ++b) {
+		    for (b = 1; b <= MAX_BUTTON; ++b) {
 			if ((sp->_mouse_mask2 & MASK_CLICK(b))
 			    && (ep->bstate & MASK_PRESS(b))) {
 			    next->bstate &= ~MASK_RELEASE(b);
@@ -1714,7 +1775,7 @@ _nc_mouse_parse(SCREEN *sp, int runcount)
 	    if ((ep->bstate & BUTTON_CLICKED)
 		&& (next->bstate & BUTTON_CLICKED)) {
 		merge = FALSE;
-		for (b = 1; b <= MAX_BUTTONS; ++b) {
+		for (b = 1; b <= MAX_BUTTON; ++b) {
 		    if ((sp->_mouse_mask2 & MASK_DOUBLE_CLICK(b))
 			&& (ep->bstate & MASK_CLICK(b))
 			&& (next->bstate & MASK_CLICK(b))) {
@@ -1732,7 +1793,7 @@ _nc_mouse_parse(SCREEN *sp, int runcount)
 	    if ((ep->bstate & BUTTON_DOUBLE_CLICKED)
 		&& (next->bstate & BUTTON_CLICKED)) {
 		merge = FALSE;
-		for (b = 1; b <= MAX_BUTTONS; ++b) {
+		for (b = 1; b <= MAX_BUTTON; ++b) {
 		    if ((sp->_mouse_mask2 & MASK_TRIPLE_CLICK(b))
 			&& (ep->bstate & MASK_DOUBLE_CLICK(b))
 			&& (next->bstate & MASK_CLICK(b))) {
@@ -2028,7 +2089,7 @@ NCURSES_SP_NAME(mousemask)(NCURSES_SP_DCLx mmask_t newmask, mmask_t * oldmask)
 		 * retain (temporarily) while building up the state that the
 		 * user asked for.
 		 */
-		for (b = 1; b <= MAX_BUTTONS; ++b) {
+		for (b = 1; b <= MAX_BUTTON; ++b) {
 		    if (SP_PARM->_mouse_mask2 & MASK_TRIPLE_CLICK(b))
 			SP_PARM->_mouse_mask2 |= MASK_DOUBLE_CLICK(b);
 		    if (SP_PARM->_mouse_mask2 & MASK_DOUBLE_CLICK(b))

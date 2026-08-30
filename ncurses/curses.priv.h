@@ -35,7 +35,7 @@
  ****************************************************************************/
 
 /*
- * $Id: curses.priv.h,v 1.758 2026/08/22 22:02:42 Liu.Hao Exp $
+ * $Id: curses.priv.h,v 1.759 2026/08/29 14:08:41 tom Exp $
  *
  *	curses.priv.h
  *
@@ -981,15 +981,23 @@ typedef int (*TYPE_Gpm_GetEvent) (Gpm_Event *);
 #define LEAF_LEN 2
 #endif
 
+#if NCURSES_MOUSE_VERSION == 1
+#define MAX_BUTTON 4
+#elif NCURSES_MOUSE_VERSION == 2
+#define MAX_BUTTON 5
+#elif NCURSES_MOUSE_VERSION == 3
+#define MAX_BUTTON 11
+#endif
+
 /*
- * TRACEMSE_FMT is no longer than 80 columns, there are 5 numbers that
- * could at most have 10 digits, and the mask contains no more than 32 bits
- * with each bit representing less than 15 characters.  Usually the whole
- * string is less than 80 columns, but this buffer size is an absolute
+ * TRACEMSE_FMT is no longer than 80 columns, there are 5 numbers that could at
+ * most have 10 digits, and the mask contains no more than 32 bits (or 64-bits
+ * in ABI 7) with each bit representing less than 15 characters.  Usually the
+ * whole string is less than 80 columns, but this buffer size is an absolute
  * limit.
  */
 #define TRACECHR_BUF	40
-#define TRACEMSE_MAX	(80 + (5 * 10) + (32 * 15))
+#define TRACEMSE_MAX	(80 + (MAX_BUTTON * 10) + (sizeof(mmask_t) * 15 * 8))
 #define TRACEMSE_FMT	"id %2d  at (%2d, %2d, %2d) state %4lx = {" /* } */
 
 extern NCURSES_EXPORT_VAR(NCURSES_GLOBALS) _nc_globals;
