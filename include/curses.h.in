@@ -267,6 +267,7 @@ typedef @cf_cv_typeof_mmask_t@ mmask_t;	/* cf_cv_typeof_mmask_t */
 #include <stdarg.h>	/* we need va_list */
 #if NCURSES_WIDECHAR
 #include <stddef.h>	/* we want wchar_t */
+#include <wchar.h>	/* we want wint_t */
 #endif
 
 /* X/Open and SVr4 specify that curses implements 'bool'.  However, C++ may also
