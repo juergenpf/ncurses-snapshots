@@ -176,10 +176,6 @@ typedef struct {
 
 #include <term_entry.h>		/* dbdLAST */
 
-#if USE_TERM_DRIVER
-struct DriverTCB; /* Terminal Control Block forward declaration */
-#endif
-
 /*
  * Global data which is not specific to a screen.
  */
@@ -227,10 +223,6 @@ typedef struct {
 	void *		cached_tparm;
 	int		count_tparm;
 #endif /* HAVE_TSEARCH */
-
-#if USE_TERM_DRIVER
-	int		(*term_driver)(struct DriverTCB*, const char*, int*);
-#endif
 
 #define WINDOWLIST struct _win_list
 

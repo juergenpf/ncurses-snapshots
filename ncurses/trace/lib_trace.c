@@ -47,6 +47,7 @@
 #include <tic.h>
 
 #include <ctype.h>
+#include <fcntl.h>
 
 MODULE_ID("$Id: lib_trace.c,v 1.110 2026/03/07 18:00:16 tom Exp $")
 

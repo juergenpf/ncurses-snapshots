@@ -57,11 +57,7 @@ idlok(WINDOW *win, bool flag)
 
     if (win) {
 	SCREEN *sp = _nc_screen_of(win);
-	if (sp != NULL
-#if USE_TERM_DRIVER
-	    && IsTermInfo(sp)
-#endif
-	    ) {
+	if (sp != NULL) {
 	    sp->_nc_sp_idlok =
 		win->_idlok = (flag && (NCURSES_SP_NAME(has_il)(NCURSES_SP_ARG)
 					|| change_scroll_region));
@@ -167,21 +163,11 @@ meta(WINDOW *win GCC_UNUSED, bool flag)
 
     if (sp != NULL) {
 	sp->_use_meta = flag;
-#if USE_TERM_DRIVER
-	if (IsTermInfo(sp)) {
-	    if (flag) {
-		NCURSES_PUTP2("meta_on", meta_on);
-	    } else {
-		NCURSES_PUTP2("meta_off", meta_off);
-	    }
-	}
-#else
 	if (flag) {
 	    NCURSES_PUTP2("meta_on", meta_on);
 	} else {
 	    NCURSES_PUTP2("meta_off", meta_off);
 	}
-#endif
 	result = OK;
     }
     returnCode(result);
@@ -200,9 +186,14 @@ NCURSES_SP_NAME(curs_set)(NCURSES_SP_DCLx int vis)
 	if (vis == cursor) {
 	    code = cursor;
 	} else {
-#if USE_TERM_DRIVER
-	    code = CallDriver_1(SP_PARM, td_cursorSet, vis);
-#else
+#if USE_SCREENBUFFERED_CONSOLE
+	    if (ScreenIsBufferedConsole(SP_PARM)) {
+		code = AsScreenBufferedConsole(SP_PARM)->curs_set(vis);
+		if (code != ERR)
+		    SP_PARM->_cursor = vis;
+		returnCode(code);
+	    }
+#endif
 	    if (IsValidTIScreen(SP_PARM)) {
 		switch (vis) {
 		case 2:
@@ -221,7 +212,6 @@ NCURSES_SP_NAME(curs_set)(NCURSES_SP_DCLx int vis)
 	    } else {
 		code = ERR;
 	    }
-#endif
 	    if (code != ERR)
 		code = (cursor == -1 ? 1 : cursor);
 	    SP_PARM->_cursor = vis;
@@ -278,14 +268,6 @@ has_key_internal(int keycode, TRIES * tp)
 		|| has_key_internal(keycode, tp->sibling));
 }
 
-#if USE_TERM_DRIVER
-NCURSES_EXPORT(int)
-TINFO_HAS_KEY(SCREEN *sp, int keycode)
-{
-    return IsValidTIScreen(sp) ?
-	has_key_internal(keycode, sp->_keytry) : 0;
-}
-#else
 NCURSES_EXPORT(int)
 NCURSES_SP_NAME(has_key)(NCURSES_SP_DCLx int keycode)
 {
@@ -299,7 +281,6 @@ has_key(int keycode)
 {
     return NCURSES_SP_NAME(has_key)(CURRENT_SCREEN, keycode);
 }
-#endif
 #endif
 #endif /* NCURSES_EXT_FUNCS */
 
@@ -354,11 +335,10 @@ _nc_keypad(SCREEN *sp, bool flag)
 	} else
 #endif
 	{
-#if USE_TERM_DRIVER
-	    rc = CallDriver_1(sp, td_kpad, flag);
-	    if (rc == OK)
-		sp->_keypad_on = flag;
-#else
+#if USE_SCREENBUFFERED_CONSOLE
+	    if (ScreenIsBufferedConsole(sp))
+		return (AsScreenBufferedConsole(sp)->keypad(flag));
+#endif
 	    if (flag) {
 		(void) NCURSES_PUTP2_FLUSH("keypad_xmit", keypad_xmit);
 	    } else if (keypad_local) {
@@ -371,7 +351,6 @@ _nc_keypad(SCREEN *sp, bool flag)
 	    }
 	    sp->_keypad_on = flag;
 	    rc = OK;
-#endif
 	}
     }
     return (rc);

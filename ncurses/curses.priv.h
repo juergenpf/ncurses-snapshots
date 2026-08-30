@@ -311,13 +311,7 @@ extern NCURSES_EXPORT(void *) _nc_memmove (void *, const void *, size_t);
 /*
  * Options for terminal drivers, etc...
  */
-#if USE_TERM_DRIVER
-#define NO_TERMINAL "unknown"
-#define USE_SP_RIPOFF     1
-#define USE_SP_TERMTYPE   1
-#else
 #define NO_TERMINAL 0
-#endif
 
 #define VALID_TERM_ENV(term_env, no_terminal) \
 	(term_env = (NonEmpty(term_env) \
@@ -420,15 +414,36 @@ typedef TRIES {
 
 #include <term.priv.h>		/* defines TERMIOS via term.h */
 
-#if USE_TERM_DRIVER
-#if defined(TERMIOS)
-#undef  USE_NAMED_PIPES
-#define USE_NAMED_PIPES 0
-#undef  USE_WIN32CON_DRIVER
-#elif defined(_NC_WINDOWS)
-#include <nc_win32.h>
-#endif /* TERMIOS */
-#endif /* USE_TERM_DRIVER */
+#ifndef USE_CONPTY
+# define USE_CONPTY 0
+#endif
+#ifndef USE_SCREENBUFFERED_CONSOLE
+# define USE_SCREENBUFFERED_CONSOLE 0
+#endif
+
+#if USE_CONPTY
+#  if defined(TERMIOS)
+#     error Unsupported configuration: named pipes and conpty are only supported on Windows
+#  endif
+#endif /* USE_NAMED_PIPES || USE_CONPTY */
+
+#undef USE_CONSOLE_API
+#if USE_CONPTY || USE_SCREENBUFFERED_CONSOLE
+  // We define USE_CONSOLE_API to describe that we use either conpty or buffered.
+# define USE_CONSOLE_API 1	
+  //  Although Windows doesn't have SIGWINCH actually, we can use the console API
+  //  to simulate the behavior of SIGWINCH.
+# undef USE_SIZECHANGE
+# define USE_SIZECHANGE 1
+# undef USE_SIGWINCH
+# define USE_SIGWINCH 1
+#else
+# define USE_CONSOLE_API 0
+#endif
+
+#if defined(NC_WINDOWS_NATIVE) && !USE_CONSOLE_API
+# error Unsupported configuration: native Windows builds must use either ConPTY or Windows Console API
+#endif
 
 #ifndef FixupPathname
 #define FixupPathname(path) /* nothing */
@@ -845,8 +860,8 @@ typedef enum {
 #if USE_SYSMOUSE
 	,M_SYSMOUSE		/* FreeBSD sysmouse on console */
 #endif
-#if USE_TERM_DRIVER
-	,M_TERM_DRIVER		/* Win32 console, etc */
+#if USE_SCREENBUFFERED_CONSOLE
+	,M_WINDOWS_CONSOLE		/* Win32 console, etc */
 #endif
 } MouseType;
 
@@ -977,13 +992,6 @@ typedef int (*TYPE_Gpm_GetEvent) (Gpm_Event *);
 #define TRACEMSE_MAX	(80 + (5 * 10) + (32 * 15))
 #define TRACEMSE_FMT	"id %2d  at (%2d, %2d, %2d) state %4lx = {" /* } */
 
-#if USE_TERM_DRIVER
-struct DriverTCB; /* Terminal Control Block forward declaration */
-#define INIT_TERM_DRIVER()	_nc_globals.term_driver = _nc_get_driver
-#else
-#define INIT_TERM_DRIVER()	/* nothing */
-#endif
-
 extern NCURSES_EXPORT_VAR(NCURSES_GLOBALS) _nc_globals;
 
 /* The limit reserves one byte for a terminating NUL */
@@ -1028,6 +1036,10 @@ typedef struct {
 #define IsCbreak(sp)    (sp)->_tty_flags._cbreak
 #define IsEcho(sp)      (sp)->_tty_flags._echo
 
+#if USE_CONSOLE_API
+// Forward declaration so we can use it in SCREEN.
+typedef struct consoleCoreInterface ConsoleCoreInterface;
+#endif
 /*
  * The SCREEN structure.
  */
@@ -1258,7 +1270,7 @@ typedef struct screen {
 	int		_sysmouse_new_buttons;
 #endif
 
-#if USE_TERM_DRIVER || USE_NAMED_PIPES
+#if USE_SCREENBUFFERED_CONSOLE
 	MEVENT		_console_mouse_fifo[FIFO_SIZE];
 	int		_console_mouse_head;
 	int		_console_mouse_tail;
@@ -1308,6 +1320,10 @@ typedef struct screen {
 	void		*_ordered_pairs; /* index used by alloc_pair()	     */
 	int		_pairs_used;	/* actual number of color-pairs used */
 	int		_recent_pair;	/* number for most recent free-pair  */
+#endif
+
+#if USE_CONSOLE_API
+	ConsoleCoreInterface *_console;	/* console API interface */
 #endif
 
 #ifdef TRACE
@@ -2163,7 +2179,7 @@ extern NCURSES_EXPORT(int) _nc_handle_sigwinch(SCREEN *);
 
 /* lib_wacs.c */
 #if USE_WIDEC_SUPPORT
-extern NCURSES_EXPORT(void) _nc_init_wacs(SCREEN*);
+extern NCURSES_EXPORT(void) _nc_init_wacs(SCREEN *sp);
 #endif
 
 typedef struct {
@@ -2203,6 +2219,7 @@ extern NCURSES_EXPORT(char *) _nc_trace_bufcat (int, const char *);
 extern NCURSES_EXPORT(char *) _nc_tracechar (SCREEN *, int);
 extern NCURSES_EXPORT(char *) _nc_tracemouse (SCREEN *, MEVENT const *);
 extern NCURSES_EXPORT(char *) _nc_trace_mmask_t (SCREEN *, mmask_t);
+extern NCURSES_EXPORT(char *) _nc_term_select (void);
 extern NCURSES_EXPORT(int) _nc_access (const char *, int);
 extern NCURSES_EXPORT(int) _nc_baudrate (int);
 extern NCURSES_EXPORT(int) _nc_freewin (WINDOW *);
@@ -2235,6 +2252,7 @@ extern NCURSES_EXPORT(void) _nc_setenv_num (const char *, int);
 extern NCURSES_EXPORT(void) _nc_signal_handler (int);
 extern NCURSES_EXPORT(void) _nc_synchook (WINDOW *);
 extern NCURSES_EXPORT(void) _nc_trace_tries (TRIES *);
+extern NCURSES_EXPORT(void) _nc_get_screensize(SCREEN *, int *, int *);
 
 #if NCURSES_EXT_NUMBERS
 extern NCURSES_EXPORT(const TERMTYPE2 *) _nc_fallback2 (const char *);
@@ -2432,8 +2450,142 @@ extern NCURSES_EXPORT(int) _nc_get_tty_mode(TTY *);
     }\
     sp->jump = outc
 
-#if USE_TERM_DRIVER
+#ifdef _NC_WINDOWS
+#if USE_WIDEC_SUPPORT
+#include <wchar.h>
+#endif
+#include <tchar.h>
+#include <io.h>
+#elif defined(_NC_WINDOWS_NATIVE)
+#include <tchar.h>
+#include <io.h>
+#elif defined(__EMX__)
+#include <io.h>
+#endif
 
+#if USE_CONPTY
+#define NC_READ(sp,fd, buf, count) AsConPTY(sp)->read(fd,buf,count)
+#else
+#define NC_READ(sp,fd, buf, count) read(fd, buf, count)
+#endif
+
+#if USE_SCREENBUFFERED_CONSOLE
+extern NCURSES_EXPORT(void) _nc_screenbuffered_console_init(void);
+#endif
+
+#define NC_ISATTY(fd) isatty(fd)
+
+/*
+ * Perhaps not "real" but possibly not "fake".
+ */
+#define IsRealTty(fd,value) \
+	(NC_ISATTY(fd) \
+	 && (value = ttyname(fd)) != NULL \
+	 && strncmp(value, "/dev/pts/", 9))
+
+#define IsTermInfo(sp)       TRUE
+#define HasTInfoTerminal(sp) (NULL != TerminalOf(sp))
+#if USE_CONSOLE_API
+#  define IsTermInfoOnConsole(sp) (IsConPTY())
+#else
+#  define IsTermInfoOnConsole(sp) FALSE
+#endif
+
+#define IsValidTIScreen(sp)  (HasTInfoTerminal(sp))
+
+#if USE_CONSOLE_API
+/*
+* Milliseconds to wait between checks for console resize events. 
+* We don't want to check too often, as that would be wasteful, but we 
+* also don't want to check too rarely, as that would make the UI feel 
+* unresponsive when resizing the console window.
+*/
+#define RESIZE_CHECK_THROTTLING_MS 100
+extern NCURSES_EXPORT(int) _nc_timeval_diff_in_ms(struct timeval start, struct timeval end);
+
+// Flags describing certain capabilities of the console.
+#define CONSOLE_STATUS_INITIALIZED      0x0001
+#define CONSOLE_STATUS_PROG_MODE        0x0002
+#define CONSOLE_STATUS_IS_CONPTY        0x0004
+#define CONSOLE_STATUS_LIMITED_RESIZE   0x0008
+#define CONSOLE_STATUS_RESIZE_PENDING   0x0010
+#define CONSOLE_STATUS_MASK             (CONSOLE_STATUS_INITIALIZED      \
+                                        | CONSOLE_STATUS_PROG_MODE       \
+                                        | CONSOLE_STATUS_IS_CONPTY       \
+                                        | CONSOLE_STATUS_LIMITED_RESIZE  \
+                                        | CONSOLE_STATUS_RESIZE_PENDING)
+typedef struct consoleCoreInterface {
+    // Properties
+    DWORD status;                    /* Certain status flags defined above */
+
+    ConsoleMode ttyflags;            /* The desired state of the console  */
+    
+    HANDLE ConsoleHandleIn;          /* Pseudo-Console Handle actually used for input operations */
+    HANDLE ConsoleHandleOut;         /* Pseudo-Console Handle actually used for output operations */
+
+    int sbi_lines;                   /* Cached console size */
+    int sbi_cols;                    /* Cached console size */
+
+    SCREEN* sp;                      /* Screen pointer */
+
+    // Methods
+    char*(*termname)(void);                            /* Get the name of the terminal type. */
+    bool (*init)(int fdOut, int fdIn);                 /* Initialize with I/O file descriptors. fdIn maybe -1 in first call */
+    bool (*getSBI)(CONSOLE_SCREEN_BUFFER_INFO *sbi);   /* Get the current console size. Returns FALSE on failure. */
+    void (*size)(int *Lines, int *Cols);               /* Query console size. Safe to be called before init */ 
+    bool (*size_changed)(void);                        /* Return TRUE if the console has been resized */
+    int  (*setmode)(int fd, const ConsoleMode *arg);   /* Our SET_TTY implementation */
+    int  (*getmode)(int fd, ConsoleMode *arg);         /* Our GET_TTY implementation */
+    int  (*defmode )(ConsoleMode *arg, short kind);    /* Used by shell-/prog-mode handling to manage start/stop of the I/O subsystem of ncurses */
+    int  (*flush)(int fd);                             /* flush the console I/O stream denoted by the file descriptor. Actualy, we only flush the input. */
+    void (*togglemode)(void);                          /* Toggle physical state of Console according to selected mode. Please never call directly. */
+} ConsoleCoreInterface;
+
+extern NCURSES_EXPORT_VAR(ConsoleCoreInterface*) _nc_CORECONSOLE;
+#define DefaultConsole() _nc_CORECONSOLE
+#define CoreConsoleInitialized() (_nc_CORECONSOLE != NULL)
+
+/* At the moment - if at all - we only have exactly one static console per process.
+ * So, if we end up with a NULL pointer, we refer to this static console pointer, 
+ * which may or may not have been initialized yet.
+*/
+#define ScreenConsole(sp) ((sp) ? ((sp)->_console ? (sp)->_console : DefaultConsole()) : DefaultConsole())
+#define ConsoleScreen(console) ((console)->sp)
+
+#define IsConPTY(console) ((console)->status & CONSOLE_STATUS_IS_CONPTY)
+#define IsScreenBufferedConsole(console) (!((console)->status & CONSOLE_STATUS_IS_CONPTY))
+
+// The following two Macros work even if sp is NULL. In that case, the DefaultConsole() is used.
+#define ScreenIsConPTY(sp) (IsConPTY(ScreenConsole(sp)))
+#define ScreenIsBufferedConsole(sp) (IsScreenBufferedConsole(ScreenConsole(sp)))
+#define ScreenIsNotTerminfoConsole(sp) (ScreenIsBufferedConsole)
+
+#define IsConsoleInitialized(console) ((console)->status & CONSOLE_STATUS_INITIALIZED)
+#define MarkConsoleInitialized(console) ((console)->status |= CONSOLE_STATUS_INITIALIZED)
+
+#define IsConsoleProgMode(console) ((console)->status & CONSOLE_STATUS_PROG_MODE)
+#define SetConsoleProgMode(console) ((console)->status |= CONSOLE_STATUS_PROG_MODE)
+#define ClearConsoleProgMode(console) ((console)->status &= ~CONSOLE_STATUS_PROG_MODE)
+#define IsConPTYProgMode(console) (IsConPTY(console) && IsConsoleProgMode(console))
+
+#define HasConsolePendingResize(console) ((console)->status & CONSOLE_STATUS_RESIZE_PENDING)
+#define SetConsolePendingResize(console) ((console)->status |= CONSOLE_STATUS_RESIZE_PENDING)
+#define ClearConsolePendingResize(console) ((console)->status &= ~CONSOLE_STATUS_RESIZE_PENDING)
+
+#define HasConsoleResizeLimitations(console) ((console)->status & CONSOLE_STATUS_LIMITED_RESIZE)
+#define SetConsoleResizeLimitations(console) ((console)->status |= CONSOLE_STATUS_LIMITED_RESIZE)
+#define ClearConsoleResizeLimitations(console) ((console)->status &= ~CONSOLE_STATUS_LIMITED_RESIZE)
+
+#define IsConPTYInProgMode(console) (IsConPTY(console) && IsConsoleProgMode(console))
+#define IsScreenBufferedConsoleInProgMode(console) (IsScreenBufferedConsole(console) && IsConsoleProgMode(console))
+#define ScreenIsConPTYInProgMode(sp) (IsConPTYInProgMode(ScreenConsole(sp)))
+#define ScreenIsBufferedConsoleInProgMode(sp) (IsScreenBufferedConsoleInProgMode(ScreenConsole(sp)))
+
+#define CONSOLE_INIT_FAILURE_MSG "Failed to initialize console interface.\n"
+
+extern NCURSES_EXPORT(bool) _nc_console_setup(void);
+
+#if USE_SCREENBUFFERED_CONSOLE
 typedef struct _termInfo
 {
     bool caninit;
@@ -2452,214 +2604,111 @@ typedef struct _termInfo
     int  numlabels;
     int  labelwidth;
     int  labelheight;
-
-    const color_t* defaultPalette;
 } TerminalInfo;
-
-typedef struct term_driver {
-    bool   isTerminfo;
-    const char* (*td_name)(struct DriverTCB*);
-    bool   (*td_CanHandle)(struct DriverTCB*, const char*, int*);
-    void   (*td_init)(struct DriverTCB*);
-    void   (*td_release)(struct DriverTCB*);
-    int    (*td_size)(struct DriverTCB*, int* Line, int *Cols);
-    int    (*td_sgmode)(struct DriverTCB*, int setFlag, TTY*);
-    chtype (*td_conattr)(struct DriverTCB*);
-    int    (*td_hwcur)(struct DriverTCB*, int yold, int xold, int y, int x);
-    int    (*td_mode)(struct DriverTCB*, int progFlag, int defFlag);
-    bool   (*td_rescol)(struct DriverTCB*);
-    bool   (*td_rescolors)(struct DriverTCB*);
-    void   (*td_color)(struct DriverTCB*, int fore, int color, int(*)(SCREEN*, int));
-    int    (*td_doBeepOrFlash)(struct DriverTCB*, int);
-    void   (*td_initpair)(struct DriverTCB*, int, int, int);
-    void   (*td_initcolor)(struct DriverTCB*, int, int, int, int);
-    void   (*td_docolor)(struct DriverTCB*, int, int, int, int(*)(SCREEN*, int));
-    void   (*td_initmouse)(struct DriverTCB*);
-    int    (*td_testmouse)(struct DriverTCB*, int EVENTLIST_2nd(_nc_eventlist*));
-    void   (*td_setfilter)(struct DriverTCB*);
-    void   (*td_hwlabel)(struct DriverTCB*, int, char*);
-    void   (*td_hwlabelOnOff)(struct DriverTCB*, int);
-    int    (*td_update)(struct DriverTCB*);
-    int    (*td_defaultcolors)(struct DriverTCB*, int, int);
-    int    (*td_print)(struct DriverTCB*, char*, int);
-    int    (*td_getsize)(struct DriverTCB*, int*, int*);
-    int    (*td_setsize)(struct DriverTCB*, int, int);
-    void   (*td_initacs)(struct DriverTCB*, chtype*, chtype*);
-    void   (*td_scinit)(SCREEN *);
-    void   (*td_scexit)(SCREEN *);
-    int    (*td_twait)(struct DriverTCB*, int, int, int* EVENTLIST_2nd(_nc_eventlist*));
-    int    (*td_read)(struct DriverTCB*, int*);
-    int    (*td_nap)(struct DriverTCB*, int);
-    int    (*td_kpad)(struct DriverTCB*, int);
-    int    (*td_kyOk)(struct DriverTCB*, int, int);
-    bool   (*td_kyExist)(struct DriverTCB*, int);
-    int    (*td_cursorSet)(struct DriverTCB*, int);
-} TERM_DRIVER;
-
-typedef struct DriverTCB
-{
-    TERMINAL      term;   /* needs to be the first Element !!! */
-    TERM_DRIVER*  drv;    /* The driver for that Terminal */
-    SCREEN*       csp;    /* The screen that owns that Terminal */
-    TerminalInfo  info;   /* Driver independent core capabilities of the Terminal */
-    void*         prop;   /* Driver dependent property storage to be used by the Driver */
-    long          magic;
-} TERMINAL_CONTROL_BLOCK;
-
-#define NCDRV_MAGIC(id) (0x47110000 | (id&0xffff))
-#define NCDRV_TINFO      0x01
-#define NCDRV_WINCONSOLE 0x02
-
-#define TCBOf(sp)    ((TERMINAL_CONTROL_BLOCK*)(TerminalOf(sp)))
-#define InfoOf(sp)   TCBOf(sp)->info
-#define CallDriver(sp,method)                        TCBOf(sp)->drv->method(TCBOf(sp))
-#define CallDriver_1(sp,method,arg1)                 TCBOf(sp)->drv->method(TCBOf(sp),arg1)
-#define CallDriver_2(sp,method,arg1,arg2)            TCBOf(sp)->drv->method(TCBOf(sp),arg1,arg2)
-#define CallDriver_3(sp,method,arg1,arg2,arg3)       TCBOf(sp)->drv->method(TCBOf(sp),arg1,arg2,arg3)
-#define CallDriver_4(sp,method,arg1,arg2,arg3,arg4)  TCBOf(sp)->drv->method(TCBOf(sp),arg1,arg2,arg3,arg4)
 
 extern NCURSES_EXPORT_VAR(const color_t*) _nc_cga_palette;
 extern NCURSES_EXPORT_VAR(const color_t*) _nc_hls_palette;
 
-extern NCURSES_EXPORT(int)      _nc_get_driver(TERMINAL_CONTROL_BLOCK*, const char*, int*);
-extern NCURSES_EXPORT(void)     _nc_get_screensize_ex(SCREEN *, TERMINAL *, int *, int *);
-#endif /* USE_TERM_DRIVER */
+extern NCURSES_EXPORT(int)  _nc_win32con_doupdate (SCREEN *sp);
 
-/*
- * Entrypoints which are actually provided in the terminal driver, which would
- * be an sp-name otherwise.
- */
-#if USE_TERM_DRIVER
-#define TINFO_HAS_KEY           _nc_tinfo_has_key
-#define TINFO_DOUPDATE          _nc_tinfo_doupdate
-#define TINFO_MVCUR             _nc_tinfo_mvcur
-extern NCURSES_EXPORT(int)      TINFO_HAS_KEY(SCREEN*, int);
-extern NCURSES_EXPORT(int)      TINFO_DOUPDATE(SCREEN *);
-extern NCURSES_EXPORT(int)      TINFO_MVCUR(SCREEN*, int, int, int, int);
-#else
-#define TINFO_HAS_KEY           NCURSES_SP_NAME(has_key)
-#define TINFO_DOUPDATE          NCURSES_SP_NAME(doupdate)
-#define TINFO_MVCUR             NCURSES_SP_NAME(_nc_mvcur)
-#endif
+#define CON_NUMPAIRS 64
 
-#ifdef _NC_WINDOWS
+typedef struct {
+    ConsoleCoreInterface core;
+
+    HANDLE hShellMode;                        // Screebuffer handle in shell mode..
+    HANDLE hProgMode;                         // Screebuffer handle in prog mode..
+    
+    int numButtons;
+    LPDWORD ansi_map;
+    LPDWORD map;
+    LPDWORD rmap;
+    WORD pairs[CON_NUMPAIRS];
+    CONSOLE_SCREEN_BUFFER_INFO SBI;
+    CONSOLE_CURSOR_INFO save_CI;
+
+    TerminalInfo info;			           // Core capabilities.
+
+    bool (*adjust_size)(void);                     // Adjust the console buffer size to match the physical window size.
+    chtype (*termattrs)(void);
+    int (*keypad)(bool);
+    int (*beeporflash)(bool);
+    int (*keyok)(int keycode,int flag);
+    int (*has_key)(int keycode);
+    void (*init_acs)(chtype *acs);
+    bool (*reset_color_pair)(void);
+    bool (*reset_colors)(void);
+    int  (*default_colors)(int fg, int bg);
+    int (*init_pair)(int pair, int fg, int bg);
+    void (*setcolor)(bool fg, int color);
+    void (*initcolor)(int c, int r, int g, int b);
+    void (*do_color)(int oldpair,int pair,int reverse, NCURSES_SP_OUTC outc);
+    int (*curs_set)(int visibility);
+    void (*hwlabel)(int num, const char* label);
+    void (*hwlabelonoff)(bool on);
+    int (*print)(char* data, int len);
+    int (*read)(int *buf);
+    int (*twait)(int, int, int* EVENTLIST_2nd(_nc_eventlist*));
+    int (*mvcur)(int yold, int xold, int y, int x);
 #if USE_WIDEC_SUPPORT
-#include <wchar.h>
+    bool (*writeat)(int y, int x, const cchar_t *str, int limit);
+#else
+    bool (*writeat)(int y, int x, const chtype *str, int limit);
 #endif
-#include <tchar.h>
-#include <io.h>
-#elif defined(_NC_WINDOWS_NATIVE)
-#include <tchar.h>
-#include <io.h>
-#elif defined(__EMX__)
-#include <io.h>
-#endif
+   void (*screen_init)(void);
+   void (*screen_exit)(void);
+   void (*setfilter)(void);
+} ScreenBufferedConsoleInterface;
+extern NCURSES_EXPORT_VAR(ScreenBufferedConsoleInterface *) _nc_SCREENBUFFEREDCONSOLE;
+#define AsScreenBufferedConsole(sp) ((ScreenBufferedConsoleInterface*)(ScreenConsole(sp)))
+#define DefaultScreenBufferedConsole() ((ScreenBufferedConsoleInterface*)(DefaultConsole()))
+
+#define MouseFifoHasEvent(sp) (sp->_console_mouse_head < sp->_console_mouse_tail)
+#define IsMouseActive(sp) (sp->_mouse_active)
+#define CONSOLE_TERM_NAME "#win32_console"
+#endif /* USE_SCREENBUFFERED_CONSOLE */
+
+#if USE_CONPTY
+
+#if !defined(POLLIN)
+/* For our simulation we don't need them all, but we define them in case they are used */
+# define POLLIN   0x0001  /* Input available (for stdin/pipe) */
+# define POLLPRI  0x0002  /* Priority input available (for stdin/pipe, optional) */
+# define POLLOUT  0x0004  /* Output available (for stdout/pipe, optional) */
+# define POLLERR  0x0008  /* Error condition (for stdin/pipe) */
+# define POLLHUP  0x0010  /* Hang up (for stdin/pipe) */
+# define POLLNVAL 0x0020  /* Invalid request: fd not open (for stdin/pipe) */
+#endif /* !defined(POLLIN) */
+
+// --- Structure similar to UNIX ---
+struct pty_pollfd {
+    int fd;         // only 0 (STDIN) supported)
+    short events;   // events to check
+    short revents;  // returned events
+};
+
+// --- Typ für Anzahl der FDs ---
+typedef unsigned long nfds_t;
+
+typedef struct {
+  // Properties
+    ConsoleCoreInterface core;                                        /* The common part for ConPTY as well as legacy console API*/
+  // Methods
+    int (*read)(int fd, void* result, size_t count);                  /* Read bytes from the input stream. */
+    int (*write)(int fd, const void *buf, size_t count);              /* Write bytes to the output stream. */
+    int (*poll)(struct pty_pollfd *fds, nfds_t nfds, int timeout_ms); /* Minimalistic clone of UNIX poll, just polling stdin console input */
+  } ConPtyInterface;
+
+// Guaranteed to be statically initialzed.
+extern NCURSES_EXPORT_VAR(ConPtyInterface*) _nc_currentCONPTY;
+#define AsConPTY(sp) ((ConPtyInterface*)(ScreenConsole(sp)))
+#define DefaultConPTY() ((ConPtyInterface*)(DefaultConsole()))
+#endif /* USE_CONPTY */
+
+#endif /* USE_CONSOLE_API */
 
 /*
- * Entrypoints using an extra parameter with the terminal driver.
- */
-#if USE_TERM_DRIVER
-extern NCURSES_EXPORT(void)   _nc_get_screensize(SCREEN *, TERMINAL *, int *, int *);
-extern NCURSES_EXPORT(int)    _nc_setupterm_ex(TERMINAL **, const char *, int , int *, int);
-#define TINFO_GET_SIZE(sp, tp, lp, cp) \
-	_nc_get_screensize(sp, tp, lp, cp)
-#define TINFO_SET_CURTERM(sp, tp) \
-	NCURSES_SP_NAME(set_curterm)(sp, tp)
-#define TINFO_SETUP_TERM(tpp, name, fd, err, reuse) \
-	_nc_setupterm_ex(tpp, name, fd, err, reuse)
-#else /* !USE_TERM_DRIVER */
-extern NCURSES_EXPORT(void)   _nc_get_screensize(SCREEN *, int *, int *);
-#define TINFO_GET_SIZE(sp, tp, lp, cp) \
-	_nc_get_screensize(sp, lp, cp)
-#define TINFO_SET_CURTERM(sp, tp) \
-	set_curterm(tp)
-#define TINFO_SETUP_TERM(tpp, name, fd, err, reuse) \
-	_nc_setupterm(name, fd, err, reuse)
-#endif /* !USE_TERM_DRIVER */
 
-#if USE_TERM_DRIVER
-extern NCURSES_EXPORT_VAR(TERM_DRIVER) _nc_WIN_DRIVER;
-extern NCURSES_EXPORT_VAR(TERM_DRIVER) _nc_TINFO_DRIVER;
-#endif /* USE_TERM_DRIVER */
-
-#ifdef TERMIOS
-#define USE_WINCONMODE 0
-#elif defined(USE_WIN32CON_DRIVER)
-#define USE_WINCONMODE 1
-extern NCURSES_EXPORT(int)  _nc_console_setmode(void* handle, const ConsoleMode* arg);
-extern NCURSES_EXPORT(int)  _nc_console_getmode(void* handle, ConsoleMode* arg);
-extern NCURSES_EXPORT(bool)  _nc_console_checkinit(bool assumeTermInfo);
-extern NCURSES_EXPORT(void*) _nc_console_fd2handle(int fd);
-extern NCURSES_EXPORT(WORD) _nc_console_MapColor(bool fore, int color);
-extern NCURSES_EXPORT(int)  _nc_console_flush(void* handle);
-extern NCURSES_EXPORT(bool) _nc_console_get_SBI(void);
-extern NCURSES_EXPORT(HANDLE) _nc_console_handle(int fd);
-extern NCURSES_EXPORT(int)  _nc_console_isatty(int fd);
-extern NCURSES_EXPORT(bool) _nc_console_keyExist(int keycode);
-extern NCURSES_EXPORT(int)  _nc_console_keyok(int keycode, int flag);
-extern NCURSES_EXPORT(int)  _nc_console_read(SCREEN *sp, HANDLE fd, int *buf);
-extern NCURSES_EXPORT(bool) _nc_console_restore(void);
-extern NCURSES_EXPORT(void) _nc_console_selectActiveHandle(void);
-extern NCURSES_EXPORT(void) _nc_console_set_scrollback(bool normal, CONSOLE_SCREEN_BUFFER_INFO * info);
-extern NCURSES_EXPORT(void) _nc_console_size(int *Lines, int *Cols);
-extern NCURSES_EXPORT(int)  _nc_console_test(int fd);
-extern NCURSES_EXPORT(int)  _nc_console_testmouse(const SCREEN *sp, HANDLE fd, int delay EVENTLIST_2nd(_nc_eventlist*));
-extern NCURSES_EXPORT(int)  _nc_console_twait(const SCREEN *sp, HANDLE hdl,int mode,int msec,int *left EVENTLIST_2nd(_nc_eventlist * evl));
-extern NCURSES_EXPORT(int)  _nc_console_vt_supported(void);
-
-#ifdef _NC_CHECK_MINTTY
-extern NCURSES_EXPORT(int)    _nc_console_checkmintty(int fd, LPHANDLE pMinTTY);
-#endif
-
-#elif defined(_NC_WINDOWS_NATIVE)
-
-#else
-#error unsupported driver configuration
-#endif /* USE_WIN32CON_DRIVER */
-
-#if USE_TERM_DRIVER && defined(USE_WIN32CON_DRIVER)
-# define NC_ISATTY(fd) (0 != _nc_console_isatty(fd))
-# define NC_READ(fd, buf, count)	read(fd, buf, (unsigned)(count))
-#else
-# if defined(_NC_WINDOWS_NATIVE)
-#  define NC_READ(fd, buf, count)	WINCONPTY.read(fd, buf, (unsigned)(count))
-# else
-#  define NC_READ(fd, buf, count)	read(fd, buf, (size_t)(count))
-# endif
-# define NC_ISATTY(fd)			isatty(fd)
-#endif
-
-/*
- * Perhaps not "real" but possibly not "fake".
- */
-#define IsRealTty(fd,value) \
-	(NC_ISATTY(fd) \
-	 && (value = ttyname(fd)) != NULL \
-	 && strncmp(value, "/dev/pts/", 9))
-
-#if USE_TERM_DRIVER
-#  define IsTermInfo(sp)       ((TCBOf(sp) != NULL) && ((TCBOf(sp)->drv != NULL)) && ((TCBOf(sp)->drv->isTerminfo)))
-#  define HasTInfoTerminal(sp) ((NULL != TerminalOf(sp)) && IsTermInfo(sp))
-#  if USE_NAMED_PIPES
-#    define IsTermInfoOnConsole(sp) (IsTermInfo(sp) && _nc_console_test(TerminalOf(sp)->Filedes))
-#  elif defined(USE_WIN32CON_DRIVER)
-#    define IsTermInfoOnConsole(sp) (IsTermInfo(sp) && _nc_console_test(TerminalOf(sp)->Filedes))
-#  else
-#    define IsTermInfoOnConsole(sp) FALSE
-#  endif
-#else
-#  define IsTermInfo(sp)       TRUE
-#  define HasTInfoTerminal(sp) (NULL != TerminalOf(sp))
-#  if USE_NAMED_PIPES
-#    define IsTermInfoOnConsole(sp) _nc_console_test(TerminalOf(sp)->Filedes)
-#  else
-#    define IsTermInfoOnConsole(sp) FALSE
-#  endif
-#endif
-
-#define IsValidTIScreen(sp)  (HasTInfoTerminal(sp))
-
-/*
  * Exported entrypoints beyond the published API
  */
 #if NCURSES_SP_FUNCS
@@ -2687,7 +2736,6 @@ extern NCURSES_EXPORT(bool)     NCURSES_SP_NAME(_nc_reset_colors)(SCREEN*);
 extern NCURSES_EXPORT(char *)   NCURSES_SP_NAME(_nc_printf_string)(SCREEN*, const char *, va_list);
 extern NCURSES_EXPORT(chtype)   NCURSES_SP_NAME(_nc_acs_char)(SCREEN*,int);
 extern NCURSES_EXPORT(int)      NCURSES_SP_NAME(_nc_get_tty_mode)(SCREEN*,TTY*);
-extern NCURSES_EXPORT(int)      NCURSES_SP_NAME(_nc_mcprint)(SCREEN*,char*, int);
 extern NCURSES_EXPORT(int)      NCURSES_SP_NAME(_nc_msec_cost)(SCREEN*, const char *, int);
 extern NCURSES_EXPORT(int)      NCURSES_SP_NAME(_nc_mvcur)(SCREEN*, int, int, int, int);
 extern NCURSES_EXPORT(int)      NCURSES_SP_NAME(_nc_outch)(SCREEN*, int);
@@ -2754,21 +2802,6 @@ extern NCURSES_EXPORT(bool)     _nc_cookie_allowed(const SCREEN *sp);
 extern NCURSES_EXPORT(void)     _nc_cookie_init(SCREEN *sp);
 extern NCURSES_EXPORT(void)     _nc_cookie_updates(SCREEN *sp);
 
-#ifdef _NC_WINDOWS
-#if USE_WIDEC_SUPPORT
-#define write_screen WriteConsoleOutputW
-#define read_screen  ReadConsoleOutputW
-#define read_keycode ReadConsoleInputW
-#define KeyEventChar KeyEvent.uChar.UnicodeChar
-#define CharInfoChar Char.UnicodeChar
-#else
-#define write_screen WriteConsoleOutput
-#define read_screen  ReadConsoleOutput
-#define read_keycode ReadConsoleInput
-#define KeyEventChar KeyEvent.uChar.AsciiChar
-#define CharInfoChar Char.AsciiChar
-#endif
-#endif /* _NC_WINDOWS */
 
 #ifdef __cplusplus
 }

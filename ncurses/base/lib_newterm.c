@@ -51,8 +51,8 @@
 
 MODULE_ID("$Id: lib_newterm.c,v 1.112 2026/05/30 21:17:40 tom Exp $")
 
-#if USE_TERM_DRIVER
-#define NumLabels      InfoOf(SP_PARM).numlabels
+#if USE_SCREENBUFFERED_CONSOLE
+#define NumLabels      (ScreenIsBufferedConsole(SP_PARM) ? AsScreenBufferedConsole(SP_PARM)->info.numlabels : num_labels)
 #else
 #define NumLabels      num_labels
 #endif
@@ -88,12 +88,18 @@ _nc_initscr(NCURSES_SP_DCL0)
 	buf.c_oflag &= (unsigned) ~(ONLCR);
 #elif HAVE_SGTTY_H
 	buf.sg_flags &= ~(ECHO | CRMOD);
-#elif USE_TERM_DRIVER && USE_NAMED_PIPES
-	buf.dwFlagIn = CONMODE_IN_DEFAULT;
-	buf.dwFlagOut = CONMODE_OUT_DEFAULT | VT_FLAG_OUT;
-	if (WINCONSOLE.isTermInfoConsole) {
-	    buf.dwFlagIn |= VT_FLAG_IN;
+#elif USE_CONSOLE_API
+	buf.dwFlagIn  = ENABLE_PROCESSED_INPUT;
+        buf.dwFlagOut = ENABLE_PROCESSED_OUTPUT 
+			| ENABLE_WRAP_AT_EOL_OUTPUT;
+	if (ScreenIsConPTY(SP_PARM)) {
+		buf.dwFlagIn |= ENABLE_VIRTUAL_TERMINAL_INPUT 
+				| ENABLE_QUICK_EDIT_MODE 
+				| ENABLE_EXTENDED_FLAGS;
+		buf.dwFlagOut |= ENABLE_VIRTUAL_TERMINAL_PROCESSING 
+				| DISABLE_NEWLINE_AUTO_RETURN;
 	}
+ 	buf.kind = TTY_MODE_PROGRAM;
 #else
 	memset(&buf, 0, sizeof(buf));
 #endif
@@ -201,23 +207,14 @@ NCURSES_SP_NAME(newterm)(NCURSES_SP_DCLx
     current = CURRENT_SCREEN;
     its_term = (current ? current->_term : NULL);
 
-#if USE_TERM_DRIVER && USE_NAMED_PIPES
-    _setmode(fileno(_ifp), _O_BINARY);
-    _setmode(fileno(_ofp), _O_BINARY);
-#endif
-
-    INIT_TERM_DRIVER();
     /* this loads the capability entry, then sets LINES and COLS */
     if (
-	   TINFO_SETUP_TERM(&new_term, name,
-			    fileno(_ofp), &errret, FALSE) != ERR) {
+	   _nc_setupterm(name,
+			 fileno(_ofp), &errret, FALSE) != ERR) {
 	int slk_format;
 	bool filter_mode;
 
 	_nc_set_screen(NULL);
-#if USE_TERM_DRIVER
-	assert(new_term != NULL);
-#endif
 
 #if NCURSES_SP_FUNCS
 	slk_format = SP_PARM->slk_format;
@@ -245,19 +242,18 @@ NCURSES_SP_NAME(newterm)(NCURSES_SP_DCLx
 	} else {
 	    int value;
 	    int cols;
-
-#if USE_TERM_DRIVER
-	    TERMINAL_CONTROL_BLOCK *TCB;
-#elif !NCURSES_SP_FUNCS
+#if USE_CONSOLE_API
+	    // Do NOT use ScreenConsole() here, because association is not yet established.
+	    if (!DefaultConsole()->init(fileno(_ofp), fileno(_ifp))) {
+		_nc_set_screen(current);
+		returnSP(NULL);
+	    }
+#endif
+#if !NCURSES_SP_FUNCS
 	    _nc_set_screen(CURRENT_SCREEN);
 #endif
 	    assert(SP_PARM != NULL);
 	    cols = *(ptrCols(SP_PARM));
-#if USE_TERM_DRIVER
-	    _nc_set_screen(SP_PARM);
-	    TCB = (TERMINAL_CONTROL_BLOCK *) new_term;
-	    TCB->csp = SP_PARM;
-#endif
 	    /*
 	     * In setupterm() we did a set_curterm(), but it was before we set
 	     * CURRENT_SCREEN.  So the "current" screen's terminal pointer was
@@ -271,11 +267,7 @@ NCURSES_SP_NAME(newterm)(NCURSES_SP_DCLx
 	    if (current)
 		current->_term = its_term;
 
-#if USE_TERM_DRIVER
-	    SP_PARM->_term = new_term;
-#else
 	    new_term = SP_PARM->_term;
-#endif
 
 	    /* allow user to set maximum escape delay from the environment */
 	    if ((value = _nc_getenv_num("ESCDELAY")) >= 0) {
@@ -301,7 +293,6 @@ NCURSES_SP_NAME(newterm)(NCURSES_SP_DCLx
 	    SP_PARM->_use_meta = FALSE;
 #endif
 	    SP_PARM->_endwin = ewInitial;
-#if !USE_TERM_DRIVER
 	    /*
 	     * Check whether we can optimize scrolling under dumb terminals in
 	     * case we do not have any of these capabilities, scrolling
@@ -314,44 +305,51 @@ NCURSES_SP_NAME(newterm)(NCURSES_SP_DCLx
 				    (parm_index ||
 				     parm_delete_line ||
 				     delete_line)));
-#endif
 
 	    NCURSES_SP_NAME(baudrate)(NCURSES_SP_ARG);	/* sets a field in the screen structure */
 
 	    SP_PARM->_keytry = NULL;
 
-	    /* compute movement costs so we can do better move optimization */
-#if USE_TERM_DRIVER
-	    TCBOf(SP_PARM)->drv->td_scinit(SP_PARM);
-#else /* ! USE_TERM_DRIVER */
-	    /*
-	     * Check for mismatched graphic-rendition capabilities.  Most SVr4
-	     * terminfo trees contain entries that have rmul or rmso equated to
-	     * sgr0 (Solaris curses copes with those entries).  We do this only
-	     * for curses, since many termcap applications assume that
-	     * smso/rmso and smul/rmul are paired, and will not function
-	     * properly if we remove rmso or rmul.  Curses applications
-	     * shouldn't be looking at this detail.
-	     */
+#if USE_SCREENBUFFERED_CONSOLE
+	    if (ScreenIsBufferedConsole(SP_PARM)) {
+		AsScreenBufferedConsole(SP_PARM)->screen_init();
+	    } else {
+#endif
+		/* compute movement costs so we can do better move optimization */
+		/*
+		 * Check for mismatched graphic-rendition capabilities.  Most SVr4
+		 * terminfo trees contain entries that have rmul or rmso equated to
+		 * sgr0 (Solaris curses copes with those entries).  We do this only
+		 * for curses, since many termcap applications assume that
+		 * smso/rmso and smul/rmul are paired, and will not function
+		 * properly if we remove rmso or rmul.  Curses applications
+		 * shouldn't be looking at this detail.
+		 */
 #define SGR0_TEST(mode) (mode != NULL) && (exit_attribute_mode == NULL || strcmp(mode, exit_attribute_mode))
-	    SP_PARM->_use_rmso = SGR0_TEST(exit_standout_mode);
-	    SP_PARM->_use_rmul = SGR0_TEST(exit_underline_mode);
+		SP_PARM->_use_rmso = SGR0_TEST(exit_standout_mode);
+		SP_PARM->_use_rmul = SGR0_TEST(exit_underline_mode);
 #if USE_ITALIC
-	    SP_PARM->_use_ritm = SGR0_TEST(exit_italics_mode);
+		SP_PARM->_use_ritm = SGR0_TEST(exit_italics_mode);
 #endif
 
-	    /* compute movement costs so we can do better move optimization */
-	    _nc_mvcur_init();
+		/* compute movement costs so we can do better move optimization */
+		_nc_mvcur_init();
 
-	    /* initialize terminal to a sane state */
-	    _nc_screen_init();
-#endif /* USE_TERM_DRIVER */
-
+		/* initialize terminal to a sane state */
+		_nc_screen_init();
+#if USE_SCREENBUFFERED_CONSOLE
+	    }
+#endif
 	    /* Initialize the terminal line settings. */
 	    _nc_initscr(NCURSES_SP_ARG);
 
 	    _nc_signal_handler(TRUE);
 	    result = SP_PARM;
+#if USE_CONSOLE_API
+	    DefaultConsole()->sp = SP_PARM;
+	    assert(DefaultConsole()->sp != 0);
+	    SP_PARM->_console = DefaultConsole();	// 1-1 relationship between screen and console interface
+#endif
 	}
     }
     _nc_unlock_global(curses);

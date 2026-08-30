@@ -28,7 +28,8 @@
  ****************************************************************************/
 
 /****************************************************************************
- * Author: Thomas Dickey, 2008-on                                           *
+ * Author: Thomas Dickey, 2008-on
+ *         Juergen Pfeifer, 2026                                           *
  ****************************************************************************/
 
 /* $Id: nc_win32.h.in,v 1.21 2026/06/06 15:36:55 tom Exp $ */
@@ -38,13 +39,14 @@
 
 #include <ncurses_cfg.h>
 
-#if defined(_WIN32) || defined(_WIN64) || defined(USE_WIN32CON_DRIVER)
-
-#if @USE_NAMED_PIPES@	/* USE_NAMED_PIPES */
+#if defined(_WIN32) || defined(_WIN64)
 
 #ifndef _NC_WINDOWS_NATIVE
-#define _NC_WINDOWS_NATIVE
+#  define _NC_WINDOWS_NATIVE
 #endif
+
+#if @USE_CONPTY@	/* USE_CONPTY */
+
 
 #ifdef TERMIOS
 #error TERMIOS must not be defined on Windows
@@ -62,14 +64,15 @@
 #  define WINVER 0x0600
 #endif
 
-#undef _NC_CHECK_MINTTY
-#if WINVER >= 0x0600
-#define _NC_CHECK_MINTTY
+// This are the "modern" defaults Windows Terminal uses
+#ifndef DEFAULT_CONSOLE_LINES
+#define DEFAULT_CONSOLE_LINES 30
+#define DEFAULT_CONSOLE_COLS  120
 #endif
 
 #include <windows.h>
 
-#else /* !USE_NAMED_PIPES */
+#else /* !USE_CONPTY */
 
 #ifdef WINVER
 #  if WINVER < 0x0501
@@ -81,11 +84,6 @@
 
 #include <windows.h>
 
-#undef sleep
-#define sleep(n) Sleep((n) * 1000)
-
-#endif /* USE_NAMED_PIPES */
-
 #if HAVE_SYS_TIME_H
 #include <sys/time.h>		/* for struct timeval */
 #endif
@@ -94,45 +92,59 @@
 #include <winsock2.h>		/* for struct timeval */
 #endif
 
+#undef sleep
+#define sleep(n) Sleep((DWORD)((n) * 1000))
+
+#endif /* USE_CONPTY */
+
 #include <stdint.h>		/* for uint32_t */
 
+#if USE_SCREENBUFFERED_CONSOLE && defined(_UCRT) && !USE_CONPTY
+# warning Using the legacy console code in UCRT environments may lead to unexpected behaviour. Most legacy sysems need special updates to even support UCRT.
+#endif
 /*
  * Allow for build-override, e.g., MinGW used "cygwin".
  */
+#define CONPTY_TERM_ENV "ms-terminal"
 #ifndef DEFAULT_TERM_ENV
-#define DEFAULT_TERM_ENV "ms-terminal"
+#define DEFAULT_TERM_ENV CONPTY_TERM_ENV
 #endif
 
 #undef VALID_TERM_ENV
 #define VALID_TERM_ENV(term_env, no_terminal) \
-	(term_env = (NonEmpty(term_env) \
-		      ? term_env \
-		      : (_nc_console_vt_supported() \
-		         ? DEFAULT_TERM_ENV \
-		         : no_terminal)), \
-	 NonEmpty(term_env))
-
-  /*
-   * Various Console mode definitions
-   */
-
-  /* Flags to enable virtual Terminal processing */
-#define VT_FLAG_OUT ENABLE_VIRTUAL_TERMINAL_PROCESSING
-#define VT_FLAG_IN  ENABLE_VIRTUAL_TERMINAL_INPUT
-
-  /* Default flags for input/output modes */
-#define CONMODE_IN_DEFAULT (ENABLE_LINE_INPUT | ENABLE_PROCESSED_INPUT | ENABLE_WINDOW_INPUT | ENABLE_MOUSE_INPUT)
-#define CONMODE_OUT_DEFAULT (ENABLE_PROCESSED_OUTPUT | DISABLE_NEWLINE_AUTO_RETURN | ENABLE_LVB_GRID_WORLDWIDE)
-
-  /* Flags to reset from RAW/CBREAK */
-#define CONMODE_NORAW    (ENABLE_PROCESSED_INPUT|ENABLE_LINE_INPUT)
-#define CONMODE_NOCBREAK (ENABLE_LINE_INPUT)
+        (term_env = (NonEmpty(term_env) \
+                      ? term_env \
+                      : DEFAULT_TERM_ENV), \
+         NonEmpty(term_env))
 
 #include <ncurses_dll.h>
 
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+#define TTY_MODE_UNSPECIFIED 0
+#define TTY_MODE_SHELL 1
+#define TTY_MODE_PROGRAM 2
+#define TTY_MODE_AUTO 3
+
+/* This is our equivalent to termios (aka TTY).
+* It can be used in ConPTY context as well as with the legacy console API. 
+* The "kind" field is used to manage the differences between shell and program 
+* mode, and is currently only used in the ConPTY implementation, where we have 
+* to manage the I/O subsystem of ncurses differently in shell and program mode.
+* But we should also make use of it in Legacy console mode to improve the
+* mode switching in that scenario as well.
+*/
+typedef struct
+{
+    DWORD dwFlagIn;        /* Input Handle Console mode flags */
+    DWORD dwFlagOut;       /* Output Handle Console mode flags */
+    uint8_t kind;          /* 0=unspecified, 1=shell, 2=prog, 3=auto */
+} ConsoleMode;
+
+NCURSES_EXPORT(int) _nc_console_gettty(int fd, ConsoleMode *buf);
+NCURSES_EXPORT(int) _nc_console_settty(int fd, ConsoleMode *buf);
 
 #if defined(CURSES_PRIV_H) || defined(TEST_PRIV_H)
 
@@ -143,49 +155,21 @@ extern NCURSES_EXPORT(int) _nc_gettimeofday(struct timeval *, void *);
 #define gettimeofday(tv,tz) _nc_gettimeofday(tv,tz)
 #endif
 
+#ifndef EVENTLIST_2nd
+#define EVENTLIST_2nd(param) /* nothing */
+#endif
+
 #endif /* defined(CURSES_PRIV_H) || defined(TEST_PRIV_H) */
 
 #if !HAVE_WCWIDTH
 #undef wcwidth
+#undef wcswidth
 #define wcwidth(ucs) _nc_wcwidth((wchar_t)(ucs))
+#define wcswidth(pwcs, n) _nc_wcswidth((pwcs), (n))
 extern NCURSES_EXPORT(int) _nc_wcwidth(uint32_t);
+extern NCURSES_EXPORT(int) _nc_wcswidth(const uint32_t *pwcs, size_t n);
 #endif
 
-typedef struct
-{
-    DWORD dwFlagIn;
-    DWORD dwFlagOut;
-} ConsoleMode;
-
-#define CON_NUMPAIRS 64
-typedef struct {
-    BOOL initialized;
-    BOOL buffered;
-    BOOL window_only;
-    BOOL progMode;
-    BOOL isMinTTY;
-    BOOL isTermInfoConsole;
-    HANDLE out;
-    HANDLE inp;
-    HANDLE hdl;
-    HANDLE lastOut;
-    int numButtons;
-    LPDWORD ansi_map;
-    LPDWORD map;
-    LPDWORD rmap;
-    WORD pairs[CON_NUMPAIRS];
-    COORD origin;
-    CHAR_INFO *save_screen;
-    COORD save_size;
-    SMALL_RECT save_region;
-    CONSOLE_SCREEN_BUFFER_INFO SBI;
-    CONSOLE_SCREEN_BUFFER_INFO save_SBI;
-    CONSOLE_CURSOR_INFO save_CI;
-    ConsoleMode originalMode;
-} ConsoleInfo;
-
-extern NCURSES_EXPORT_VAR(ConsoleInfo) _nc_CONSOLE;
-#define WINCONSOLE _nc_CONSOLE
 
 #ifdef __cplusplus
 }

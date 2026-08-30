@@ -1,6 +1,5 @@
 /****************************************************************************
- * Copyright 2018-2024,2025 Thomas E. Dickey                                *
- * Copyright 2009-2012,2014 Free Software Foundation, Inc.                  *
+ * Copyright 2026 Juergen Pfeifer                                           *
  *                                                                          *
  * Permission is hereby granted, free of charge, to any person obtaining a  *
  * copy of this software and associated documentation files (the            *
@@ -27,78 +26,44 @@
  * authorization.                                                           *
  ****************************************************************************/
 
-/****************************************************************************
- *  Author: Juergen Pfeifer                                                 *
- *                                                                          *
+ /****************************************************************************
+ *  Author: Juergen Pfeifer                                                *
  ****************************************************************************/
 
 #include <curses.priv.h>
 
-MODULE_ID("$Id: lib_driver.c,v 1.12 2025/10/18 19:20:33 tom Exp $")
+MODULE_ID("$Id$")
 
-NCURSES_EXPORT(int)
-NCURSES_SP_NAME(has_key) (SCREEN *sp, int keycode)
+/*
+ * This routine is a replacement for a simple getenv("TERM").  It is used for
+ * environments like Windows, where we do not have terminfo and it's unusual to
+ * have an environment variable TERM.
+ * 
+ * The idea is, that this routine initializes potential platform specific
+ * subsystems like for example the Console subsystem on Windows and then
+ * returns a name that can be interpreted as the result of getenv("TERM"). 
+ * 
+ * If the resulting name starts with a "#", which cannot be a valid terminfo
+ * name, we know we are in a non-terminfo environment.  Any other result,
+ * including NULL or an empty string, will result in a terminfo processing,
+ * e.g. lookup in the database or whatever is configured.
+*/
+NCURSES_EXPORT(char *)
+_nc_term_select(void)
 {
-    T((T_CALLED("has_key(%p, %d)"), (void *) sp, keycode));
-    returnCode(IsValidTIScreen(sp) ? CallDriver_1(sp, td_kyExist, keycode) : FALSE);
-}
-
-NCURSES_EXPORT(int)
-has_key(int keycode)
-{
-    return NCURSES_SP_NAME(has_key) (CURRENT_SCREEN, keycode);
-}
-
-NCURSES_EXPORT(int)
-NCURSES_SP_NAME(_nc_mcprint) (SCREEN *sp, char *data, int len)
-{
-    int code = ERR;
-
-    if (NULL != TerminalOf(sp))
-	code = CallDriver_2(sp, td_print, data, len);
-    return (code);
-}
-
-NCURSES_EXPORT(int)
-mcprint(char *data, int len)
-{
-    return NCURSES_SP_NAME(_nc_mcprint) (CURRENT_SCREEN, data, len);
-}
-
-NCURSES_EXPORT(int)
-NCURSES_SP_NAME(doupdate) (SCREEN *sp)
-{
-    int code = ERR;
-
-    T((T_CALLED("doupdate(%p)"), (void *) sp));
-
-    if (IsValidScreen(sp))
-	code = CallDriver(sp, td_update);
-
-    returnCode(code);
-}
-
-NCURSES_EXPORT(int)
-doupdate(void)
-{
-    return NCURSES_SP_NAME(doupdate) (CURRENT_SCREEN);
-}
-
-NCURSES_EXPORT(int)
-NCURSES_SP_NAME(mvcur) (SCREEN *sp, int yold, int xold, int ynew, int xnew)
-{
-    int code = ERR;
-    TR(TRACE_CALLS | TRACE_MOVE, (T_CALLED("mvcur(%p,%d,%d,%d,%d)"),
-				  (void *) sp, yold, xold, ynew, xnew));
-    if (HasTerminal(sp)) {
-	code = CallDriver_4(sp, td_hwcur, yold, xold, ynew, xnew);
+#if USE_CONSOLE_API
+    if (!CoreConsoleInitialized()) {
+	if (!_nc_console_setup()) {
+	    fprintf(stderr, CONSOLE_INIT_FAILURE_MSG);
+	    /* This is part of termlib and detected early in the initialization
+	     * phase, so - for now - we skip formal release of potentially
+	     * allocated resources if there are any at all in that early stage. 
+	     */
+	    exit(EXIT_FAILURE);
+	}
     }
-    returnCode(code);
-}
-
-NCURSES_EXPORT(int)
-mvcur(int yold, int xold, int ynew, int xnew)
-/* optimized cursor move from (yold, xold) to (ynew, xnew) */
-{
-    return NCURSES_SP_NAME(mvcur) (CURRENT_SCREEN, yold, xold, ynew, xnew);
+    assert(DefaultConsole() != NULL);
+    return (DefaultConsole()->termname());
+#endif
+    return (getenv("TERM"));
 }

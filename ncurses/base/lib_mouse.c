@@ -392,7 +392,7 @@ handle_sysmouse(int sig GCC_UNUSED)
 }
 #endif /* USE_SYSMOUSE */
 
-#if !defined(_NC_WINDOWS_NATIVE) || USE_NAMED_PIPES
+#if USE_CONPTY
 #define xterm_kmous "\033[M"
 
 static void
@@ -449,7 +449,7 @@ init_xterm_mouse(SCREEN *sp)
 	}
     }
 }
-#endif
+#endif /* USE_CONPTY */
 
 static void
 enable_xterm_mouse(SCREEN *sp, bool enable)
@@ -464,18 +464,6 @@ enable_xterm_mouse(SCREEN *sp, bool enable)
 #endif
     sp->_mouse_active = enable;
 }
-
-#if USE_TERM_DRIVER
-static void
-enable_win32_mouse(SCREEN *sp, bool enable)
-{
-#if USE_NAMED_PIPES
-    enable_xterm_mouse(sp, enable);
-#else
-    sp->_mouse_active = enable;
-#endif
-}
-#endif
 
 #if USE_GPM_SUPPORT
 static bool
@@ -766,10 +754,14 @@ initialize_mousetype(SCREEN *sp)
     }
 #endif /* USE_SYSMOUSE */
 
-#if USE_TERM_DRIVER
-    CallDriver(sp, td_initmouse);
+#if USE_CONSOLE_API
+#if USE_SCREENBUFFERED_CONSOLE
+    if (ScreenIsBufferedConsole(sp)) {
+	sp->_mouse_type = M_WINDOWS_CONSOLE;
+	returnVoid;
+    }
 #endif
-#if !defined(_NC_WINDOWS_NATIVE) || USE_NAMED_PIPES
+#if USE_CONPTY
     /* we know how to recognize mouse events under "xterm" */
     if (NonEmpty(key_mouse)) {
 	init_xterm_mouse(sp);
@@ -778,7 +770,8 @@ initialize_mousetype(SCREEN *sp)
 	if (_nc_add_to_try(&(sp->_keytry), xterm_kmous, KEY_MOUSE) == OK)
 	    init_xterm_mouse(sp);
     }
-#endif
+#endif /* USE_CONPTY */
+#endif /* USE_CONSOLE_API */
 
     returnVoid;
 }
@@ -823,8 +816,6 @@ _nc_mouse_event(SCREEN *sp)
     MEVENT *eventp = EventAt(sp, sp->_mouse_write);
     bool result = FALSE;
 
-    (void) eventp;
-
     switch (sp->_mouse_type) {
     case M_XTERM:
 	/* xterm: never have to query, mouse events are in the keyboard stream */
@@ -832,7 +823,7 @@ _nc_mouse_event(SCREEN *sp)
 	{
 	    char kbuf[3];
 
-	    int i, res = NC_READ(M_FD(sp), &kbuf, 3);	/* Eat the prefix */
+	    int i, res = NC_READ(sp, M_FD(sp), &kbuf, 3);	/* Eat the prefix */
 	    if (res != 3)
 		printf("Got %d chars instead of 3 for prefix.\n", res);
 	    for (i = 0; i < res; i++) {
@@ -917,13 +908,16 @@ _nc_mouse_event(SCREEN *sp)
 	break;
 #endif /* USE_SYSMOUSE */
 
-#if USE_TERM_DRIVER
-    case M_TERM_DRIVER:
-	while (sp->_console_mouse_head < sp->_console_mouse_tail) {
+#if USE_SCREENBUFFERED_CONSOLE
+    case M_WINDOWS_CONSOLE:
+	if (sp->_console_mouse_head < sp->_console_mouse_tail) {
 	    /*
-	     * Point the fifo-head to the next possible location.  If there
-	     * are none, reset the indices.
+	     * Copy the event data from the driver FIFO into the ncurses
+	     * mouse event list, then advance the driver FIFO head.
+	     * Process one event per call so the wgetch gesture-collection
+	     * loop can accumulate press/release pairs normally.
 	     */
+	    *eventp = sp->_console_mouse_fifo[sp->_console_mouse_head];
 	    sp->_console_mouse_head += 1;
 	    if (sp->_console_mouse_head == sp->_console_mouse_tail) {
 		sp->_console_mouse_tail = 0;
@@ -938,6 +932,7 @@ _nc_mouse_event(SCREEN *sp)
 #endif
 
     case M_NONE:
+	(void) eventp;
 	break;
     }
 
@@ -1121,7 +1116,7 @@ decode_xterm_X10(SCREEN *sp, MEVENT * eventp)
     _nc_set_read_thread(TRUE);
     for (grabbed = 0; grabbed < MAX_KBUF; grabbed += (size_t) res) {
 
-	res = (int) NC_READ(Mouse_FD(sp),
+	res = (int) NC_READ(sp, Mouse_FD(sp),
 			    kbuf + grabbed, (MAX_KBUF - (int) grabbed));
 	if (res < 0)
 	    break;
@@ -1164,7 +1159,7 @@ decode_xterm_1005(SCREEN *sp, MEVENT * eventp)
     for (grabbed = 0; grabbed < limit;) {
 	int res;
 
-	res = (int) NC_READ(Mouse_FD(sp),
+	res = (int) NC_READ(sp, Mouse_FD(sp),
 			    (kbuf + grabbed), 1);
 	if (res < 0)
 	    break;
@@ -1237,7 +1232,7 @@ read_SGR(const SCREEN *sp, SGR_DATA * result)
     do {
 	int res;
 
-	res = (int) NC_READ(Mouse_FD(sp),
+	res = (int) NC_READ(sp, Mouse_FD(sp),
 			    (kbuf + grabbed), 1);
 	if (res < 0)
 	    break;
@@ -1402,6 +1397,48 @@ _nc_mouse_inline(SCREEN *sp)
 	    }
 	}
     }
+#if USE_SCREENBUFFERED_CONSOLE
+    else if (sp->_mouse_type == M_WINDOWS_CONSOLE) {
+	/*
+	 * The event data was already placed in _mouse_events by
+	 * _nc_mouse_event() (called from fifo_push before KEY_MOUSE was
+	 * queued).  _mouse_write was incremented there too, so the current
+	 * event sits at _mouse_write-1.  We must NOT read from the console
+	 * input stream here -- all data comes through the driver FIFO.
+	 *
+	 * Guard against a spurious KEY_MOUSE where _nc_mouse_event was not
+	 * called: _mouse_write == _mouse_read means no new event was placed
+	 * in the ring, and accessing _mouse_write-1 would be an underflow.
+	 */
+	MEVENT *ep;
+	if (sp->_mouse_write <= sp->_mouse_read)
+	    returnCode(FALSE);
+	ep = EventAt(sp, sp->_mouse_write - 1);
+
+	TR(MY_TRACE,
+	   ("_nc_mouse_inline: slot %ld %s",
+	    (long) IndexEV(sp, ep),
+	    _nc_tracemouse(sp, ep)));
+
+	result = (ep->bstate & REPORT_MOUSE_POSITION) ? TRUE : FALSE;
+	if (!result) {
+	    /* Treat wheel-mouse buttons like position reports: no matching
+	     * release event will ever arrive, so break the gesture loop
+	     * immediately.
+	     */
+	    if (ep->bstate & BUTTON_PRESSED) {
+		int b;
+
+		for (b = 4; b <= MAX_BUTTONS; ++b) {
+		    if ((ep->bstate & MASK_PRESS(b))) {
+			result = TRUE;
+			break;
+		    }
+		}
+	    }
+	}
+    }
+#endif /* USE_SCREENBUFFERED_CONSOLE */
 
     returnCode(result);
 }
@@ -1441,9 +1478,9 @@ mouse_activate(SCREEN *sp, bool on)
 	    sp->_mouse_active = TRUE;
 	    break;
 #endif
-#if USE_TERM_DRIVER
-	case M_TERM_DRIVER:
-	    enable_win32_mouse(sp, TRUE);
+#if USE_SCREENBUFFERED_CONSOLE
+	case M_WINDOWS_CONSOLE:
+	    sp->_mouse_active = TRUE;
 	    break;
 #endif
 	case M_NONE:
@@ -1478,9 +1515,9 @@ mouse_activate(SCREEN *sp, bool on)
 	    sp->_mouse_active = FALSE;
 	    break;
 #endif
-#if USE_TERM_DRIVER
-	case M_TERM_DRIVER:
-	    enable_win32_mouse(sp, FALSE);
+#if USE_SCREENBUFFERED_CONSOLE
+	case M_WINDOWS_CONSOLE:
+	    sp->_mouse_active = FALSE;
 	    break;
 #endif
 	case M_NONE:
@@ -1803,8 +1840,8 @@ _nc_mouse_wrap(SCREEN *sp)
 	mouse_activate(sp, FALSE);
 	break;
 #endif
-#if USE_TERM_DRIVER
-    case M_TERM_DRIVER:
+#if USE_SCREENBUFFERED_CONSOLE
+    case M_WINDOWS_CONSOLE:
 	mouse_activate(sp, FALSE);
 	break;
 #endif
@@ -1841,8 +1878,8 @@ _nc_mouse_resume(SCREEN *sp)
 	break;
 #endif
 
-#if USE_TERM_DRIVER
-    case M_TERM_DRIVER:
+#if USE_SCREENBUFFERED_CONSOLE
+    case M_WINDOWS_CONSOLE:
 	mouse_activate(sp, TRUE);
 	break;
 #endif
@@ -1895,6 +1932,7 @@ NCURSES_SP_NAME(getmouse)(NCURSES_SP_DCLx MEVENT * aevent)
 	    SP_PARM->_mouse_read++;
 	    result = OK;
 	} else {
+	    TR(TRACE_IEVENT, ("getmouse: no valid event in queue"));
 	    TR(TRACE_IEVENT, ("getmouse: no valid event in queue"));
 	    /* Reset the provided event */
 	    aevent->bstate = 0;

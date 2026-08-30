@@ -94,7 +94,7 @@ NCURSES_SP_NAME(erasechar)(NCURSES_SP_DCL0)
 	result = termp->Ottyb.c_cc[VERASE];
 	if (result == _nc_vdisable())
 	    result = ERR;
-#elif defined(_NC_WINDOWS_NATIVE)
+#elif USE_CONSOLE_API
 	result = ERR;
 #else
 	result = termp->Ottyb.sg_erase;
@@ -131,7 +131,7 @@ NCURSES_SP_NAME(killchar)(NCURSES_SP_DCL0)
 	result = termp->Ottyb.c_cc[VKILL];
 	if (result == _nc_vdisable())
 	    result = ERR;
-#elif defined(_NC_WINDOWS_NATIVE)
+#elif USE_CONSOLE_API
 	result = ERR;
 #else
 	result = termp->Ottyb.sg_kill;
@@ -156,8 +156,8 @@ flush_input(int fd)
 #else /* !TERMIOS */
     errno = 0;
     do {
-#if defined(USE_WIN32CON_DRIVER)
-	_nc_console_flush(_nc_console_fd2handle(fd));
+#if USE_CONSOLE_API
+	DefaultConsole()->flush(fd);
 #else
 	ioctl(fd, TIOCFLUSH, 0);
 #endif

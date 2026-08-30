@@ -142,19 +142,19 @@ check_mouse_activity(SCREEN *sp, int delay EVENTLIST_2nd(_nc_eventlist * evl))
 {
     int rc;
 
-#if USE_TERM_DRIVER
-    TERMINAL_CONTROL_BLOCK *TCB = TCBOf(sp);
-    rc = TCBOf(sp)->drv->td_testmouse(TCBOf(sp), delay EVENTLIST_2nd(evl));
-# if USE_NAMED_PIPES || defined(_NC_WINDOWS_NATIVE)
-    /* if we emulate terminfo on console, we have to use the console routine */
-    if (IsTermInfoOnConsole(sp)) {
-	rc = _nc_console_testmouse(sp,
-				   _nc_console_handle(sp->_ifd),
-				   delay EVENTLIST_2nd(evl));
-    } else
-# endif
-	rc = TCB->drv->td_testmouse(TCB, delay EVENTLIST_2nd(evl));
-#else /* !USE_TERM_DRIVER */
+#if USE_SCREENBUFFERED_CONSOLE
+    if (ScreenIsBufferedConsole(sp)) {
+	SCREEN *spc = ConsoleScreen(DefaultConsole());
+	assert(spc);
+	assert(sp == spc);
+	return (MouseFifoHasEvent(spc)
+		?
+		TW_MOUSE :
+		AsScreenBufferedConsole(sp)->twait(TWAIT_MASK, delay,
+						   (int *) 0
+						   EVENTLIST_2nd(evl)));
+    }
+#endif /* !USE_SCREENBUFFERED_CONSOLE */
 # if USE_SYSMOUSE
     if ((sp->_mouse_type == M_SYSMOUSE)
 	&& (sp->_sysmouse_head < sp->_sysmouse_tail)) {
@@ -162,18 +162,11 @@ check_mouse_activity(SCREEN *sp, int delay EVENTLIST_2nd(_nc_eventlist * evl))
     } else
 # endif
     {
-# if USE_TERM_DRIVER && USE_NAMED_PIPES
-	rc = _nc_console_testmouse(sp,
-				   _nc_console_handle(sp->_ifd),
-				   delay
-				   EVENTLIST_2nd(evl));
-# else
 	rc = _nc_timed_wait(sp,
 			    TWAIT_MASK,
 			    delay,
 			    (int *) 0
 			    EVENTLIST_2nd(evl));
-# endif
 # if USE_SYSMOUSE
 	if ((sp->_mouse_type == M_SYSMOUSE)
 	    && (sp->_sysmouse_head < sp->_sysmouse_tail)
@@ -183,7 +176,6 @@ check_mouse_activity(SCREEN *sp, int delay EVENTLIST_2nd(_nc_eventlist * evl))
 	}
 # endif
     }
-#endif /* USE_TERM_DRIVER */
     return rc;
 }
 
@@ -272,8 +264,8 @@ fifo_push(SCREEN *sp EVENTLIST_2nd(_nc_eventlist * evl))
 	n = 1;
     } else
 #endif
-#if USE_TERM_DRIVER
-	if ((sp->_mouse_type == M_TERM_DRIVER)
+#if USE_SCREENBUFFERED_CONSOLE
+	if ((sp->_mouse_type == M_WINDOWS_CONSOLE)
 	    && (sp->_console_mouse_head < sp->_console_mouse_tail)) {
 	sp->_mouse_event(sp);
 	ch = KEY_MOUSE;
@@ -288,38 +280,25 @@ fifo_push(SCREEN *sp EVENTLIST_2nd(_nc_eventlist * evl))
     } else
 #endif
     {				/* Can block... */
-#if USE_TERM_DRIVER
-	int buf;
-# if USE_NAMED_PIPES || defined(_NC_WINDOWS_NATIVE)
-	if (NC_ISATTY(sp->_ifd) && IsTermInfoOnConsole(sp) && IsCbreak(sp)) {
+#if USE_SCREENBUFFERED_CONSOLE
+	if (ScreenIsBufferedConsole(sp)) {
+	    int buf;
 	    _nc_set_read_thread(TRUE);
-	    n = _nc_console_read(sp,
-				 _nc_console_handle(sp->_ifd),
-				 &buf);
+	    n = AsScreenBufferedConsole(sp)->read(&buf);
 	    _nc_set_read_thread(FALSE);
-	} else
-# endif	/* USE_NAMED_PIPES */
-	    n = CallDriver_1(sp, td_read, &buf);
-	ch = buf;
-#else /* !USE_TERM_DRIVER */
-#if USE_TERM_DRIVER && USE_NAMED_PIPES
-	int buf;
-#endif
-	unsigned char c2 = 0;
+	    ch = buf;
+	} else {
+#endif /* USE_SCREENBUFFERED_CONSOLE */
+	    unsigned char c2 = 0;
 
-	_nc_set_read_thread(TRUE);
-#if USE_TERM_DRIVER && USE_NAMED_PIPES
-	n = _nc_console_read(sp,
-			     _nc_console_handle(sp->_ifd),
-			     &buf);
-	c2 = buf;
-#else
-	n = (int) NC_READ(sp->_ifd, &c2, (size_t) 1);
-#endif
-	_nc_set_read_thread(FALSE);
-	ch = c2;
-#endif /* USE_TERM_DRIVER */
+	    _nc_set_read_thread(TRUE);
+	    n = (int) NC_READ(sp, sp->_ifd, &c2, (size_t) 1);
+	    _nc_set_read_thread(FALSE);
+	    ch = c2;
+	}
+#if USE_SCREENBUFFERED_CONSOLE
     }
+#endif /* USE_SCREENBUFFERED_CONSOLE */
 
     if ((n == -1) || (n == 0)) {
 	TR(TRACE_IEVENT, ("read(%d,&ch,1)=%d, errno=%d", sp->_ifd, n, errno));
@@ -577,6 +556,14 @@ _nc_wgetch(WINDOW *win,
 	    fifo_push(sp EVENTLIST_2nd(evl));
 	ch = fifo_pull(sp);
     }
+#if USE_CONSOLE_API
+    /* Check for console resize events after getting input */
+    if (ScreenConsole(sp)->size_changed()) {
+	/* Resize detected - preserve the triggering character */
+	safe_ungetch(sp, ch);
+	ch = ERR;		// Fake an error to trigger the resize handling below
+    }
+#endif
 
     if (ch == ERR) {
       check_sigwinch:

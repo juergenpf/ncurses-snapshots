@@ -191,6 +191,7 @@ lib_raw		lib		$(tinfo)	$(HEADER_DEPS)
 lib_setup	lib		$(tinfo)	$(HEADER_DEPS)	$(INCDIR)/tic.h
 lib_termcap	lib		$(tinfo)	$(HEADER_DEPS)	$(INCDIR)/tic.h ../include/termcap.h $(INCDIR)/capdefaults.c
 lib_termname	lib		$(tinfo)	$(HEADER_DEPS)
+lib_termselect	lib		$(tinfo)	$(HEADER_DEPS)
 lib_tgoto	lib		$(tinfo)	$(HEADER_DEPS)	../include/termcap.h
 lib_ti		lib		$(tinfo)	$(HEADER_DEPS)	$(INCDIR)/tic.h
 lib_tparm	lib		$(tinfo)	$(HEADER_DEPS)	$(INCDIR)/tic.h
@@ -233,40 +234,39 @@ keybound	lib		$(base)		$(HEADER_DEPS)
 keyok		lib		$(base)		$(HEADER_DEPS)
 version		lib		$(base)		$(HEADER_DEPS)
 
-# Porting
-@ port_drivers
-lib_driver	lib		$(base)		$(HEADER_DEPS)
-
 # MSYS2, using termios
 @ port_msys2
 gettimeofday	lib		$(win32con)	$(HEADER_DEPS)
-lib_win32util	lib		$(tinfo)	$(HEADER_DEPS)
 wcwidth		lib		$(win32con)	$(HEADER_DEPS)
 widechars	lib		$(wide)		$(HEADER_DEPS)
 
-# MinGW, using Console API
+# MinGW base-library Win32 support
+@ port_win32_base
+win32conupdate	lib		$(win32con)	$(HEADER_DEPS)
+
+# MinGW, using ConPTY only
+@ port_win32_conpty
+gettimeofday	lib		$(win32con)	$(HEADER_DEPS)
+wcwidth		lib		$(win32con)	$(HEADER_DEPS)
+widechars	lib		$(wide)		$(HEADER_DEPS)
+win32concore	lib		$(tinfo)	$(HEADER_DEPS)
+win32conpty	lib		$(tinfo)	$(HEADER_DEPS)
+
+# MinGW, using Console API only
 @ port_win32con
 gettimeofday	lib		$(win32con)	$(HEADER_DEPS)
-lib_win32con	lib		$(tinfo)	$(HEADER_DEPS)
-lib_win32util	lib		$(tinfo)	$(HEADER_DEPS)
 wcwidth		lib		$(win32con)	$(HEADER_DEPS)
 widechars	lib		$(wide)		$(HEADER_DEPS)
-win32_driver	lib		$(win32con)	$(HEADER_DEPS)
+win32concore	lib		$(tinfo)	$(HEADER_DEPS)
+win32screenbuf	lib		$(win32con)	$(HEADER_DEPS)
 
-# MinGW-W64, using Console API and named pipes
+# MinGW, using Console API and ConPTY
 @ port_win32
 gettimeofday	lib		$(win32con)	$(HEADER_DEPS)
-lib_win32con	lib		$(tinfo)	$(HEADER_DEPS)
-lib_win32util	lib		$(tinfo)	$(HEADER_DEPS)
 wcwidth		lib		$(win32con)	$(HEADER_DEPS)
-win32_driver	lib		$(win32con)	$(HEADER_DEPS)
-
-# MinGW-W64 or Windows native, using ConPTY
-@ port_win32_conpty
-lib_win32conpty	lib		$(tinfo)	$(HEADER_DEPS)
-lib_win32util	lib		$(tinfo)	$(HEADER_DEPS)
-
-@ port_tinfo
-tinfo_driver	lib		$(tinfo)	$(HEADER_DEPS)	$(INCDIR)/tic.h
+widechars	lib		$(wide)		$(HEADER_DEPS)
+win32concore	lib		$(tinfo)	$(HEADER_DEPS)
+win32conpty	lib		$(tinfo)	$(HEADER_DEPS)
+win32screenbuf	lib		$(win32con)	$(HEADER_DEPS)
 
 # vile:makemode

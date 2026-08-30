@@ -66,7 +66,7 @@ initscr(void)
 
 	_nc_globals.init_screen = TRUE;
 
-	env = getenv("TERM");
+	env = _nc_term_select();
 	(void) VALID_TERM_ENV(env, "unknown");
 
 	if ((name = strdup(env)) == NULL) {

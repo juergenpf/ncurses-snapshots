@@ -46,10 +46,10 @@
 
 MODULE_ID("$Id: lib_slkrefr.c,v 1.36 2026/05/30 22:10:47 tom Exp $")
 
-#if USE_TERM_DRIVER
-#define NumLabels    InfoOf(SP_PARM).numlabels
+#if USE_SCREENBUFFERED_CONSOLE
+#define NumLabels      (ScreenIsBufferedConsole(SP_PARM) ? AsScreenBufferedConsole(SP_PARM)->info.numlabels : num_labels)
 #else
-#define NumLabels    num_labels
+#define NumLabels      num_labels
 #endif
 
 /*
@@ -97,14 +97,19 @@ slk_intern_refresh(SCREEN *sp)
 	if (slk->dirty || slk->ent[i].dirty) {
 	    if (slk->ent[i].visible) {
 		if (numlab > 0 && SLK_STDFMT(fmt)) {
-#if USE_TERM_DRIVER
-		    CallDriver_2(sp, td_hwlabel, i + 1, slk->ent[i].form_text);
-#else
-		    if (i < num_labels) {
-			NCURSES_PUTP2("plab_norm",
-				      TPARM_2(plab_norm,
-					      i + 1,
-					      slk->ent[i].form_text));
+#if USE_SCREENBUFFERED_CONSOLE
+		    if (ScreenIsBufferedConsole(sp)) {
+			AsScreenBufferedConsole(sp)->hwlabel(i + 1,
+							     slk->ent[i].form_text);
+		    } else {
+#endif
+			if (i < num_labels) {
+			    NCURSES_PUTP2("plab_norm",
+					  TPARM_2(plab_norm,
+						  i + 1,
+						  slk->ent[i].form_text));
+			}
+#if USE_SCREENBUFFERED_CONSOLE
 		    }
 #endif
 		} else {
@@ -125,13 +130,17 @@ slk_intern_refresh(SCREEN *sp)
     slk->dirty = FALSE;
 
     if (numlab > 0) {
-#if USE_TERM_DRIVER
-	CallDriver_1(sp, td_hwlabelOnOff, slk->hidden ? FALSE : TRUE);
-#else
-	if (slk->hidden) {
-	    NCURSES_PUTP2("label_off", label_off);
+#if USE_SCREENBUFFERED_CONSOLE
+	if (ScreenIsBufferedConsole(sp)) {
+	    AsScreenBufferedConsole(sp)->hwlabelonoff(!(slk->hidden));
 	} else {
-	    NCURSES_PUTP2("label_on", label_on);
+#endif
+	    if (slk->hidden) {
+		NCURSES_PUTP2("label_off", label_off);
+	    } else {
+		NCURSES_PUTP2("label_on", label_on);
+	    }
+#if USE_SCREENBUFFERED_CONSOLE
 	}
 #endif
     }

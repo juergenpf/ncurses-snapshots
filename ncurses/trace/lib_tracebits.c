@@ -68,7 +68,7 @@ MODULE_ID("$Id: lib_tracebits.c,v 1.38 2026/03/28 20:22:56 tom Exp $")
 
 #ifdef TRACE
 
-#if defined(_NC_WINDOWS_NATIVE)
+#if USE_CONSOLE_API
 #define BITNAMELEN 36
 #else
 #define BITNAMELEN 8
@@ -214,7 +214,7 @@ _nc_trace_ttymode(const TTY * tty)
 	if (tty->c_lflag & ALLLOCAL)
 	    lookup_bits(buf, lflags, "lflags", tty->c_lflag);
     }
-#elif defined(_NC_WINDOWS_NATIVE)
+#elif USE_CONSOLE_API
 #define DATA(name)        { name, { #name } }
     static const BITNAMES dwFlagsOut[] =
     {
@@ -238,11 +238,15 @@ _nc_trace_ttymode(const TTY * tty)
     };
 
     buf = _nc_trace_buf(0,
-			8 + sizeof(dwFlagsOut) +
-			8 + sizeof(dwFlagsIn));
+			14 + sizeof(dwFlagsOut) +
+			14 + sizeof(dwFlagsIn) +
+			24);
     if (buf != NULL) {
-	lookup_bits(buf, dwFlagsIn, "dwIn", tty->dwFlagIn);
-	lookup_bits(buf, dwFlagsOut, "dwOut", tty->dwFlagOut);
+	_nc_STRCAT(buf, "\n", TRACE_BUF_SIZE(0));
+	lookup_bits(buf, dwFlagsIn, "dwFlagIn", tty->dwFlagIn);
+	_nc_STRCAT(buf, "\n", TRACE_BUF_SIZE(0));
+	lookup_bits(buf, dwFlagsOut, "dwFlagOut", tty->dwFlagOut);
+	_nc_STRCAT(buf, "\n", TRACE_BUF_SIZE(0));
     }
 #else
     /* reference: ttcompat(4M) on SunOS 4.1 */

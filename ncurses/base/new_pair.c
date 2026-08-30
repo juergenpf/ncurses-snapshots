@@ -43,8 +43,8 @@
 #define CUR SP_TERMTYPE
 #endif
 
-#if USE_TERM_DRIVER
-#define MaxColors      InfoOf(SP_PARM).maxcolors
+#if USE_SCREENBUFFERED_CONSOLE
+#define MaxColors      (ScreenIsBufferedConsole(SP_PARM) ? AsScreenBufferedConsole(SP_PARM)->info.maxcolors : max_colors)
 #else
 #define MaxColors      max_colors
 #endif

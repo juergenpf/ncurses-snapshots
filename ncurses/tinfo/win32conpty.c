@@ -1,0 +1,709 @@
+/****************************************************************************
+ * Copyright 2026 Juergen Pfeifer                                           *
+ *                                                                          *
+ * Permission is hereby granted, free of charge, to any person obtaining a  *
+ * copy of this software and associated documentation files (the            *
+ * "Software"), to deal in the Software without restriction, including      *
+ * without limitation the rights to use, copy, modify, merge, publish,      *
+ * distribute, distribute with modifications, sublicense, and/or sell       *
+ * copies of the Software, and to permit persons to whom the Software is    *
+ * furnished to do so, subject to the following conditions:                 *
+ *                                                                          *
+ * The above copyright notice and this permission notice shall be included  *
+ * in all copies or substantial portions of the Software.                   *
+ *                                                                          *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS  *
+ * OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF               *
+ * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.   *
+ * IN NO EVENT SHALL THE ABOVE COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,   *
+ * DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR    *
+ * OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR    *
+ * THE USE OR OTHER DEALINGS IN THE SOFTWARE.                               *
+ *                                                                          *
+ * Except as contained in this notice, the name(s) of the above copyright   *
+ * holders shall not be used in advertising or otherwise to promote the     *
+ * sale, use or other dealings in this Software without prior written       *
+ * authorization.                                                           *
+ ****************************************************************************/
+
+/****************************************************************************
+ *  Author: Juergen Pfeifer                                                 *
+ ****************************************************************************/
+
+#include <curses.priv.h>
+
+MODULE_ID("$Id$")
+
+#if USE_CONPTY
+#include <windows.h>
+#include <stdio.h>
+#include <string.h>
+#include <io.h>
+#include <fcntl.h>
+#include <process.h>
+#include <sys/time.h>
+#include <stdint.h>
+#if USE_WIDEC_SUPPORT
+#include <wchar.h>
+#endif
+
+#define DispatchMethod(name) pty_##name
+#define Dispatch(name) .name = DispatchMethod(name)
+#define NoDispatch(name) .name = NULL
+#define METHOD(name, type)static type DispatchMethod(name)
+#define T_METHOD(name,fmt) "called {lib_win32conpty::pty_" #name fmt
+
+// Prototypes of static function we want to use in initializers
+METHOD(termname, char*)(void);
+METHOD(init, bool)(int fdOut, int fdIn);
+METHOD(size, void)(int *Lines, int *Cols);
+METHOD(size_changed, bool)(void);
+METHOD(togglemode, void)(void);
+METHOD(read, int)(int fd, void *result, size_t count);
+METHOD(write, int)(int fd, const void *buf, size_t count);
+METHOD(poll, int)(struct pty_pollfd *fds, nfds_t nfds, int timeout_ms);
+
+static int pty_start_input_subsystem(void);
+static int pty_stop_input_subsystem(void);
+
+#define AssertIsConPTY() assert((defaultCONPTY.core.status & CONSOLE_STATUS_IS_CONPTY))
+
+/* A process can only have a single console, so it is safe
+ * to maintain all the information about it in a single
+ * static structure. */
+static ConPtyInterface defaultCONPTY =
+{
+    .core =
+    {
+	Dispatch(termname),
+	Dispatch(init),
+	Dispatch(size),
+	Dispatch(size_changed),
+	Dispatch(togglemode)
+    },
+    Dispatch(read),
+    Dispatch(write),
+    Dispatch(poll)
+};
+#define MYSELF defaultCONPTY
+
+/* Poor man's dependency injection - we maintain a pointer to the current console information,
+ * which is initialized to point to our default implementation. If in the future we want to
+ * support other types of consoles or terminal backends on Windows, we can create additional
+ * ConsoleInfo structures with different implementations of the methods, and switch the
+ * _nc_currentCONPTY pointer to point to the appropriate one based on runtime detection
+ * or configuration. */
+NCURSES_EXPORT_VAR (ConPtyInterface *)
+  _nc_currentCONPTY = &defaultCONPTY;
+
+// ----------------------- The Input Subsystem ----------------------------------------------
+/* In order to stay strictly in the pipe I/O model of the Windows Console, we need to have
+ * a dedicated thread that is responsible for reading input from the console handle and
+ * putting it into a thread-safe buffer that the main thread can read from. This is because
+ * the Windows Console does not support non-blocking reads or polling in the same way that
+ * a Unix terminal does, so we need to have a separate thread that can block on ReadFile
+ * and then signal the main thread when input is available.
+ * This input model is only used when in ncurses program mode, where we want to have direct
+ * control over the console input. In shell mode, we can rely on the C runtime to handle
+ * console input in the usual way, and we don't need to intercept it with our own thread and
+ * buffer.
+ * We implement a standard ring buffer for the input, and use Windows events to signal between
+ * the threads when input is available or when the thread should shut down. We also implement
+ * a simple lazy read model, where the input thread only reads from the console when the main
+ * thread signals that it wants to read. 
+ * 
+ * Please note, that although we are in a pseudo-console context, the hConsole... handles are not
+ * really pipes and must not be used as such, but they are still console handles that we can read 
+ * from and write to using the console API calls ReadFile and WriteFile, and we can also call 
+ * GetConsoleMode and other console API calls on them to query metadata, but we should avoid to use
+ * ReadConsoleInput or WriteConsoleOutput or similar API calls that are not compatible with the 
+ * pipe I/O model, because those calls might not work properly with the pseudo-console handles and 
+ * could cause issues. 
+ * */
+
+#define INPUT_BUFFER_SIZE 4096
+typedef struct {
+    uint8_t buf[INPUT_BUFFER_SIZE];
+    int head;
+    int tail;
+    CRITICAL_SECTION lock;
+} InputBuffer;
+
+static InputBuffer g_input_buffer;
+static HANDLE g_input_thread = NULL;
+
+static HANDLE g_read_request_event = NULL;	// Signal: "Thread, please call ReadFile"
+static HANDLE g_input_available_event = NULL;	// Signal: "Data available in ring buffer"
+static HANDLE g_shutdown_event = NULL;	// Signal: "Shutdown system"
+
+/* Our handle is always the consoles input handle (actually a pseudo-console handle provided 
+ * by ConPTY), which we read from in the input thread. We need it to call ReadFile and to
+ * cancel the I/O when shutting down. */
+#define g_stdin_handle defaultCONPTY.core.ConsoleHandleIn
+
+// Forward declaration of the input reader thread
+static unsigned __stdcall input_thread(LPVOID param);
+
+// ---------------------------------------------------------------------------------------
+METHOD(termname, char*)(void) {
+    return CONPTY_TERM_ENV;
+}
+
+// ---------------------------------------------------------------------------------------
+
+/* This initializaton function can be called multiple times, and actually it is called from within
+ * setupterm() and/or newterm(). It initializes the defaultCONPTY structure when called the first 
+ * time, and on subsequent calls it just returns TRUE.
+ * 
+ * The other purpose of this routine is to manage the assignment of pseudo-console handles. If the
+ * assigned filedescriptors are NOT valid pseudo-console handles, the call will return FALSE.
+ *
+ * The function will also return FALSE, if the Windows version we run on does not support ConPTY,
+ * which is a requirement for the Windows Console backend of ncurses. This is because without
+ * ConPTY, the Windows Console does not provide the necessary capabilities for ncurses and
+ * especially the terminfo layer to function properly. */
+METHOD(init, bool)(int fdOut, int fdIn) {
+    bool result = FALSE;
+
+    T((T_METHOD(init, "(fdOut=%d, fdIn=%d)"), fdOut, fdIn));
+
+    AssertIsConPTY();
+
+    /* initialize once, or not at all */
+    if (!IsConsoleInitialized(&MYSELF.core)) {
+	/*
+	 * We set the console mode flags to the most basic ones that are required for ConPTY
+	 * to function properly. */
+	DWORD dwFlagIn = (ENABLE_LINE_INPUT
+			  | ENABLE_PROCESSED_INPUT
+			  | ENABLE_ECHO_INPUT
+			  | ENABLE_EXTENDED_FLAGS);
+
+	DWORD dwFlagOut = (ENABLE_VIRTUAL_TERMINAL_PROCESSING
+			   | ENABLE_PROCESSED_OUTPUT
+			   | DISABLE_NEWLINE_AUTO_RETURN
+			   | ENABLE_WRAP_AT_EOL_OUTPUT);
+
+	DWORD dwFlag;
+
+	/* Note, this are pseudo-console handles provided by ConPTY, which we will use for all
+	 * console I/O operations. Essentially, this are pseudo-console handles that ConPTY gives 
+	 * us, which we can read from and write to, and ConPTY will forward the data to the actual 
+	 * console. This allows us to stay in the pipe I/O model. */
+	HANDLE stdin_hdl = GetDirectHandle("CONIN$", FILE_SHARE_READ);
+	HANDLE stdout_hdl = GetDirectHandle("CONOUT$", FILE_SHARE_WRITE);
+
+	if (fdIn != -1) {
+	    T(("In the first call fdIn is expected to be -1."));
+	    returnBool(FALSE);
+	}
+
+	if (stdout_hdl == INVALID_HANDLE_VALUE || GetConsoleMode(stdout_hdl,
+								 &dwFlag) == 0) {
+	    T(("Output handle is not a pseudo-console"));
+	    returnBool(FALSE);
+	}
+	defaultCONPTY.core.ConsoleHandleOut = stdout_hdl;
+
+	if (stdin_hdl == INVALID_HANDLE_VALUE || GetConsoleMode(stdin_hdl,
+								&dwFlag) == 0) {
+	    T(("StdIn handle is not a pseudo-console"));
+	    returnBool(FALSE);
+	}
+	defaultCONPTY.core.ConsoleHandleIn = stdin_hdl;
+
+	SetConsoleMode(stdout_hdl, dwFlagOut);
+	/* We immediately read the console mode back to reflect any changes the
+	 * runtime may have added, so the saved value reflects the actual mode
+	 * of the console. */
+	if (GetConsoleMode(stdout_hdl, &dwFlagOut) == 0) {
+	    T(("GetConsoleMode() failed for stdout"));
+	    returnBool(FALSE);
+	}
+	defaultCONPTY.core.ttyflags.dwFlagOut = dwFlagOut;
+
+	SetConsoleMode(stdin_hdl, dwFlagIn);
+	/* We immediately read the console mode back to reflect any changes the
+	 * runtime may have added, so the saved value reflects the actual mode
+	 * of the console. */
+	if (GetConsoleMode(stdin_hdl, &dwFlagIn) == 0) {
+	    T(("GetConsoleMode() failed for stdin"));
+	    returnBool(FALSE);
+	}
+	defaultCONPTY.core.ttyflags.dwFlagIn = dwFlagIn;
+	MarkConsoleInitialized(&MYSELF.core);
+	result = TRUE;
+    } else {
+	T(("Console already initialized, skipping initialization"));
+	result = TRUE;
+    }
+    returnBool(result);
+}
+
+/* Get the current size of the Windows Console in lines and columns.
+ * This method must not alter the cached values stored in ConsoleInfo.
+ * It should report the result from the GetConsoleScreenBufferInfo
+ * API call directly. It may use the cached values as a fallback if the
+ * API call fails. The use of this API call is non-destructive in the
+ * API context.
+ * This method can be safely called before the Console is initialized,
+ * because we can fallback to query the standard handles. */
+METHOD(size, void)(int *Lines, int *Cols) {
+    T((T_METHOD(size, "(lines=%p, cols=%p)"), Lines, Cols));
+
+    AssertIsConPTY();
+
+    if (Lines != NULL && Cols != NULL) {
+	CONSOLE_SCREEN_BUFFER_INFO csbi;
+	if (MYSELF.core.getSBI(&csbi)) {
+	    *Lines = (int) (csbi.srWindow.Bottom + 1 - csbi.srWindow.Top);
+	    *Cols = (int) (csbi.srWindow.Right + 1 - csbi.srWindow.Left);
+	    returnVoid;
+	}
+	/* Fallback to cached values or defaults if we can't get the console size.
+	 * Windows Terminal default size is 120 columns x 30 rows.
+	 * If cached values are set we use those instead to reflect the actual size. */
+	*Lines = MYSELF.core.sbi_lines != -1 ? MYSELF.core.sbi_lines : DEFAULT_CONSOLE_LINES;
+	*Cols = MYSELF.core.sbi_cols != -1 ? MYSELF.core.sbi_cols : DEFAULT_CONSOLE_COLS;
+    }
+    returnVoid;
+}
+
+/* Check if the Windows Console has been resized. Returns TRUE if a resize was detected.
+ * We implement a simple throttling to ensure that we don't call GetConsoleScreenBufferInfo
+ * too often, which could become expensive in a pseudo-console context because it involves
+ * a round trip to the ConPTY backend. The throttling is implemented by keeping	 track of the
+ * last time we checked for a resize, and if the function is called again within a certain
+ * time frame, we simply return FALSE without checking. This allows us to avoid unnecessary
+ * calls to GetConsoleScreenBufferInfo while still detecting resizes in a timely manner when
+ * they occur. */
+METHOD(size_changed, bool)(void) {
+    static struct timeval lastCheck =
+    {0, 0};
+    struct timeval now;
+    int current_lines, current_cols;
+    bool resized = FALSE;
+
+    T((T_METHOD(size_changed, "()")));
+
+    AssertIsConPTY();
+
+    gettimeofday(&now, NULL);
+
+    if (_nc_timeval_diff_in_ms(lastCheck, now) < RESIZE_CHECK_THROTTLING_MS)
+	returnBool(FALSE);
+
+    DispatchMethod(size) (&current_lines, &current_cols);
+
+    if (MYSELF.core.sbi_lines == -1 || MYSELF.core.sbi_cols == -1) {
+	MYSELF.core.sbi_lines = current_lines;
+	MYSELF.core.sbi_cols = current_cols;
+    } else {
+	if (current_lines != MYSELF.core.sbi_lines || current_cols != MYSELF.core.sbi_cols) {
+	    MYSELF.core.sbi_lines = current_lines;
+	    MYSELF.core.sbi_cols = current_cols;
+
+	    _nc_globals.have_sigwinch = 1;
+
+	    resized = TRUE;
+	}
+    }
+    gettimeofday(&lastCheck, NULL);
+    returnBool(resized);
+}
+
+// ---------------------------The input subsystem -------------------------------------------
+
+/* This function is called, when we enter ncurses program mode, which means we want to take
+ * control over the console input and use our own input thread and buffer to manage console
+ * input. We initialize the necessary synchronization primitives and start the input thread,
+ * which will block on reading from the console input handle. */
+static int
+pty_start_input_subsystem(void)
+{
+    T((T_CALLED("libwin32conpty::pty_start_input_subsystem()")));
+
+    AssertIsConPTY();
+
+    if (g_input_thread != NULL)
+	returnCode(OK);		// Already running
+
+    if (g_stdin_handle == INVALID_HANDLE_VALUE)
+	returnCode(ERR);
+
+    g_read_request_event = CreateEvent(NULL, TRUE, FALSE, NULL);
+    if (g_read_request_event == NULL)
+	returnCode(ERR);
+
+    g_input_available_event = CreateEvent(NULL, TRUE, FALSE, NULL);
+    if (g_input_available_event == NULL) {
+	CloseHandle(g_read_request_event);
+	returnCode(ERR);
+    }
+
+    g_shutdown_event = CreateEvent(NULL, TRUE, FALSE, NULL);
+    if (g_shutdown_event == NULL) {
+	CloseHandle(g_read_request_event);
+	CloseHandle(g_input_available_event);
+	returnCode(ERR);
+    }
+
+    InitializeCriticalSection(&g_input_buffer.lock);
+
+    g_input_thread = (HANDLE) (uintptr_t) _beginthreadex(NULL, 0,
+							 input_thread,
+							 &g_input_buffer, 0, NULL);
+    if (g_input_thread == NULL) {
+	CloseHandle(g_read_request_event);
+	CloseHandle(g_input_available_event);
+	CloseHandle(g_shutdown_event);
+	DeleteCriticalSection(&g_input_buffer.lock);
+	returnCode(ERR);
+    }
+    returnCode(OK);
+}
+
+/* This function is called when we exit ncurses program mode, which means we want to shut down
+ * our input thread and clean up the synchronization primitives and buffers. We signal the
+ * input thread to shut down, and we also cancel any pending ReadFile operation in case the
+ * thread is currently blocked on reading from the console, to ensure that it can exit promptly.
+ * We then wait for the thread to exit. Finally, we clean up all the resources and reset the
+ * global variables to their initial state. */
+static int
+pty_stop_input_subsystem(void)
+{
+    T((T_CALLED("libwin32conpty::pty_stop_input_subsystem()")));
+
+    AssertIsConPTY();
+
+    if (g_input_thread == NULL)
+	returnCode(OK);		// not running, nothing to do
+
+    SetEvent(g_shutdown_event);
+
+    /* Force input_thread to exit immediately if it's currently blocked in ReadFile
+     * by cancelling the I/O operation. This is necessary to ensure that we can shut
+     * down cleanly even if the input thread is waiting for input and no input is
+     * coming. */
+    CancelSynchronousIo(g_input_thread);
+
+    /* Wait until thread really exits, with a timeout to avoid hanging indefinitely
+     * in case something goes wrong. */
+    if (WaitForSingleObject(g_input_thread, 2000) == WAIT_TIMEOUT) {
+	/* Emergency measure if the thread is extremely stubborn and does not exit
+	 * in a reasonable time frame. */
+	TerminateThread(g_input_thread, 0);
+    }
+
+    CloseHandle(g_input_thread);
+    g_input_thread = NULL;	// IMPORTANT!!
+
+    CloseHandle(g_read_request_event);
+    g_read_request_event = NULL;
+
+    CloseHandle(g_input_available_event);
+    g_input_available_event = NULL;
+
+    CloseHandle(g_shutdown_event);
+    g_shutdown_event = NULL;
+
+    DeleteCriticalSection(&g_input_buffer.lock);
+    g_input_buffer.lock = (CRITICAL_SECTION) {
+	0
+    };
+
+    g_input_buffer.head = 0;
+    g_input_buffer.tail = 0;
+
+    returnCode(OK);
+}
+
+// This function returns the number of bytes available in the input buffer.
+static int
+input_available_count(InputBuffer * pbuf)
+{
+    int avail;
+    T((T_CALLED("lib_win32conpty::input_available_count(pbuf=%p)"), pbuf));
+    assert(g_input_thread != NULL);
+    EnterCriticalSection(&pbuf->lock);
+    avail = (pbuf->head - pbuf->tail + INPUT_BUFFER_SIZE) % INPUT_BUFFER_SIZE;
+    LeaveCriticalSection(&pbuf->lock);
+    returnCode(avail);
+}
+
+/* This function writes data to the input buffer. It is called by the input thread when it
+ * reads data from the console, and it needs to store that data in the buffer for the main
+ * thread to read later. The function takes care of managing the head and tail indices of
+ * the ring buffer, and it also ensures that if the buffer becomes full, it will overwrite
+ * the oldest data (by advancing the tail index). The function is protected by a critical
+ * section to ensure thread safety when accessing the buffer. */
+static void
+ringbuffer_write(InputBuffer * pbuf, uint8_t *data, DWORD n)
+{
+    T((T_CALLED("lib_win32conpty::ringbuffer_write(pbuf=%p, data=%p, n=%lu)"),
+       pbuf, data, n));
+    EnterCriticalSection(&pbuf->lock);
+    for (DWORD i = 0; i < n; i++) {
+	pbuf->buf[pbuf->head] = data[i];
+	pbuf->head = (pbuf->head + 1) % INPUT_BUFFER_SIZE;
+	if (pbuf->head == pbuf->tail)
+	    pbuf->tail = (pbuf->tail + 1) % INPUT_BUFFER_SIZE;
+    }
+    LeaveCriticalSection(&pbuf->lock);
+}
+
+/* This function reads a byte from the input buffer. It is indirectly called by the main
+ * thread when it wants to read input that has been stored in the buffer by the input
+ * thread. The function takes care of managing the head and tail indices of the ring
+ * buffer, and it is protected by a critical section to ensure thread safety when
+ * accessing the buffer. */
+static bool
+ringbuffer_read(InputBuffer * pbuf, uint8_t *byte)
+{
+    T((T_CALLED("lib_win32conpty::ringbuffer_read(pbuf=%p, byte=%p)"), pbuf, byte));
+    EnterCriticalSection(&pbuf->lock);
+    if (((pbuf->head - pbuf->tail + INPUT_BUFFER_SIZE) % INPUT_BUFFER_SIZE)
+	== 0) {
+	LeaveCriticalSection(&pbuf->lock);
+	returnBool(FALSE);
+    }
+    *byte = pbuf->buf[pbuf->tail];
+    pbuf->tail = (pbuf->tail + 1) % INPUT_BUFFER_SIZE;
+    LeaveCriticalSection(&pbuf->lock);
+    returnBool(TRUE);
+}
+
+/* This function is the entry point for the input thread. It continuously waits for 
+ * input requests or shutdown events, reads data from the console, and writes it to 
+ * the input buffer. */
+static unsigned __stdcall
+input_thread(LPVOID param)
+{
+    InputBuffer *pbuf = (InputBuffer *) param;
+    uint8_t tmp[256];
+    DWORD n;
+    HANDLE wait_handles[2] =
+    {g_shutdown_event, g_read_request_event};
+
+    T((T_CALLED("lib_win32conpty::input_thread(param=%p)"), param));
+
+    while (1) {
+	DWORD r = WaitForMultipleObjects(2, wait_handles, FALSE, INFINITE);
+	if (r == WAIT_OBJECT_0) {
+	    T(("input_thread: Shutdown event received, exiting thread"));
+	    break;
+	} else if (r != WAIT_OBJECT_0 + 1) {
+	    T(("input_thread: Unexpected wait result: %lu, continuing...", r));
+	    continue;
+	}
+
+	if (ReadFile(g_stdin_handle, tmp, sizeof(tmp), &n, NULL)) {
+	    if (n > 0) {
+		ringbuffer_write(pbuf, tmp, n);
+		SetEvent(g_input_available_event);
+	    }
+	} else {
+	    DWORD err = GetLastError();
+	    if (err == ERROR_OPERATION_ABORTED) {
+		T(("input_thread: ReadFile was cancelled, exiting thread"));
+		break;
+	    }
+	}
+	ResetEvent(g_read_request_event);
+    }
+    T(("input_thread: Thread exiting"));
+    return 0;
+}
+
+/* This function attempts to read a byte from the input buffer without blocking.
+ * It is indirectly called by the main thread when it wants to read input that has
+ * been stored in the buffer by the input thread. The function returns immediately
+ * if no input is available.
+ * It is here for mere completeness, the ncurses code actually doesn't use it, but it
+ * could be useful for future extensions or for other parts of the code that want to
+ * check for input without blocking. */
+GCC_UNUSED static int
+get_byte_nonblocking(void)
+{
+    uint8_t byte;
+    T((T_CALLED("lib_win32conpty::get_byte_nonblocking()")));
+    if (ringbuffer_read(&g_input_buffer, &byte)) {
+	if (input_available_count(&g_input_buffer) == 0)
+	    ResetEvent(g_input_available_event);
+	returnCode((int) byte);
+    }
+    returnCode(-1);
+}
+
+/* This function attempts to read a byte from the input buffer, blocking if necessary.
+ * It is called indirectlyby the main thread when it wants to read input that has been
+ * stored in the buffer by the input thread. The function waits until input is available. */
+static int
+get_byte_blocking(void)
+{
+    uint8_t byte;
+
+    T((T_CALLED("lib_win32conpty::get_byte_blocking()")));
+
+    while (input_available_count(&g_input_buffer) == 0) {
+	SetEvent(g_read_request_event);
+	WaitForSingleObject(g_input_available_event, INFINITE);
+    }
+
+    if (ringbuffer_read(&g_input_buffer, &byte)) {
+	if (input_available_count(&g_input_buffer) == 0) {
+	    ResetEvent(g_input_available_event);
+	}
+	returnCode((int) byte);
+    }
+
+    returnCode(-1);		// Should never happen
+}
+
+/* This function polls the input buffer for available data. It waits for the specified
+ * timeout and returns 1 if data is available, 0 if the timeout expires, and -1 on error. */
+static int
+poll_input(DWORD timeout_ms)
+{
+    DWORD r;
+
+    if (input_available_count(&g_input_buffer) > 0)
+	return 1;
+
+    SetEvent(g_read_request_event);
+
+    r = WaitForSingleObject(g_input_available_event, timeout_ms);
+
+    if (r == WAIT_OBJECT_0)
+	return 1;
+
+    if (r == WAIT_TIMEOUT)
+	return 0;
+
+    return -1;
+}
+
+/* This function polls the input buffer for available data. It waits for the specified
+ * timeout and returns 1 if data is available, 0 if the timeout expires, and -1 on error.
+ *
+ * This is the implementation of the pty_poll method for the Windows Console backend, which
+ * allows the main thread to wait for input without blocking indefinitely, by waiting on
+ * the input_available_event that the input thread signals when it has read data from the
+ * console and stored it in the input buffer.
+ *
+ * The call has the same signature as the corresponding UNIX function, but it only supports
+ * polling on stdin (fd 0) and ignores any other file descriptors, since the Windows Console
+ * backend is designed to work with the console input handle directly. If the caller tries
+ * to poll on any other file descriptor or more than one file descriptor, the function
+ * will return -1 to indicate an error.
+ *
+ * We implement it that way, so that we can use it in module lib_twait.c with minimal changes
+ * to the original UNIX based design, and we can also support the standard ncurses polling
+ * mechanism in a way that is consistent with the rest of the Windows Console backend design.
+ *
+ * The basic assumption is, that this will only be called when in prog mode. */
+METHOD(poll, int)(struct pty_pollfd
+			 * fds, nfds_t nfds, int timeout_ms) {
+    int code = -1;
+
+    T((T_METHOD(poll, "(fds=%p, nfds=%u, timeout_ms=%d)"),
+       fds, (unsigned) nfds, timeout_ms));
+
+    AssertIsConPTY();
+
+    if (nfds == 0) {
+	// pure wait, o we don't actually poll and don't need to assert the input system is up.
+	Sleep((DWORD) timeout_ms);
+	returnCode(0);
+    }
+    assert(g_input_thread != NULL && g_stdin_handle != INVALID_HANDLE_VALUE);
+
+    if (g_input_thread == NULL || g_stdin_handle == INVALID_HANDLE_VALUE)
+	returnCode(code);
+
+    // We only support polling stdin
+    if (nfds != 1 || fds[0].fd != fileno(stdin))
+	returnCode(code);
+
+    code = poll_input(timeout_ms);
+    if (code < 0)
+	returnCode(code);
+    if (code == 0)
+	fds[0].revents = 0;
+    else
+	fds[0].revents = POLLIN;
+    returnCode(code);
+}
+
+/* This function reads bytes of input from the console. It is called by the main thread when
+ * it wants to read input that has been stored in the buffer by the input thread. The function
+ * blocks until input is available, and then it returns the byte that was read. If there is an
+ * error, it returns -1.
+ *
+ * The basic assumption is, that this will only be called when in prog mode. */
+METHOD(read, int)(int fd GCC_UNUSED, void
+			 *result, size_t count) {
+    int byte;
+    size_t i;
+
+    T((T_METHOD(read, "(fd=%d, result=%p)"), fd, result));
+
+    AssertIsConPTY();
+    assert(g_input_thread != NULL && g_stdin_handle != INVALID_HANDLE_VALUE);
+
+    if (!result || g_input_thread == NULL || g_stdin_handle == INVALID_HANDLE_VALUE)
+	returnCode(-1);
+
+    if (count == 0)
+	returnCode(0);
+
+    // If the input thread is running, we read from the ring buffer it fills
+    for (i = 0; i < count; i++) {
+	byte = get_byte_blocking();
+	if (byte == -1)
+	    returnCode((int) i);	// Return the number of bytes read so far, which may be 0 if we fail on the first byte
+	((unsigned char *) result)[i] = (unsigned char) byte;
+    }
+    returnCode((int) count);
+}
+
+/* This function writes data to the console output. It is called by the main thread when it
+ * wants to write output to the console. The function takes a buffer and a count of bytes to
+ * write, and it returns the number of bytes that were actually written, or -1 on error.
+ * The function uses the WriteFile API to write to the console output handle, which is a
+ * pseudo-console handle provided by ConPTY. This allows us to write to the console in a way
+ * that is consistent with the rest of the Windows Console backend design, and it also ensures
+ * that we can take advantage of any features provided by ConPTY, such as proper handling of
+ * UTF-8 output and support for virtual terminal sequences. */
+METHOD(write, int)(int fd
+			  GCC_UNUSED, const void *buf, size_t count) {
+    HANDLE hOut = defaultCONPTY.core.ConsoleHandleOut;
+    DWORD written = 0;
+
+    T((T_METHOD(write, "(fd=%d, buf=%p, count=%u)"), fd, buf, (unsigned) count));
+
+    AssertIsConPTY();
+
+    if (hOut == INVALID_HANDLE_VALUE)
+	returnCode(-1);
+
+    if (!buf || count == 0)
+	returnCode(0);
+
+    if (!WriteFile(hOut, buf, (DWORD) count, &written, NULL)) {
+	T(("WriteFile failed with error %lu", GetLastError()));
+	returnCode(-1);
+    }
+
+    returnCode((int) written);
+}
+
+METHOD(togglemode, void)(void) {
+    if (IsConsoleProgMode(&MYSELF.core)) {
+	pty_start_input_subsystem();
+    } else {
+	pty_stop_input_subsystem();
+    }
+}
+
+#endif /* USE_CONPTY */

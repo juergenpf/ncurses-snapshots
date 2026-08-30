@@ -207,10 +207,10 @@ GoTo(NCURSES_SP_DCLx int const row, int const col)
 		   SP_PARM->_cursrow,
 		   SP_PARM->_curscol, "GoTo");
 
-    TINFO_MVCUR(NCURSES_SP_ARGx
-		SP_PARM->_cursrow,
-		SP_PARM->_curscol,
-		row, col);
+    NCURSES_SP_NAME(_nc_mvcur)(NCURSES_SP_ARGx
+			       SP_PARM->_cursrow,
+			       SP_PARM->_curscol,
+			       row, col);
     position_check(NCURSES_SP_ARGx
 		   SP_PARM->_cursrow,
 		   SP_PARM->_curscol, "GoTo2");
@@ -741,7 +741,7 @@ PutRange(NCURSES_SP_DCLx
 		if_USE_SCROLL_HINTS(win->_line[row].oldindex = row)
 
 NCURSES_EXPORT(int)
-TINFO_DOUPDATE(NCURSES_SP_DCL0)
+NCURSES_SP_NAME(doupdate)(NCURSES_SP_DCL0)
 {
     int i;
     int nonempty;
@@ -750,7 +750,11 @@ TINFO_DOUPDATE(NCURSES_SP_DCL0)
 #endif /* USE_TRACE_TIMES */
 
     T((T_CALLED("_nc_tinfo:doupdate(%p)"), (void *) SP_PARM));
-
+#if USE_SCREENBUFFERED_CONSOLE
+    if (ScreenIsBufferedConsole(SP_PARM)) {
+	returnCode(_nc_win32con_doupdate(SP_PARM));
+    }
+#endif
     _nc_lock_global(update);
 
     if (SP_PARM == NULL) {
@@ -1100,11 +1104,11 @@ TINFO_DOUPDATE(NCURSES_SP_DCL0)
     returnCode(OK);
 }
 
-#if NCURSES_SP_FUNCS && !USE_TERM_DRIVER
+#if NCURSES_SP_FUNCS
 NCURSES_EXPORT(int)
 doupdate(void)
 {
-    return TINFO_DOUPDATE(CURRENT_SCREEN);
+    return NCURSES_SP_NAME(doupdate)(CURRENT_SCREEN);
 }
 #endif
 
@@ -2244,11 +2248,11 @@ NCURSES_SP_NAME(_nc_screen_wrap)(NCURSES_SP_DCL0)
 					  NCURSES_SP_NAME(_nc_outch));
 	    SP_PARM->_default_color = FALSE;
 
-	    TINFO_MVCUR(NCURSES_SP_ARGx
-			SP_PARM->_cursrow,
-			SP_PARM->_curscol,
-			screen_lines(SP_PARM) - 1,
-			0);
+	    NCURSES_SP_NAME(_nc_mvcur)(NCURSES_SP_ARGx
+				       SP_PARM->_cursrow,
+				       SP_PARM->_curscol,
+				       screen_lines(SP_PARM) - 1,
+				       0);
 
 	    ClrToEOL(NCURSES_SP_ARGx blank, TRUE);
 	}

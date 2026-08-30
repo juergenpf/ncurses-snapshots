@@ -272,7 +272,12 @@ use_tioctl(bool f)
 }
 #endif
 
-#if !(USE_TERM_DRIVER || USE_NAMED_PIPES)
+#if USE_CONSOLE_API
+/* By design, the CONSOLE always provides a default size */
+#define _nc_default_screensize(termp, linep, colp) DefaultConsole()->size(linep, colp);
+#endif
+
+#if !USE_CONSOLE_API
 static void
 _nc_default_screensize(TERMINAL *termp, int *linep, int *colp)
 {
@@ -454,47 +459,44 @@ _nc_check_screensize(SCREEN *sp, TERMINAL *termp, int *linep, int *colp)
 #else /* !USE_CHECK_SIZE */
 #define _nc_check_screensize(sp, termp, linep, colp)	/* nothing */
 #endif
-#endif /* !(USE_TERM_DRIVER || USE_NAMED_PIPES) */
+#else
+#define _nc_check_screensize(sp, termp, linep, colp)	/* nothing */
+#endif /* !USE_CONSOLE_API */
 
 NCURSES_EXPORT(void)
 _nc_get_screensize(SCREEN *sp,
-#if USE_TERM_DRIVER
-		   TERMINAL *termp,
-#endif
 		   int *linep, int *colp)
 /* Obtain lines/columns values from the environment and/or terminfo entry */
 {
-#if USE_TERM_DRIVER
-    TERMINAL_CONTROL_BLOCK *TCB;
     int my_tabsize;
-
-    assert(termp != NULL && linep != NULL && colp != NULL);
-    TCB = (TERMINAL_CONTROL_BLOCK *) termp;
-
-    my_tabsize = TCB->info.tabsize;
-    TCB->drv->td_size(TCB, linep, colp);
-
-#if USE_REENTRANT
-    if (sp != NULL) {
-	sp->_TABSIZE = my_tabsize;
-    }
-#else
-    (void) sp;
-    TABSIZE = my_tabsize;
-#endif
-    T(("TABSIZE = %d", my_tabsize));
-#else /* !USE_TERM_DRIVER */
     TERMINAL *termp = cur_term;
-    int my_tabsize;
     bool useEnv = _nc_prescreen.use_env;
     bool useTioctl = _nc_prescreen.use_tioctl;
 
+    assert(linep != NULL && colp != NULL);
+#if USE_SCREENBUFFERED_CONSOLE
+    if (ScreenIsBufferedConsole(sp)) {
+	my_tabsize = AsScreenBufferedConsole(sp)->info.tabsize;
+#if USE_REENTRANT
+	if (sp != NULL) {
+	    sp->_TABSIZE = my_tabsize;
+	}
+#else
+	(void) sp;
+	TABSIZE = my_tabsize;
+#endif
+	T(("TABSIZE = %d", my_tabsize));
+	DefaultConsole()->size(linep, colp);
+	returnVoid
+    }
+#endif /* !USE_SCREENBUFFERED_CONSOLE */
+
     T((T_CALLED("_nc_get_screensize (%p)"), (void *) sp));
-#if USE_NAMED_PIPES
+#if USE_CONPTY
     /* If we are here, then Windows console is used in terminfo mode.
        We need to figure out the size using the console API
      */
-    _nc_console_size(linep, colp);
+    ScreenConsole(sp)->size(linep, colp);
     T(("screen size: winconsole lines = %d columns = %d", *linep, *colp));
 #else
     /* figure out the size of the screen */
@@ -613,7 +615,6 @@ _nc_get_screensize(SCREEN *sp,
 #endif
     T(("TABSIZE = %d", TABSIZE));
     returnVoid;
-#endif /* USE_TERM_DRIVER */
 }
 
 #if USE_SIZECHANGE
@@ -622,23 +623,27 @@ _nc_update_screensize(SCREEN *sp)
 {
     int new_lines;
     int new_cols;
-
-#if USE_TERM_DRIVER
     int old_lines;
     int old_cols;
-
-    assert(sp != NULL);
-
-    CallDriver_2(sp, td_getsize, &old_lines, &old_cols);
-
-#else
     TERMINAL *termp = cur_term;
-    int old_lines = lines;
-    int old_cols = columns;
+
+#if USE_SCREENBUFFERED_CONSOLE
+    assert(sp != NULL);
+    if (ScreenIsBufferedConsole(sp)) {
+	old_lines = AsScreenBufferedConsole(sp)->core.sbi_lines;
+	old_cols = AsScreenBufferedConsole(sp)->core.sbi_cols;
+	AsScreenBufferedConsole(sp)->adjust_size();
+	// JPF TODO FIXME : Not sure we can let run that through for legacy console... need to check.
+    } else {
+#endif
+	old_lines = lines;
+	old_cols = columns;
+#if USE_SCREENBUFFERED_CONSOLE
+    }
 #endif
 
     if (sp != NULL) {
-	TINFO_GET_SIZE(sp, sp->_term, &new_lines, &new_cols);
+	_nc_get_screensize(sp, &new_lines, &new_cols);
 	/*
 	 * See is_term_resized() and resizeterm().
 	 * We're doing it this way because those functions belong to the upper
@@ -818,15 +823,11 @@ _nc_locale_breaks_acs(TERMINAL *termp)
 }
 
 NCURSES_EXPORT(int)
-TINFO_SETUP_TERM(TERMINAL **tp,
-		 const char *tname,
-		 int Filedes,
-		 int *errret,
-		 int reuse)
+_nc_setupterm(const char *tname,
+	      int Filedes,
+	      int *errret,
+	      int reuse)
 {
-#if USE_TERM_DRIVER
-    TERMINAL_CONTROL_BLOCK *TCB = NULL;
-#endif
     TERMINAL *termp;
     SCREEN *sp = NULL;
     char *myname;
@@ -834,30 +835,32 @@ TINFO_SETUP_TERM(TERMINAL **tp,
 
     START_TRACE();
 
-#if USE_TERM_DRIVER
-    T((T_CALLED("_nc_setupterm_ex(%p,%s,%d,%p)"),
-       (void *) tp, _nc_visbuf(tname), Filedes, (void *) errret));
-
-    if (tp == NULL) {
-	ret_error0(TGETENT_ERR,
-		   "Invalid parameter, internal error.\n");
-    } else
-	termp = *tp;
-#else
     termp = cur_term;
     T((T_CALLED("setupterm(%s,%d,%p)"), _nc_visbuf(tname), Filedes, (void *) errret));
+
+#if USE_CONSOLE_API
+    tname = _nc_term_select();
+    // Do NOT use ScreenConsole() here, because association is not yet established.
+    if (!DefaultConsole()->init(Filedes, -1)) {
+	code = ERR;
+	ret_error0(TGETENT_ERR,
+		   CONSOLE_INIT_FAILURE_MSG);
+    }
 #endif
 
     if (tname == NULL) {
-	tname = getenv("TERM");
-#if USE_NAMED_PIPES
-	if (!VALID_TERM_ENV(tname, NO_TERMINAL)) {
-	    T(("Failure with TERM=%s", NonNull(tname)));
-	    ret_error0(TGETENT_ERR, "TERM environment variable not set.\n");
+	tname = _nc_term_select();
+
+#if USE_SCREENBUFFERED_CONSOLE
+	if (ScreenIsBufferedConsole(sp)) {
+	    tname = CONSOLE_TERM_NAME;
+	} else {
+	    if (!VALID_TERM_ENV(tname, NO_TERMINAL)) {
+		T(("Failure with TERM=%s", NonNull(tname)));
+		ret_error0(TGETENT_ERR,
+			   "TERM environment variable not set.\n");
+	    }
 	}
-#elif USE_TERM_DRIVER
-	if (!NonEmpty(tname))
-	    tname = "unknown";
 #else
 	if (!NonEmpty(tname)) {
 	    T(("Failure with TERM=%s", NonNull(tname)));
@@ -881,10 +884,6 @@ TINFO_SETUP_TERM(TERMINAL **tp,
      */
     if (Filedes == STDOUT_FILENO && !NC_ISATTY(Filedes))
 	Filedes = STDERR_FILENO;
-#if USE_NAMED_PIPES
-    if (Filedes != STDERR_FILENO && NC_ISATTY(Filedes))
-	_setmode(Filedes, _O_BINARY);
-#endif
 
     /*
      * Check if we have already initialized to use this terminal.  If so, we
@@ -910,20 +909,10 @@ TINFO_SETUP_TERM(TERMINAL **tp,
 	&& _nc_name_match(TerminalType(termp).term_names, myname, "|")) {
 	T(("reusing existing terminal information and mode-settings"));
 	code = OK;
-#if USE_TERM_DRIVER
-	TCB = (TERMINAL_CONTROL_BLOCK *) termp;
-#endif
     } else {
-#if USE_TERM_DRIVER
-	TERMINAL_CONTROL_BLOCK *my_tcb;
-	termp = NULL;
-	if ((my_tcb = typeCalloc(TERMINAL_CONTROL_BLOCK, 1)) != NULL)
-	    termp = &(my_tcb->term);
-#else
 	int status;
 
 	termp = typeCalloc(TERMINAL, 1);
-#endif
 	if (termp == NULL) {
 	    ret_error1(TGETENT_ERR,
 		       "Not enough memory to create terminal structure.\n",
@@ -948,23 +937,6 @@ TINFO_SETUP_TERM(TERMINAL **tp,
 #endif /* HAVE_SYSCONF */
 	T(("using %d for getstr limit", _nc_globals.getstr_limit));
 
-#if USE_TERM_DRIVER
-	INIT_TERM_DRIVER();
-	/*
-	 * _nc_get_driver() will call td_CanHandle() for each driver, and win_driver
-	 * needs file descriptor to do the test, so set it before calling.
-	 */
-	termp->Filedes = Filedes;
-	TCB = (TERMINAL_CONTROL_BLOCK *) termp;
-	code = _nc_globals.term_driver(TCB, myname, errret);
-	if (code == OK) {
-	    termp->_termname = strdup(myname);
-	} else {
-	    ret_error1(errret ? *errret : TGETENT_ERR,
-		       "Could not find any driver to handle terminal.\n",
-		       myname, free(myname));
-	}
-#else
 #if NCURSES_USE_DATABASE || NCURSES_USE_TERMCAP
 	status = _nc_setup_tinfo(myname, &TerminalType(termp));
 	T(("_nc_setup_tinfo returns %d", status));
@@ -985,16 +957,26 @@ TINFO_SETUP_TERM(TERMINAL **tp,
 	}
 
 	if (status != TGETENT_YES) {
-	    del_curterm(termp);
-	    if (status == TGETENT_ERR) {
-		free(myname);
-		ret_error0(status, "terminals database is inaccessible\n");
-	    } else if (status == TGETENT_NO) {
-		ret_error1(status, "unknown terminal type.\n",
-			   myname, free(myname));
-	    } else {
-		free(myname);
-		ret_error0(status, "unexpected return-code\n");
+#if USE_SCREENBUFFERED_CONSOLE
+	    if (ScreenIsBufferedConsole(sp)) {
+		/* Legacy console has no terminfo entry; initialize with defaults */
+		_nc_init_termtype(&TerminalType(termp));
+		status = TGETENT_YES;
+	    } else
+#endif
+	    {
+		del_curterm(termp);
+		if (status == TGETENT_ERR) {
+		    free(myname);
+		    ret_error0(status,
+			       "terminals database is inaccessible\n");
+		} else if (status == TGETENT_NO) {
+		    ret_error1(status, "unknown terminal type.\n",
+			       myname, free(myname));
+		} else {
+		    free(myname);
+		    ret_error0(status, "unexpected return-code\n");
+		}
 	    }
 	}
 #if NCURSES_EXT_NUMBERS
@@ -1024,26 +1006,18 @@ TINFO_SETUP_TERM(TERMINAL **tp,
 	    NCURSES_SP_NAME(baudrate)(NCURSES_SP_ARG);
 	}
 	code = OK;
-#endif /* USE_TERM_DRIVER */
     }
 
-#if USE_TERM_DRIVER
-    *tp = termp;
-    NCURSES_SP_NAME(set_curterm)(sp, termp);
-    TCB->drv->td_init(TCB);
-#else
     sp = SP;
-#endif
 
     /*
      * We should always check the screensize, just in case.
      */
-    TINFO_GET_SIZE(sp, termp, ptrLines(sp), ptrCols(sp));
+    _nc_get_screensize(sp, ptrLines(sp), ptrCols(sp));
 
     if (errret)
 	*errret = TGETENT_YES;
 
-#if !USE_TERM_DRIVER
     if (generic_type) {
 	/*
 	 * BSD 4.3's termcap contains mis-typed "gn" for wy99.  Do a sanity
@@ -1063,6 +1037,10 @@ TINFO_SETUP_TERM(TERMINAL **tp,
 	ret_error1(TGETENT_YES, "I can't handle hardcopy terminals.\n",
 		   myname, free(myname));
     }
+#if USE_CONSOLE_API
+    DefaultConsole()->sp = sp;
+    if (sp)
+	sp->_console = DefaultConsole();	// 1-1 relationship between console and screen
 #endif
     free(myname);
     returnCode(code);
@@ -1165,35 +1143,6 @@ new_prescr(void)
     }
     _nc_unlock_global(screen);
     returnSP(sp);
-}
-#endif
-
-#if USE_TERM_DRIVER
-/*
- * This entrypoint is called from tgetent() to allow a special case of reusing
- * the same TERMINAL data (see comment).
- */
-NCURSES_EXPORT(int)
-_nc_setupterm(const char *tname,
-	      int Filedes,
-	      int *errret,
-	      int reuse)
-{
-    int rc = ERR;
-    TERMINAL *termp = NULL;
-
-    _nc_init_pthreads();
-    _nc_lock_global(prescreen);
-    START_TRACE();
-    if (TINFO_SETUP_TERM(&termp, tname, Filedes, errret, reuse) == OK) {
-	_nc_forget_prescr();
-	if (NCURSES_SP_NAME(set_curterm)(CURRENT_SCREEN_PRE, termp) != NULL) {
-	    rc = OK;
-	}
-    }
-    _nc_unlock_global(prescreen);
-
-    return rc;
 }
 #endif
 

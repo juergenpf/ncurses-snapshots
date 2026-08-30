@@ -59,6 +59,12 @@ NCURSES_EXPORT_VAR(NCURSES_OSPEED) ospeed = 0;        /* used by termcap library
 
 NCURSES_EXPORT_VAR(int) _nc_nulls_sent = 0;
 
+#if USE_CONPTY
+#define NC_WRITE(fd,buf,len) (ScreenIsConPTYInProgMode(SP_PARM) ? AsConPTY(SP_PARM)->write(fd,buf, len) : write(fd, buf, len))
+#else
+#define NC_WRITE(fd,buf,len) write(fd, buf, len)
+#endif /* USE_CONPTY */
+
 #if NCURSES_NO_PADDING
 NCURSES_EXPORT(void)
 _nc_set_no_padding(SCREEN *sp)
@@ -136,8 +142,16 @@ NCURSES_SP_NAME(_nc_flush)(NCURSES_SP_DCL0)
 	    TR(TRACE_CHARPUT, ("flushing %ld/%ld bytes",
 			       (unsigned long) amount, _nc_outchars));
 	    while (amount) {
-		ssize_t res = write(SP_PARM->_ofd, buf, amount);
+		ssize_t res = NC_WRITE(SP_PARM->_ofd, buf, amount);
 		if (res > 0) {
+		    /* Because this is part of termlib, it can be called when we are not in program mode.
+		     * In that case on Windows for example the output file will be in it's default mode, 
+		     * which is text mode. In that case, effects like CRLF translation can cause the effect,
+		     * so the number of bytes written is greater than the amount requested. In that case, 
+		     * we must not subtract the number of bytes written from the amount, because that would
+		     * produce an underflow effect. */
+		    if ((size_t) res > amount)
+			break;
 		    /* if the write was incomplete, try again */
 		    amount -= (size_t) res;
 		    buf += res;
@@ -191,11 +205,12 @@ NCURSES_SP_NAME(_nc_outch)(NCURSES_SP_DCLx int ch)
 	     * POSIX says write() is safe in a signal handler, but the
 	     * buffered I/O is not.
 	     */
-	    if (write(fileno(NC_OUTPUT(SP_PARM)), &tmp, (size_t) 1) == -1)
+	    if (NC_WRITE(fileno(NC_OUTPUT(SP_PARM)), &tmp, (size_t) 1) == -1)
 		rc = ERR;
 	}
     } else {
 	char tmp = (char) ch;
+	// Write not in context of terminal/screen, don't use NC_WRITE.
 	if (write(fileno(stdout), &tmp, (size_t) 1) == -1)
 	    rc = ERR;
     }

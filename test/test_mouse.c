@@ -36,7 +36,7 @@
 
 #include <test.priv.h>
 
-#if defined(NCURSES_MOUSE_VERSION) && !defined(_NC_WINDOWS_NATIVE)
+#if defined(NCURSES_MOUSE_VERSION)
 
 static int logoffset = 0;
 
