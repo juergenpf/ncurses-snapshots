@@ -27,7 +27,7 @@
  * authorization.                                                           *
  ****************************************************************************/
 /*
- * $Id: test_mouse.c,v 1.39 2026/08/29 22:56:31 tom Exp $
+ * $Id: test_mouse.c,v 1.48 2026/09/05 21:31:48 tom Exp $
  *
  * Author: Leonid S Usov
  *
@@ -39,6 +39,19 @@
 #if defined(NCURSES_MOUSE_VERSION)
 
 static int logoffset = 0;
+
+static void
+cleanup(void)
+{
+    stop_curses();
+}
+
+static void
+onsig(int sig GCC_UNUSED)
+{
+    cleanup();
+    ExitProgram(EXIT_FAILURE);
+}
 
 static void
 raw_loop(void)
@@ -105,11 +118,30 @@ logw(const char *fmt, ...)
     clrtoeol();
 }
 
+#define ShowQ(btn,name) \
+	(((this_event & NCURSES_MOUSE_MASK(btn, NCURSES_ ## name)) != 0) \
+	 ? (" " #name) \
+	 : "")
+#define ShowM(name) \
+	(((this_event & BUTTON_ ## name) != 0) \
+	 ? (" " #name) \
+	 : "")
+#define ShowP() \
+	 ((this_event & REPORT_MOUSE_POSITION) != 0 \
+	  ? " position" \
+	  : "")
+#if NCURSES_MOUSE_VERSION == 3
+#define HexFormat "[%016lX]"
+#else
+#define HexFormat "[%08lX]"
+#endif
+
 static void
 cooked_loop(char *my_environ, int interval)
 {
     MEVENT event;
 
+    signal(SIGINT, onsig);
     initscr();
     noecho();
     cbreak();			/* Line buffering disabled; pass everything */
@@ -133,7 +165,6 @@ cooked_loop(char *my_environ, int interval)
 	case KEY_MOUSE:
 	    if (getmouse(&event) == OK) {
 		unsigned btn;
-		mmask_t events;
 #if NCURSES_MOUSE_VERSION > 2
 		const unsigned max_btn = 11;
 #elif NCURSES_MOUSE_VERSION > 1
@@ -147,53 +178,43 @@ cooked_loop(char *my_environ, int interval)
 					  NCURSES_DOUBLE_CLICKED |
 					  NCURSES_TRIPLE_CLICKED);
 		bool found = FALSE;
+		mmask_t this_event = event.bstate;
 		for (btn = 1; btn <= max_btn; btn++) {
-		    events = (mmask_t) (event.bstate
-					& NCURSES_MOUSE_MASK(btn, btn_mask));
-		    if (events == 0)
+		    mmask_t this_btn = (mmask_t) (this_event
+						  & NCURSES_MOUSE_MASK(btn, btn_mask));
+		    if (this_btn == 0)
 			continue;
-#define ShowQ(btn,name) \
-	(((event.bstate & NCURSES_MOUSE_MASK(btn, NCURSES_ ## name)) != 0) \
-	 ? (" " #name) \
-	 : "")
-#define ShowM(name) \
-	(((event.bstate & NCURSES_MOUSE_MASK(btn, BUTTON_ ## name)) != 0) \
-	 ? (" " #name) \
-	 : "")
-#define ShowP() \
-	 ((event.bstate & REPORT_MOUSE_POSITION) != 0 \
-	  ? " position" \
-	  : "")
-		    logw("[%08lX] button %d%s%s%s%s%s%s%s%s%s @ %d, %d",
-			 (unsigned long) events,
+		    logw(HexFormat " button %2d%s%s%s%s%s%s @%3d,%3d%s%s%s",
+			 (unsigned long) this_btn,
 			 btn,
 			 ShowQ(btn, BUTTON_RELEASED),
 			 ShowQ(btn, BUTTON_PRESSED),
 			 ShowQ(btn, BUTTON_CLICKED),
 			 ShowQ(btn, DOUBLE_CLICKED),
 			 ShowQ(btn, TRIPLE_CLICKED),
+			 ShowP(),
+			 event.y, event.x,
 			 ShowM(SHIFT),
 			 ShowM(CTRL),
-			 ShowM(ALT),
-			 ShowP(),
-			 event.y, event.x);
+			 ShowM(ALT));
 		    found = TRUE;
 		}
 		/*
 		 * A position report need not have a button associated with it.
 		 * The modifiers probably are unused.
 		 */
-		if (!found && (event.bstate & REPORT_MOUSE_POSITION)) {
-		    logw("[%08lX]%s%s%s%s @ %d, %d",
-			 (unsigned long) events,
+		if (!found && (this_event & REPORT_MOUSE_POSITION)) {
+		    logw(HexFormat "%s @%3d,%3d%s%s%s",
+			 (unsigned long) this_event,
+			 ShowP(),
+			 event.y, event.x,
 			 ShowM(SHIFT),
 			 ShowM(CTRL),
-			 ShowM(ALT),
-			 ShowP(),
-			 event.y, event.x);
+			 ShowM(ALT));
 		}
 	    }
 	    break;
+	case ERR:
 	case '\003':
 	    goto end;
 	default:
@@ -238,7 +259,7 @@ int
 main(int argc, char *argv[])
 {
     bool rawmode = FALSE;
-    int interval = 0;
+    int interval = -1;
     int ch;
     size_t my_len;
     char *my_environ = NULL;

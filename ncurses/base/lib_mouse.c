@@ -84,7 +84,7 @@
 #define CUR SP_TERMTYPE
 #endif
 
-MODULE_ID("$Id: lib_mouse.c,v 1.237 2026/08/29 22:54:06 tom Exp $")
+MODULE_ID("$Id: lib_mouse.c,v 1.252 2026/09/05 00:04:40 tom Exp $")
 
 #include <tic.h>
 
@@ -976,130 +976,90 @@ _nc_mouse_event(SCREEN *sp)
     } while (0)
 #endif
 
+#define MODIFY_PRESS(mods) \
+    do { \
+	if ((mods) & 4) \
+	    eventp->bstate |= BUTTON_SHIFT; \
+	if ((mods) & 8) \
+	    eventp->bstate |= BUTTON_ALT; \
+	if ((mods) & 16) \
+	    eventp->bstate |= BUTTON_CTRL; \
+    } while (0)
+
+#if NCURSES_MOUSE_VERSION > 2
+#define MAX_OPCODE 192
+#elif NCURSES_MOUSE_VERSION > 1
+#define MAX_OPCODE 96
+#else
+#define MAX_OPCODE 64
+#endif
+
 /*
+ * Parse X10/SGR xterm mouse protocol, returning
+ * 1 if a button is decoded,
+ * 0 if a release or motion event is decoded, and
+ * -1 if the opcode is not valid in the given protocol.
+ *
  * Refer to XTerm Control Sequences "Mouse Tracking", as well as the
  * mouse-codes script added in xterm patch #338 (2018).
  */
-static bool
-handle_wheel(SCREEN *sp, MEVENT * eventp, int button, int wheel)
+static int
+decode_xterm_opcode(SCREEN *sp, MEVENT * eventp, int opcode)
 {
-    bool result = TRUE;
+    int result = 1;
 
-#if NCURSES_MOUSE_VERSION == 3
-    (void) sp;
-    (void) wheel;
-    if (button > 191 || button < 0) {
-	result = FALSE;
+    if (opcode >= MAX_OPCODE || opcode < 0) {
+	result = -1;
     } else {
-	int bbits = button;
-	int bcode = button % 4;
+	int bbits = opcode;
+	int bcode = opcode % 4;
 
-	if (button >= 128) {	/* buttons 8-11 */
+	if (opcode >= 128) {	/* buttons 8-11 */
 	    bcode += 8;
-	} else if (button >= 64) {	/* buttons 4-7 */
+	} else if (opcode >= 64) {	/* buttons 4-7 */
 	    bcode += 4;
-	} else if ((button % 4) < 3) {	/* buttons 1-3, unmodified release */
+	} else if ((opcode % 4) < 3) {	/* buttons 1-3, unmodified release */
 	    bcode += 1;
 	}
-	if (button == 64 || button == 65) {
-	    eventp->bstate = MASK_PRESS((button == 64) ? 4 : 5);
-	    bbits &= ~1;
-	} else if (button != 3) {
-	    PRESS_POSITION(bcode);
+	if (bcode > MAX_BUTTON) {
+	    result = -1;
 	} else {
-	    eventp->bstate = REPORT_MOUSE_POSITION;
-	    result = FALSE;
-	}
-	/*
-	 * xterm does not produce the shift/control/alt modifiers, but someone
-	 * may have read the mouse protocol documentation.
-	 */
-	if (button > 3) {
-	    if (bbits & 1)
-		eventp->bstate |= BUTTON_SHIFT;
-	    if (bbits & 2)
-		eventp->bstate |= BUTTON_ALT;
-	    if (bbits & 4)
-		eventp->bstate |= BUTTON_CTRL;
-	}
-    }
-#else /* NCURSES_MOUSE_VERSION <= 2 */
-    switch (button & 3) {
-    case 0:
-	if (wheel) {
-	    eventp->bstate = MASK_PRESS(4);
-	    /* Do not record in sp->_mouse_bstate; there will be no
-	     * corresponding release event.
+	    if (opcode >= 64) {
+		eventp->bstate = MASK_PRESS(bcode);
+	    } else if ((opcode % 4) == 3) {
+		eventp->bstate = REPORT_MOUSE_POSITION;
+		result = 0;
+	    } else if (opcode >= 4) {
+		eventp->bstate = MASK_PRESS(bcode);
+	    } else {
+		PRESS_POSITION(bcode);
+	    }
+	    /*
+	     * xterm does not produce the shift/control/alt modifiers, but
+	     * someone may have read the mouse protocol documentation.
 	     */
-	} else {
-	    PRESS_POSITION(1);
+	    if (opcode > 3) {
+		MODIFY_PRESS(bbits);
+	    }
 	}
-	break;
-    case 1:
-	if (wheel) {
-#if NCURSES_MOUSE_VERSION >= 2
-	    eventp->bstate = MASK_PRESS(5);
-	    /* See comment above for button 4 */
-#else
-	    /* Ignore this event as it is not a true press of the button */
-	    eventp->bstate = REPORT_MOUSE_POSITION;
-#endif
-	} else {
-	    PRESS_POSITION(2);
-	}
-	break;
-    case 2:
-	if (wheel) {
-	    /* Ignore this event as it is not a true press of the button */
-	    eventp->bstate = REPORT_MOUSE_POSITION;
-	} else {
-	    PRESS_POSITION(3);
-	}
-	break;
-    default:
-	/*
-	 * case 3 is sent when the mouse buttons are released.
-	 *
-	 * If the terminal uses xterm mode 1003, a continuous series of
-	 * button-release events is sent as the mouse moves around the screen,
-	 * or as the wheel mouse is rotated.
-	 *
-	 * Return false in this case, so that when running in X10 mode, we will
-	 * recalculate bstate.
-	 */
-	eventp->bstate = REPORT_MOUSE_POSITION;
-	result = FALSE;
-	break;
     }
-#endif
     TR(TRACE_IEVENT,
-       ("handle_wheel %d: %d(%d) %d %lx",
-	result, button, button & 3, wheel, (unsigned long) eventp->bstate));
+       ("decode_xterm_opcode %d: %d(%d) %lx",
+	result, opcode, opcode & 3, (unsigned long) eventp->bstate));
     return result;
 }
 
-static bool
+static int
 decode_X10_bstate(SCREEN *sp, MEVENT * eventp, unsigned intro)
 {
-    bool result;
-    int button = 0;
-    int wheel = (intro & 96) == 96;
+    int result;
 
     eventp->bstate = 0;
 
-    if (intro >= 96) {
-	if (intro >= 160) {
-	    button = (int) (intro - 152);	/* buttons 8-11 */
-	} else {
-	    button = (int) (intro - 92);	/* buttons 4-7 */
-	}
-    } else {
-	button = (intro & 3);
-    }
-
-    if (button > MAX_BUTTON) {
+    result = decode_xterm_opcode(sp, eventp, (int) (intro) - 32);
+    if (result < 0) {
 	eventp->bstate = REPORT_MOUSE_POSITION;
-    } else if (!handle_wheel(sp, eventp, (int) (intro) - 32, wheel)) {
+    } else if (result == 0) {
 
 	/*
 	 * Release events aren't reported for individual buttons, just for
@@ -1126,17 +1086,10 @@ decode_X10_bstate(SCREEN *sp, MEVENT * eventp, unsigned intro)
 	    eventp->bstate = REPORT_MOUSE_POSITION;
 	}
     }
-
-    if (intro & 4) {
-	eventp->bstate |= BUTTON_SHIFT;
+    if (result >= 0) {
+	MODIFY_PRESS(intro);
+	result = (eventp->bstate & REPORT_MOUSE_POSITION) ? TRUE : FALSE;
     }
-    if (intro & 8) {
-	eventp->bstate |= BUTTON_ALT;
-    }
-    if (intro & 16) {
-	eventp->bstate |= BUTTON_CTRL;
-    }
-    result = (eventp->bstate & REPORT_MOUSE_POSITION) ? TRUE : FALSE;
     return result;
 }
 
@@ -1168,14 +1121,17 @@ decode_X10_bstate(SCREEN *sp, MEVENT * eventp, unsigned intro)
  * Wheel mice may return buttons 4 and 5 when the wheel is turned.  We encode
  * those as button presses.
  */
-static bool
+#define MIN_WHEEL	4
+#define MAX_WHEEL	5
+
+static int
 decode_xterm_X10(SCREEN *sp, MEVENT * eventp)
 {
 #define MAX_KBUF 3
     unsigned char kbuf[MAX_KBUF + 1];
     size_t grabbed;
     int res;
-    bool result;
+    int result;
 
     _nc_set_read_thread(TRUE);
     for (grabbed = 0; grabbed < MAX_KBUF; grabbed += (size_t) res) {
@@ -1194,10 +1150,10 @@ decode_xterm_X10(SCREEN *sp, MEVENT * eventp)
     /* there's only one mouse... */
     eventp->id = NORMAL_EVENT;
 
-    result = decode_X10_bstate(sp, eventp, kbuf[0]);
-
-    eventp->x = (kbuf[1] - ' ') - 1;
-    eventp->y = (kbuf[2] - ' ') - 1;
+    if ((result = decode_X10_bstate(sp, eventp, kbuf[0])) >= 0) {
+	eventp->x = (kbuf[1] - ' ') - 1;
+	eventp->y = (kbuf[2] - ' ') - 1;
+    }
 
     return result;
 }
@@ -1207,14 +1163,14 @@ decode_xterm_X10(SCREEN *sp, MEVENT * eventp)
  * This is identical to X10/X11 responses except that there are two UTF-8
  * characters storing the ordinates instead of two bytes.
  */
-static bool
+static int
 decode_xterm_1005(SCREEN *sp, MEVENT * eventp)
 {
     char kbuf[80];
     size_t grabbed;
     size_t limit = (sizeof(kbuf) - 1);
     unsigned coords[2];
-    bool result;
+    int result;
 
     coords[0] = 0;
     coords[1] = 0;
@@ -1256,10 +1212,10 @@ decode_xterm_1005(SCREEN *sp, MEVENT * eventp)
     /* there's only one mouse... */
     eventp->id = NORMAL_EVENT;
 
-    result = decode_X10_bstate(sp, eventp, UChar(kbuf[0]));
-
-    eventp->x = (int) (coords[0] - ' ') - 1;
-    eventp->y = (int) (coords[1] - ' ') - 1;
+    if ((result = decode_X10_bstate(sp, eventp, UChar(kbuf[0]))) >= 0) {
+	eventp->x = (int) (coords[0] - ' ') - 1;
+	eventp->y = (int) (coords[1] - ' ') - 1;
+    }
 
     return result;
 }
@@ -1281,7 +1237,7 @@ typedef struct {
     int final;			/* the final-character */
 } SGR_DATA;
 
-static bool
+static int
 read_SGR(const SCREEN *sp, SGR_DATA * result)
 {
     char kbuf[80];		/* bigger than any possible mouse response */
@@ -1363,29 +1319,30 @@ read_SGR(const SCREEN *sp, SGR_DATA * result)
     return (grabbed > 0) && !result->nerror;
 }
 
-static bool
+static int
 decode_xterm_SGR1006(SCREEN *sp, MEVENT * eventp)
 {
     SGR_DATA data;
-    bool result = FALSE;
+    int result = FALSE;
     if (read_SGR(sp, &data)) {
 	int b = data.params[0];
 	int b3 = 1 + (b & 3);
-	int wheel = ((b & 64) == 64);
 
-	if (b >= 132) {
+	if (b >= 192) {
 	    b3 = MAX_BUTTON + 1;
 	} else if (b >= 128) {
-	    b3 = (b - 120);	/* buttons 8-11 */
+	    b3 += 7;		/* buttons 8-11 */
 	} else if (b >= 64) {
-	    b3 = (b - 60);	/* buttons 6-7 */
+	    b3 += 3;		/* buttons 4-7 */
 	}
 
 	eventp->id = NORMAL_EVENT;
-	if (data.final == 'M') {
-	    (void) handle_wheel(sp, eventp, b, wheel);
-	} else if (b3 > MAX_BUTTON) {
-	    eventp->bstate = REPORT_MOUSE_POSITION;
+	if (b < 0 || (b < 64 && ((b & 3) == 3))) {
+	    result = -TRUE;
+	} else if (data.final == 'M') {
+	    result = decode_xterm_opcode(sp, eventp, b);
+	} else if (data.final != 'm' || b3 > MAX_BUTTON) {
+	    result = -TRUE;
 	} else {
 	    mmask_t pressed = (mmask_t) NCURSES_MOUSE_MASK(b3, NCURSES_BUTTON_PRESSED);
 	    mmask_t release = (mmask_t) NCURSES_MOUSE_MASK(b3, NCURSES_BUTTON_RELEASED);
@@ -1393,21 +1350,15 @@ decode_xterm_SGR1006(SCREEN *sp, MEVENT * eventp)
 		eventp->bstate = release;
 		sp->_mouse_bstate &= ~pressed;
 	    } else {
-		eventp->bstate = REPORT_MOUSE_POSITION;
+		eventp->bstate = MASK_RELEASE(b3);
 	    }
 	}
-	if (b & 4) {
-	    eventp->bstate |= BUTTON_SHIFT;
+	if (result >= 0) {
+	    MODIFY_PRESS(b);
+	    result = (eventp->bstate & REPORT_MOUSE_POSITION) ? TRUE : FALSE;
+	    eventp->x = (data.params[1] ? (data.params[1] - 1) : 0);
+	    eventp->y = (data.params[2] ? (data.params[2] - 1) : 0);
 	}
-	if (b & 8) {
-	    eventp->bstate |= BUTTON_ALT;
-	}
-	if (b & 16) {
-	    eventp->bstate |= BUTTON_CTRL;
-	}
-	result = (eventp->bstate & REPORT_MOUSE_POSITION) ? TRUE : FALSE;
-	eventp->x = (data.params[1] ? (data.params[1] - 1) : 0);
-	eventp->y = (data.params[2] ? (data.params[2] - 1) : 0);
     }
     return result;
 }
@@ -1416,7 +1367,7 @@ static bool
 _nc_mouse_inline(SCREEN *sp)
 /* mouse report received in the keyboard stream -- parse its info */
 {
-    bool result = FALSE;
+    int result = FALSE;
     MEVENT *eventp = EventAt(sp, sp->_mouse_write);
 
     TR(MY_TRACE, (T_CALLED("_nc_mouse_inline(%p)"), (void *) sp));
@@ -1436,26 +1387,28 @@ _nc_mouse_inline(SCREEN *sp)
 #endif
 	}
 
-	TR(MY_TRACE,
-	   ("_nc_mouse_inline: slot %ld %s",
-	    (long) IndexEV(sp, eventp),
-	    _nc_tracemouse(sp, eventp)));
+	if (result >= 0) {
+	    TR(MY_TRACE,
+	       ("_nc_mouse_inline: slot %ld %s",
+		(long) IndexEV(sp, eventp),
+		_nc_tracemouse(sp, eventp)));
 
-	/* bump the next-free pointer into the circular list */
-	sp->_mouse_write++;
+	    /* bump the next-free pointer into the circular list */
+	    sp->_mouse_write++;
 
-	if (!result) {
-	    /* If this event is from a wheel-mouse, treat it like position
-	     * reports and avoid waiting for the release-events which will
-	     * never come.
-	     */
-	    if (eventp->bstate & BUTTON_PRESSED) {
-		int b;
+	    if (!result) {
+		/* If this event is from a wheel-mouse, treat it like position
+		 * reports and avoid waiting for the release-events which will
+		 * never come.
+		 */
+		if (eventp->bstate & BUTTON_PRESSED) {
+		    int b;
 
-		for (b = 4; b <= MAX_BUTTON; ++b) {
-		    if ((eventp->bstate & MASK_PRESS(b))) {
-			result = TRUE;
-			break;
+		    for (b = MIN_WHEEL; b <= MAX_WHEEL; ++b) {
+			if ((eventp->bstate & MASK_PRESS(b))) {
+			    result = TRUE;
+			    break;
+			}
 		    }
 		}
 	    }
@@ -1616,7 +1569,7 @@ _nc_mouse_parse(SCREEN *sp, int runcount)
     bool merge;
     bool endLoop;
 
-    TR(MY_TRACE, (T_CALLED("_nc_mouse_parse(%d)"), runcount));
+    T((T_CALLED("_nc_mouse_parse(%d)"), runcount));
 
     if (!sp->_maxclick
 	&& ValidEvent(readp)

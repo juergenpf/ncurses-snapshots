@@ -46,7 +46,7 @@
 #define CUR SP_TERMTYPE
 #endif
 
-MODULE_ID("$Id: resizeterm.c,v 1.65 2026/06/06 09:59:40 tom Exp $")
+MODULE_ID("$Id: resizeterm.c,v 1.66 2026/09/05 14:47:30 tom Exp $")
 
 /*
  * If we're trying to be reentrant, do not want any local statics.
@@ -488,7 +488,7 @@ NCURSES_SP_NAME(resizeterm)(NCURSES_SP_DCLx int ToLines, int ToCols)
 				&& !(SP_PARM->_slk->hidden));
 	    T(("resizeterm: check slk"));
 	    if (slk_visible) {
-		slk_clear();
+		NCURSES_SP_NAME(slk_clear)(NCURSES_SP_ARG);
 	    }
 #endif
 	    result = NCURSES_SP_NAME(resize_term)(NCURSES_SP_ARGx ToLines, ToCols);

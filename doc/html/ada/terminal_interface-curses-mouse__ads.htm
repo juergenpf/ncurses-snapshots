@@ -24,7 +24,7 @@
 <span class="comment"><em>--                                 S P E C                                  --</em></span>
 <span class="comment"><em>--                                                                          --</em></span>
 <span class="comment"><em>------------------------------------------------------------------------------</em></span>
-<span class="comment"><em>-- Copyright 2020 Thomas E. Dickey                                          --</em></span>
+<span class="comment"><em>-- Copyright 2020,2026 Thomas E. Dickey                                     --</em></span>
 <span class="comment"><em>-- Copyright 1998-2014,2015 Free Software Foundation, Inc.                  --</em></span>
 <span class="comment"><em>--                                                                          --</em></span>
 <span class="comment"><em>-- Permission is hereby granted, free of charge, to any person obtaining a  --</em></span>
@@ -53,8 +53,8 @@
 <span class="comment"><em>------------------------------------------------------------------------------</em></span>
 <span class="comment"><em>--  Author:  Juergen Pfeifer, 1996</em></span>
 <span class="comment"><em>--  Version Control:</em></span>
-<span class="comment"><em>--  @Revision: 1.33 @</em></span>
-<span class="comment"><em>--  @Date: 2020/02/02 23:34:34 @</em></span>
+<span class="comment"><em>--  @Revision: 1.34 @</em></span>
+<span class="comment"><em>--  @Date: 2026/08/30 18:16:31 @</em></span>
 <span class="comment"><em>--  Binding Version 01.00</em></span>
 <span class="comment"><em>------------------------------------------------------------------------------</em></span>
 <b>with</b> System;
@@ -176,7 +176,7 @@
    <span class="comment"><em>--  This can be as little as 32 bits (unsigned), or as long as the system's</em></span>
    <span class="comment"><em>--  unsigned long.  Declare it as the minimum size to handle all valid</em></span>
    <span class="comment"><em>--  sizes.</em></span>
-   <b>type</b> <a href="terminal_interface-curses-mouse__ads.htm#ref_57_9">Event_Mask</a> <b>is</b> <b>mod</b> 4294967296;
+   <b>type</b> <a href="terminal_interface-curses-mouse__ads.htm#ref_57_9">Event_Mask</a> <b>is</b> <b>mod</b> <a href="terminal_interface-curses_constants__ads.htm#ref_6_28">Curses_Constants</a>.<a href="terminal_interface-curses_constants__ads.htm#ref_351_4">REPORT_MOUSE_POSITION</a>;
 
    <b>type</b> <a href="terminal_interface-curses-mouse__ads.htm#ref_85_9">Mouse_Event</a> <b>is</b>
       <b>record</b>

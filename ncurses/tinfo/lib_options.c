@@ -47,7 +47,7 @@
 #define CUR SP_TERMTYPE
 #endif
 
-MODULE_ID("$Id: lib_options.c,v 1.87 2026/05/30 22:10:47 tom Exp $")
+MODULE_ID("$Id: lib_options.c,v 1.90 2026/09/05 22:52:49 tom Exp $")
 
 NCURSES_EXPORT(int)
 idlok(WINDOW *win, bool flag)
@@ -151,13 +151,11 @@ keypad(WINDOW *win, bool flag)
 }
 
 NCURSES_EXPORT(int)
-meta(WINDOW *win GCC_UNUSED, bool flag)
+meta_sp(SCREEN *sp, bool flag)
 {
     int result = ERR;
-    SCREEN *sp = (win == NULL) ? CURRENT_SCREEN : _nc_screen_of(win);
 
-    /* Ok, we stay relaxed and don't signal an error if win is NULL */
-    T((T_CALLED("meta(%p,%d)"), (void *) win, flag));
+    T((T_CALLED("meta(%p,%d)"), (void *) sp, flag));
 
     /* Ok, we stay relaxed and don't signal an error if win is NULL */
 
@@ -171,6 +169,12 @@ meta(WINDOW *win GCC_UNUSED, bool flag)
 	result = OK;
     }
     returnCode(result);
+}
+
+NCURSES_EXPORT(int)
+meta(WINDOW *win GCC_UNUSED, bool flag)
+{
+    return meta_sp((win == NULL) ? CURRENT_SCREEN : _nc_screen_of(win), flag);
 }
 
 /* curs_set() moved here to narrow the kernel interface */
@@ -315,6 +319,7 @@ _nc_keypad(SCREEN *sp, bool flag)
 {
     int rc = ERR;
 
+    T((T_CALLED("_nc_keypad(%p,%d)"), (void *) sp, flag));
     if (sp != NULL) {
 #ifdef USE_PTHREADS
 	/*
@@ -353,5 +358,5 @@ _nc_keypad(SCREEN *sp, bool flag)
 	    rc = OK;
 	}
     }
-    return (rc);
+    returnCode(rc);
 }

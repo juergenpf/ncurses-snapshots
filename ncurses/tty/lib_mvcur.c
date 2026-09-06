@@ -160,7 +160,7 @@
 #define CUR SP_TERMTYPE
 #endif
 
-MODULE_ID("$Id: lib_mvcur.c,v 1.171 2026/06/06 09:59:40 tom Exp $")
+MODULE_ID("$Id: lib_mvcur.c,v 1.172 2026/09/05 19:09:44 tom Exp $")
 
 #define WANT_CHAR(sp, y, x) NewScreen(sp)->_line[y].text[x]	/* desired state */
 
@@ -1003,8 +1003,8 @@ _nc_real_mvcur(NCURSES_SP_DCLx
 {
     int code;
 
-    TR(TRACE_CALLS | TRACE_MOVE, (T_CALLED("_nc_real_mvcur(%p,%d,%d,%d,%d)"),
-				  (void *) SP_PARM, yold, xold, ynew, xnew));
+    TR(TRACE_CALLS, (T_CALLED("_nc_real_mvcur(%p,%d,%d,%d,%d)"),
+		     (void *) SP_PARM, yold, xold, ynew, xnew));
 
     if (SP_PARM == NULL) {
 	code = ERR;

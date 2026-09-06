@@ -10,7 +10,7 @@ include(M4MACRO)dnl
 --                                 S P E C                                  --
 --                                                                          --
 ------------------------------------------------------------------------------
--- Copyright 2020 Thomas E. Dickey                                          --
+-- Copyright 2020,2026 Thomas E. Dickey                                     --
 -- Copyright 1998-2014,2015 Free Software Foundation, Inc.                  --
 --                                                                          --
 -- Permission is hereby granted, free of charge, to any person obtaining a  --
@@ -39,8 +39,8 @@ include(M4MACRO)dnl
 ------------------------------------------------------------------------------
 --  Author:  Juergen Pfeifer, 1996
 --  Version Control:
---  $Revision: 1.33 $
---  $Date: 2020/02/02 23:34:34 $
+--  $Revision: 1.34 $
+--  $Date: 2026/08/30 18:16:31 $
 --  Binding Version 01.00
 ------------------------------------------------------------------------------
 with System;
@@ -158,7 +158,7 @@ private
    --  This can be as little as 32 bits (unsigned), or as long as the system's
    --  unsigned long.  Declare it as the minimum size to handle all valid
    --  sizes.
-   type Event_Mask is mod 4294967296;
+   type Event_Mask is mod Curses_Constants.REPORT_MOUSE_POSITION;
 
    type Mouse_Event is
       record

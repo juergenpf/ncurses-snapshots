@@ -42,7 +42,7 @@
 #define CUR SP_TERMTYPE
 #endif
 
-MODULE_ID("$Id: lib_ttyflags.c,v 1.42 2026/05/30 21:17:40 tom Exp $")
+MODULE_ID("$Id: lib_ttyflags.c,v 1.44 2026/09/05 20:27:44 tom Exp $")
 
 NCURSES_EXPORT(int)
 NCURSES_SP_NAME(_nc_get_tty_mode)(NCURSES_SP_DCLx TTY * buf)
@@ -208,6 +208,8 @@ NCURSES_SP_NAME(reset_prog_mode)(NCURSES_SP_DCL0)
 	    if (SP_PARM) {
 		if (SP_PARM->_keypad_on)
 		    _nc_keypad(SP_PARM, TRUE);
+		if (SP_PARM->_use_meta)
+		    meta_sp(SP_PARM, TRUE);
 	    }
 	    rc = OK;
 	}
@@ -235,6 +237,7 @@ NCURSES_SP_NAME(reset_shell_mode)(NCURSES_SP_DCL0)
     if (termp != NULL) {
 	if (SP_PARM) {
 	    _nc_keypad(SP_PARM, FALSE);
+	    meta_sp(SP_PARM, FALSE);
 	    _nc_flush();
 	}
 	rc = _nc_set_tty_mode(&termp->Ottyb);

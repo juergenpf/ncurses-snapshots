@@ -26,7 +26,7 @@
 -- sale, use or other dealings in this Software without prior written        --
 -- authorization.                                                            --
 -------------------------------------------------------------------------------
--- $Id: README,v 1.84 2026/08/15 22:48:47 tom Exp $
+-- $Id: README,v 1.85 2026/09/05 21:25:30 tom Exp $
 -------------------------------------------------------------------------------
 
 The programs in this directory are used to test and demonstrate ncurses.
@@ -461,6 +461,7 @@ longname_sp			test: sp_tinfo
 mcprint				-
 mcprint_sp			-
 meta				test: key_names keynames ncurses
+meta_sp				lib: ncurses
 mouse_trafo			lib: form
 mouseinterval			test: test_mouse
 mouseinterval_sp		-
@@ -651,7 +652,7 @@ slk_attron_sp			-
 slk_attrset			test: extended_color ncurses
 slk_attrset_sp			-
 slk_clear			test: ncurses
-slk_clear_sp			-
+slk_clear_sp			lib: ncurses
 slk_color			test: ncurses
 slk_color_sp			-
 slk_init			test: extended_color ncurses

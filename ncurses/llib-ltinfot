@@ -625,6 +625,12 @@ int	keypad(
 		NCURSES_BOOL flag)
 		{ return(*(int *)0); }
 
+#undef meta_sp
+int	meta_sp(
+		SCREEN	*sp,
+		NCURSES_BOOL flag)
+		{ return(*(int *)0); }
+
 #undef meta
 int	meta(
 		WINDOW	*win,

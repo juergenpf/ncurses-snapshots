@@ -35,7 +35,7 @@
  ****************************************************************************/
 
 /*
- * $Id: curses.priv.h,v 1.759 2026/08/29 14:08:41 tom Exp $
+ * $Id: curses.priv.h,v 1.760 2026/09/05 22:53:02 tom Exp $
  *
  *	curses.priv.h
  *
@@ -2780,6 +2780,10 @@ extern NCURSES_EXPORT(void)     NCURSES_SP_NAME(_nc_linedump)(SCREEN*);
 #if USE_WIDEC_SUPPORT
 extern NCURSES_EXPORT(wchar_t *) NCURSES_SP_NAME(_nc_wunctrl)(SCREEN*, cchar_t *);
 #endif
+
+#else
+
+extern NCURSES_EXPORT(int) meta_sp(SCREEN *sp, bool flag);
 
 #endif /* NCURSES_SP_FUNCS */
 

@@ -39,7 +39,7 @@
 
 #include <curses.priv.h>
 
-MODULE_ID("$Id: lib_tracemse.c,v 1.25 2026/08/29 14:35:37 tom Exp $")
+MODULE_ID("$Id: lib_tracemse.c,v 1.26 2026/08/31 23:56:06 tom Exp $")
 
 #ifdef TRACE
 
@@ -63,10 +63,8 @@ _nc_trace_mmask_t(SCREEN *sp, mmask_t code)
 	_nc_STRCAT(my_buffer, my_button, sizeof(my_buffer)); \
     }
 
-#define OTHER_MASK(name) NCURSES_MOUSE_MASK(MAX_BUTTON, name)
-
 #define SHOW(name, show) \
-    if ((code & OTHER_MASK(name)) == OTHER_MASK(name)) { \
+    if ((code & name) == name) { \
 	size_t n = strlen(my_buffer); \
 	if (n && (my_buffer[n-1] != '{')) \
 	_nc_STRCAT(my_buffer, ", ", sizeof(my_buffer)); \
@@ -74,8 +72,8 @@ _nc_trace_mmask_t(SCREEN *sp, mmask_t code)
     }
 
     for (button = 1; button <= MAX_BUTTON; ++button) {
+	SHOW_BUTTON(NCURSES_BUTTON_PRESSED, "press");
 	SHOW_BUTTON(NCURSES_BUTTON_RELEASED, "release");
-	SHOW_BUTTON(NCURSES_BUTTON_PRESSED, "press-1");
 	SHOW_BUTTON(NCURSES_BUTTON_CLICKED, "clicked");
 	SHOW_BUTTON(NCURSES_DOUBLE_CLICKED, "doubleclick");
 	SHOW_BUTTON(NCURSES_TRIPLE_CLICKED, "tripleclick");

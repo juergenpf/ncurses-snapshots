@@ -1,5 +1,5 @@
 .\"***************************************************************************
-.\" Copyright 2018-2024,2025 Thomas E. Dickey                                *
+.\" Copyright 2018-2025,2026 Thomas E. Dickey                                *
 .\" Copyright 2010-2015,2017 Free Software Foundation, Inc.                  *
 .\"                                                                          *
 .\" Permission is hereby granted, free of charge, to any person obtaining a  *
@@ -27,8 +27,8 @@
 .\" authorization.                                                           *
 .\"***************************************************************************
 .\"
-.\" $Id: curs_sp_funcs.3x,v 1.57 2025/02/01 22:47:44 tom Exp $
-.TH curs_sp_funcs 3X 2025-02-01 "ncurses @NCURSES_MAJOR@.@NCURSES_MINOR@" "Library calls"
+.\" $Id: curs_sp_funcs.3x,v 1.58 2026/09/05 20:08:00 tom Exp $
+.TH curs_sp_funcs 3X 2026-09-05 "ncurses @NCURSES_MAJOR@.@NCURSES_MINOR@" "Library calls"
 .ie \n(.g \{\
 .ds `` \(lq
 .ds '' \(rq
@@ -104,6 +104,7 @@
 \fBint killwchar_sp(SCREEN * \fIsp\fP, wchar_t *\fIwc\fP);
 \fBchar * longname_sp(SCREEN * \fIsp\fP);
 \fBint mcprint_sp(SCREEN * \fIsp\fP, char *\fIdata\fP, int \fIlen\fP);
+\fBint meta_sp(SCREEN * \fIsp\fP, bool \fIflag\fP);
 \fBint mouseinterval_sp(SCREEN * \fIsp\fP, int \fIerval\fP);
 \fBmmask_t mousemask_sp(SCREEN * \fIsp\fP, mmask_t \fInewmask\fP, mmask_t *\fIoldmask\fP);
 \fBint mvcur_sp(SCREEN * \fIsp\fP, int \fIoldrow\fP, int \fIoldcol\fP, int \fInewrow\fP, int \fInewcol\fP);

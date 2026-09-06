@@ -43,7 +43,7 @@
 
 #include <curses.priv.h>
 
-MODULE_ID("$Id: lib_endwin.c,v 1.30 2026/05/30 22:10:47 tom Exp $")
+MODULE_ID("$Id: lib_endwin.c,v 1.32 2026/09/05 19:30:54 tom Exp $")
 
 NCURSES_EXPORT(int)
 NCURSES_SP_NAME(endwin)(NCURSES_SP_DCL0)
@@ -53,6 +53,10 @@ NCURSES_SP_NAME(endwin)(NCURSES_SP_DCL0)
     T((T_CALLED("endwin(%p)"), (void *) SP_PARM));
 
     if (SP_PARM != NULL) {
+	bool save_keypad = stdscr->_use_keypad;
+	bool save_meta = SP_PARM->_use_meta;
+	bool suspended = FALSE;
+
 	if (SP_PARM->_endwin != ewSuspend) {
 #if USE_SCREENBUFFERED_CONSOLE
 	    if (ScreenIsBufferedConsole(SP_PARM)) {
@@ -67,10 +71,21 @@ NCURSES_SP_NAME(endwin)(NCURSES_SP_DCL0)
 #if USE_SCREENBUFFERED_CONSOLE
 	    }
 #endif	    
+	    suspended = TRUE;
 	    code = OK;
 	}
 	if (NCURSES_SP_NAME(reset_shell_mode)(NCURSES_SP_ARG) == ERR)
 	    code = ERR;
+	/*
+	 * reset_shell_mode resets the terminal's keypad and meta modes.
+	 * If we did this as part of suspending screen mode, keep the
+	 * "use" flags in the data structure, for reference when restoring
+	 * screen mode in doupdate(), e.g., as called from refresh().
+	 */
+	if (suspended) {
+	    stdscr->_use_keypad = save_keypad;
+	    SP_PARM->_use_meta = save_meta;
+	}
     }
 
     returnCode(code);

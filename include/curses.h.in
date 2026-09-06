@@ -33,7 +33,7 @@
  *     and: Thomas E. Dickey                        1996-on                 *
  ****************************************************************************/
 
-/* $Id: curses.h.in,v 1.301 2026/05/30 19:13:55 tom Exp $ */
+/* $Id: curses.h.in,v 1.302 2026/09/05 20:02:00 tom Exp $ */
 
 #ifndef __NCURSES_H
 #define __NCURSES_H
@@ -1028,6 +1028,7 @@ extern NCURSES_EXPORT(int) wgetscrreg (const WINDOW *, int *, int *); /* @GENERA
 typedef int (*NCURSES_SP_OUTC)(SCREEN*, int);
 
 extern NCURSES_EXPORT(SCREEN *) new_prescr (void); /* implemented:SP_FUNC */
+extern NCURSES_EXPORT(int) NCURSES_SP_NAME(meta) (SCREEN*, bool); /* implemented:SP_FUNC */
 
 extern NCURSES_EXPORT(int) NCURSES_SP_NAME(baudrate) (SCREEN*); /* implemented:SP_FUNC */
 extern NCURSES_EXPORT(int) NCURSES_SP_NAME(beep) (SCREEN*); /* implemented:SP_FUNC */
