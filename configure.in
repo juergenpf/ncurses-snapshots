@@ -29,7 +29,7 @@ dnl***************************************************************************
 dnl
 dnl Author: Thomas E. Dickey 1995-on
 dnl
-dnl $Id: configure.in,v 1.837 2026/08/29 21:22:01 tom Exp $
+dnl $Id: configure.in,v 1.838 2026/09/12 20:54:13 tom Exp $
 dnl Process this file with autoconf to produce a configure script.
 dnl
 dnl For additional information, see
@@ -38,7 +38,7 @@ dnl     https://invisible-island.net/autoconf/my-autoconf.html
 dnl
 dnl ---------------------------------------------------------------------------
 AC_PREREQ(2.52.20210101)
-AC_REVISION($Revision: 1.837 $)
+AC_REVISION($Revision: 1.838 $)
 AC_INIT
 AC_CONFIG_SRCDIR([ncurses/base/lib_initscr.c])
 AC_CONFIG_HEADERS([include/ncurses_cfg.h:include/ncurses_cfg.hin])
@@ -1252,6 +1252,11 @@ else
 	NCURSES_MOUSE_VERSION=2
 fi
 
+test "$NCURSES_MMASK_T" = auto && NCURSES_MMASK_T=long
+cf_cv_typeof_mmask_t=$NCURSES_MMASK_T
+test "$cf_cv_typeof_mmask_t" = unsigned && cf_cv_typeof_mmask_t=""
+AC_SUBST(cf_cv_typeof_mmask_t)
+
 # mouse version 3 needs 64-bits; version 2 works with 32-bits
 if test "$NCURSES_MOUSE_VERSION" -ge 3 ; then
 	cf_sizeof_mmask_t=8
@@ -1829,14 +1834,6 @@ cf_cv_1UL="1"
 test ".$cf_cv_unsigned_literals" = .yes && cf_cv_1UL="${cf_cv_1UL}U"
 test ".$cf_cv_typeof_chtype"    = .long && cf_cv_1UL="${cf_cv_1UL}L"
 AC_SUBST(cf_cv_1UL)
-
-if test "$NCURSES_MMASK_T" = auto ; then
-	cf_cv_typeof_mmask_t=long
-else
-	cf_cv_typeof_mmask_t=$NCURSES_MMASK_T
-fi
-test "$cf_cv_typeof_mmask_t" = unsigned && cf_cv_typeof_mmask_t=""
-AC_SUBST(cf_cv_typeof_mmask_t)
 
 ###	Checks for external-data
 CF_ERRNO

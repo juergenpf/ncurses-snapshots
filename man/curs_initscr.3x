@@ -27,8 +27,8 @@
 .\" authorization.                                                           *
 .\"***************************************************************************
 .\"
-.\" $Id: curs_initscr.3x,v 1.114 2026/08/22 20:08:37 tom Exp $
-.TH curs_initscr 3X 2026-08-22 "ncurses @NCURSES_MAJOR@.@NCURSES_MINOR@" "Library calls"
+.\" $Id: curs_initscr.3x,v 1.116 2026/09/12 17:19:47 tom Exp $
+.TH curs_initscr 3X 2026-09-12 "ncurses @NCURSES_MAJOR@.@NCURSES_MINOR@" "Library calls"
 .ie \n(.g \{\
 .ds `` \(lq
 .ds '' \(rq
@@ -115,7 +115,8 @@ writes an appropriate diagnostic message to the standard error stream
 and exits;
 otherwise,
 it returns
-.BR \%stdscr "."
+.B \%stdscr
+(see \fB\%curs_variables\fP(3X)).
 .SS newterm
 An application that manages multiple terminals should call
 .B \%newterm
@@ -143,7 +144,7 @@ an input stream
 connected to the terminal.
 .PP
 .B \%newterm
-returns a variable of
+returns a value of
 .RI pointer-to- SCREEN
 type,
 which should be saved for later use with

@@ -27,26 +27,26 @@
   * sale, use or other dealings in this Software without prior written       *
   * authorization.                                                           *
   ****************************************************************************
-  * @Id: curs_termcap.3x,v 1.110 2026/08/22 21:43:25 tom Exp @
+  * @Id: curs_termcap.3x,v 1.112 2026/09/12 17:23:45 tom Exp @
 -->
 <!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01//EN">
 <HTML>
 <HEAD>
 <meta http-equiv="Content-Type" content="text/html; charset=us-ascii">
 <meta name="generator" content="Manpage converted by man2html - see https://invisible-island.net/scripts/readme.html#others_scripts">
-<TITLE>curs_termcap 3x 2026-08-22 ncurses 6.6 Library calls</TITLE>
+<TITLE>curs_termcap 3x 2026-09-12 ncurses 6.6 Library calls</TITLE>
 <link rel="author" href="mailto:bug-ncurses@gnu.org">
 
 </HEAD>
 <BODY>
-<H1 class="no-header">curs_termcap 3x 2026-08-22 ncurses 6.6 Library calls</H1>
+<H1 class="no-header">curs_termcap 3x 2026-09-12 ncurses 6.6 Library calls</H1>
 <PRE>
 <STRONG><A HREF="curs_termcap.3x.html">curs_termcap(3x)</A></STRONG>                 Library calls                <STRONG><A HREF="curs_termcap.3x.html">curs_termcap(3x)</A></STRONG>
 
 
 </PRE><H2><a name="h2-NAME">NAME</a></H2><PRE>
        <STRONG>PC</STRONG>, <STRONG>UP</STRONG>, <STRONG>BC</STRONG>, <STRONG>ospeed</STRONG>, <STRONG>tgetent</STRONG>, <STRONG>tgetflag</STRONG>, <STRONG>tgetnum</STRONG>, <STRONG>tgetstr</STRONG>, <STRONG>tgoto</STRONG>, <STRONG>tputs</STRONG> -
-       <EM>curses</EM> emulation of <EM>termcap</EM>
+       <EM>ncurses</EM> emulation of <EM>termcap</EM>
 
 
 </PRE><H2><a name="h2-SYNOPSIS">SYNOPSIS</a></H2><PRE>
@@ -233,7 +233,7 @@
 
        <STRONG>o</STRONG>   some <EM>termcap</EM> libraries print a warning message,
 
-       <STRONG>o</STRONG>   some exit if they find an entry that's longer than 1023 bytes,
+       <STRONG>o</STRONG>   some exit if they find an entry longer than 1023 bytes,
 
        <STRONG>o</STRONG>   some neither exit nor warn, doing nothing useful, and
 
@@ -244,50 +244,51 @@
 
        Each <EM>termcap</EM> entry has two important sizes associated with  it:  before
        "tc"  expansion, and after "tc" expansion.  "tc" is the capability that
-       tacks on another <EM>termcap</EM> entry to the end of the current one, to add on
-       its capabilities.  If a <EM>termcap</EM> entry does not use the "tc" capability,
-       then of course the two lengths are the same.
+       tacks on another <EM>termcap</EM> entry to  the  end  of  the  current  one,  to
+       supplement,  redefine, or cancel capabilities.  If a <EM>termcap</EM> entry does
+       not use the "tc" capability, then of course the  two  lengths  are  the
+       same.
 
-       The "before tc expansion" length is the more important one, because  it
-       affects  more than just users of that particular terminal.  This is the
-       length of the entry as it exists in <EM>/etc/termcap</EM>, minus the  backslash-
+       The  "before tc expansion" length is the more important one, because it
+       affects more than just users of that particular terminal.  This is  the
+       length  of the entry as it exists in <EM>/etc/termcap</EM>, minus the backslash-
        newline pairs, which <STRONG>tgetent</STRONG> strips out while reading it.  Some <EM>termcap</EM>
-       libraries  strip  off  the  final newline, too (though GNU <EM>termcap</EM> does
+       libraries strip off the final newline, too  (though  GNU  <EM>termcap</EM>  does
        not).  Now suppose:
 
        <STRONG>o</STRONG>   a <EM>termcap</EM> entry before expansion is more than 1023 bytes long,
 
        <STRONG>o</STRONG>   and the application has allocated only a 1KB buffer,
 
-       <STRONG>o</STRONG>   and the <EM>termcap</EM> library (like the one in BSD/OS 1.1 and GNU)  reads
-           the  whole entry into the buffer, no matter what its length, to see
+       <STRONG>o</STRONG>   and  the <EM>termcap</EM> library (like the one in BSD/OS 1.1 and GNU) reads
+           the whole entry into the buffer, no matter what its length, to  see
            if it is the entry it wants,
 
-       <STRONG>o</STRONG>   and <STRONG>tgetent</STRONG> is searching for a terminal type  that  either  is  the
-           long  entry,  appears  in the <EM>termcap</EM> file after the long entry, or
-           does not appear in the file at all (so that <STRONG>tgetent</STRONG> has  to  search
+       <STRONG>o</STRONG>   and  <STRONG>tgetent</STRONG>  is  searching  for a terminal type that either is the
+           long entry, appears in the <EM>termcap</EM> file after the  long  entry,  or
+           does  not  appear in the file at all (so that <STRONG>tgetent</STRONG> has to search
            the whole <EM>termcap</EM> file).
 
-       Then  <STRONG>tgetent</STRONG>  will  overwrite  memory, perhaps its stack, and probably
-       core dump  the  program.   Programs  like  <STRONG>telnet(1)</STRONG>  are  particularly
-       vulnerable;  modern  <EM>telnet</EM>s  pass  along values like the terminal type
-       automatically.  The results are almost as undesirable  with  a  <EM>termcap</EM>
-       library,  like those of SunOS 4.1.3 and Ultrix 4.4, that prints warning
-       messages when it reads an overly long  <EM>termcap</EM>  entry.   If  a  <EM>termcap</EM>
-       library  truncates  long entries, like OSF/1 3.0, it is immune to dying
-       here but will return incorrect data for the terminal.
+       Then <STRONG>tgetent</STRONG> will overwrite memory, perhaps  its  stack,  and  probably
+       core  dump  the  program.   Programs  like  <STRONG>telnet(1)</STRONG>  are particularly
+       vulnerable; modern <EM>telnet</EM>s pass along values  like  the  terminal  type
+       automatically.   The  results  are almost as undesirable with a <EM>termcap</EM>
+       library, like those of SunOS 4.1.3 and Ultrix 4.4, that prints  warning
+       messages  when  it  reads  an  overly long <EM>termcap</EM> entry.  If a <EM>termcap</EM>
+       library truncates long entries, like OSF/1 3.0, it is immune  to  dying
+       here but returns incorrect data for the terminal.
 
-       The "after tc expansion" length will  have  a  similar  effect  to  the
-       above, but only for people who actually set <EM>TERM</EM> to that terminal type,
-       since  <STRONG>tgetent</STRONG>  only does "tc" expansion once it has found the terminal
-       type it was looking for, not while searching.
+       The  "after  tc  expansion"  length  has a similar effect, but only for
+       people who actually set <EM>TERM</EM>  to  that  terminal  type,  since  <STRONG>tgetent</STRONG>
+       performs  "tc"  expansion  only  when it has found the terminal type it
+       seeks -- not while searching.
 
        In summary, a <EM>termcap</EM> entry that is longer than 1023 bytes  can  cause,
        with various combinations of <EM>termcap</EM> libraries and applications, a core
        dump,  warnings, or incorrect operation.  If it is too long even before
        "tc" expansion, it will have this effect even for users of  some  other
-       terminal  types  and  users whose <EM>TERM</EM> variable does not have a <EM>termcap</EM>
-       entry.
+       terminal   types   and  users  whose  <EM>TERM</EM>  variable  contents  lack  a
+       corresponding <EM>termcap</EM> description.
 
        When in -C (translate to <EM>termcap</EM>) mode, the <EM>ncurses</EM>  implementation  of
        <STRONG><A HREF="tic.1m.html">tic(1m)</A></STRONG>  issues  warning  messages  when the pre-tc length of a <EM>termcap</EM>
@@ -444,7 +445,7 @@
 
        <STRONG><A HREF="ncurses.3x.html">curses(3x)</A></STRONG>, <STRONG><A HREF="curs_terminfo.3x.html">curs_terminfo(3x)</A></STRONG>, <STRONG>putc(3)</STRONG>, <STRONG><A HREF="term_variables.3x.html">term_variables(3x)</A></STRONG>, <STRONG><A HREF="terminfo.5.html">terminfo(5)</A></STRONG>
 
-ncurses 6.6                       2026-08-22                  <STRONG><A HREF="curs_termcap.3x.html">curs_termcap(3x)</A></STRONG>
+ncurses 6.6                       2026-09-12                  <STRONG><A HREF="curs_termcap.3x.html">curs_termcap(3x)</A></STRONG>
 </PRE>
 <div class="nav">
 <ul>

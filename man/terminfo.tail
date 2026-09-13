@@ -27,7 +27,7 @@
 .\" authorization.                                                           *
 .\"***************************************************************************
 .\"
-.\" $Id: terminfo.tail,v 1.166 2026/08/22 20:21:30 Branden.Robinson Exp $
+.\" $Id: terminfo.tail,v 1.167 2026/09/12 17:49:05 Branden.Robinson Exp $
 .ps +1
 .SS "User-Defined Capabilities"
 .
@@ -1718,6 +1718,34 @@ and
 such as \*(``1=red\*('')
 discussed in this subsection.
 See \fB\%curs_color\fP(3X) for details on these and related functions.
+.PP
+Color support in
+.I curses
+requires that the terminal type description
+support the capabilities
+.B \%max_colors
+.RB \%( colors ),
+.B \%max_pairs
+.RB \%( pairs ),
+.B \%orig_pair
+.RB ( op ),
+and any of
+.bP
+.B \%set_foreground
+.RB ( setf )
+and
+.B \%set_background
+.RB ( setb );
+.bP
+.B \%set_a_foreground
+.RB ( setaf )
+and
+.B \%set_a_background
+.RB ( setab );
+or
+.bP
+.B \%set_color_pair
+.RB ( scp ).
 .PP
 Most color terminals are either \*(``Tektronix-like\*(''
 or \*(``HP-like\*(''

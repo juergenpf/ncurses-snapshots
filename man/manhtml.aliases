@@ -1,4 +1,4 @@
-# $Id: manhtml.aliases,v 1.51 2026/08/23 00:00:46 tom Exp $
+# $Id: manhtml.aliases,v 1.52 2026/09/12 20:25:26 tom Exp $
 #***************************************************************************
 # Copyright 2019-2025,2026 Thomas E. Dickey                                *
 # Copyright 2013,2017 Free Software Foundation, Inc.                       *
@@ -33,7 +33,9 @@ addch(3X)		curs_addch(3X)
 assume_default_colors(3X)	default_colors(3X)
 attr_get(3X)		curs_attr(3X)
 attr_on(3X)		curs_attr(3X)
+attr_set(3X)		curs_attr(3X)
 attron(3X)		curs_attr(3X)
+attrset(3X)		curs_attr(3X)
 baudrate(3X)		curs_termattrs(3X)
 beep(3X)		curs_beep(3X)
 bkgd(3X)		curs_bkgd(3X)

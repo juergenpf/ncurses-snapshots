@@ -6,8 +6,8 @@
 # Report bugs and new terminal descriptions to
 #	bug-ncurses@gnu.org
 #
-#	$Revision: 1.1273 $
-#	$Date: 2026/08/22 23:45:36 $
+#	$Revision: 1.1275 $
+#	$Date: 2026/09/12 18:59:03 $
 #
 # The original header is preserved below for reference.  It is noted that there
 # is a "newer" version which differs in some cosmetic details (but actually
@@ -3149,6 +3149,7 @@ vt520-w|DEC VT520 in wide mode,
 # in EK-VT520-RM
 vt525|DEC VT525,
 	colors#8, pairs#64,
+	flash=\E[1;1;999;999;7$t\E[1;1;999;999;7$t,
 	op=\E[39;49m, setab=\E[4%p1%dm, setaf=\E[3%p1%dm,
 	use=vt520,
 
@@ -4636,18 +4637,26 @@ teraterm4.59|Tera Term 4.59,
 #	  e.g., for VT220
 #	+ VT220 screen-display tests are ok
 #	+ no VT52 support
+#	+ supports both VT320 and xterm status/title sequences
 # Other tests:
 #	+ recognizes xterm's original direct-colors sequences, but result is
 #	  poor.
 #	+ no UTF-8 apparent when UTF-8 is set, with font Lucida Control
 teraterm4.97|Tera Term 4.97,
-	XT, use=ecma+color, use=xterm+sm+1006, use=teraterm4.59,
+	XT,
+	kdch1=^?, kf0@, kf1=\E[11~, kf2=\E[12~, kf3=\E[13~,
+	kf4=\E[14~, kpADD=\EOl, kpNUM@, rv=\E\\[>32;331;0c,
+	use=dec+sl, use=ecma+color, use=vt100+keypad+emul,
+	use=report+da2, use=xterm+sm+1006, use=teraterm+keypad,
+	use=teraterm4.59,
 teraterm-256color|TeraTerm with xterm 256-colors,
 	use=xterm+256setaf, use=teraterm,
+teraterm+keypad|teraterm emulating VT100/VT220 numeric keypad,
+	kbeg=\EOE, kent=\EOM, kpCMA=\EOl, kpDOT=\EOn, kpZRO=\EOp,
+	use=vt100+keypad,
 teraterm5.0|Tera Term 5.0,
-	xenl,
-	rv=\E\\[>32;331;0c, use=bracketed+paste, use=dec+sl,
-	use=xterm+keypad, use=report+da2, use=teraterm4.97,
+	xenl, use=bracketed+paste, use=xterm+keypad,
+	use=teraterm4.97,
 
 teraterm|Tera Term,
 	use=teraterm5.0,
@@ -28575,6 +28584,10 @@ v3220|LANPAR Vision II model 3220/3221/3222,
 #	+ add ich1 to several entries, providing for support of non-curses
 #	  applications via termcap only -TD
 #	+ add dch/dch1 to rxvt-basic -TD
-#	+ drop redundant xterm=setaf2 (patch by Branden Robinson)
+#	+ drop redundant xterm+256setaf2 (patch by Branden Robinson)
+#
+# 2026-09-12
+#	+ review/fix teraterm* (report by Jakub Horky)
+#	+ modify flash for vt525 to use DECRARA (patch by Branden Robinson)
 #
 ######## SHANTIH!  SHANTIH!  SHANTIH!

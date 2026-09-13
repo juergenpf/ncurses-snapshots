@@ -1,6 +1,6 @@
 '\" t
 .\"***************************************************************************
-.\" Copyright 2018-2024,2025 Thomas E. Dickey                                *
+.\" Copyright 2018-2025,2026 Thomas E. Dickey                                *
 .\" Copyright 1998-2016,2017 Free Software Foundation, Inc.                  *
 .\"                                                                          *
 .\" Permission is hereby granted, free of charge, to any person obtaining a  *
@@ -28,8 +28,8 @@
 .\" authorization.                                                           *
 .\"***************************************************************************
 .\"
-.\" $Id: curs_attr.3x,v 1.142 2025/11/12 01:05:49 tom Exp $
-.TH curs_attr 3X 2025-11-11 "ncurses @NCURSES_MAJOR@.@NCURSES_MINOR@" "Library calls"
+.\" $Id: curs_attr.3x,v 1.145 2026/09/12 19:12:56 tom Exp $
+.TH curs_attr 3X 2026-09-12 "ncurses @NCURSES_MAJOR@.@NCURSES_MINOR@" "Library calls"
 .ie \n(.g \{\
 .ds `` \(lq
 .ds '' \(rq
@@ -461,17 +461,30 @@ arguments as always returning
 .PP
 Very old versions of this library did not force an update of the screen
 when changing the attributes.
-Use \fBtouchwin\fP to force the screen to match the updated attributes.
+Use
+.B \%touchwin
+to force the screen to match the updated attributes.
 .PP
 X/Open Curses states that whether the traditional functions
-\fBattron\fP/\fBattroff\fP/\fBattrset\fP can manipulate attributes other than
-\fBA_BLINK\fP, \fBA_BOLD\fP, \fBA_DIM\fP, \fBA_REVERSE\fP, \fBA_STANDOUT\fP, or
-\fBA_UNDERLINE\fP is \*(``unspecified\*(''.
+.BR \%attron / attroff / attrset
+can manipulate attributes other than
+.BR \%A_BLINK ","
+.BR \%A_BOLD ","
+.BR \%A_DIM ","
+.BR \%A_REVERSE ","
+.BR \%A_STANDOUT ","
+or
+.B \%A_UNDERLINE
+is \*(``unspecified\*(''.
 Under this implementation as well as
 SVr4
 .IR curses ","
 these functions correctly manipulate all other highlights
-(specifically, \fBA_ALTCHARSET\fP, \fBA_PROTECT\fP, and \fBA_INVIS\fP).
+(specifically,
+.BR \%A_ALTCHARSET ","
+.BR \%A_PROTECT ","
+and
+.BR \%A_INVIS ")."
 .PP
 X/Open Curses added these entry points:
 .sp
@@ -550,11 +563,21 @@ This is consistent with SVr4
 X/Open Curses does not specify this.
 .PP
 The X/Open Curses extended conformance level adds new highlights
-\fBA_HORIZONTAL\fP, \fBA_LEFT\fP, \fBA_LOW\fP, \fBA_RIGHT\fP, \fBA_TOP\fP,
-\fBA_VERTICAL\fP (and corresponding \fBWA_\fP macros for each).
+.BR \%A_HORIZONTAL ","
+.BR \%A_LEFT ","
+.BR \%A_LOW ","
+.BR \%A_RIGHT ","
+.BR \%A_TOP ","
+and
+.B \%A_VERTICAL
+(and corresponding
+.B WA_
+macros for each).
 As of August 2013,
 no known terminal provides these highlights
-(i.e., via the \fBsgr1\fP capability).
+(i.e., via the
+.B sgr1
+capability).
 .\" ---------------------------------------------------------------------------
 .SH HISTORY
 4BSD (1980)

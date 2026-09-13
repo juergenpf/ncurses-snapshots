@@ -26,7 +26,7 @@
 -- sale, use or other dealings in this Software without prior written        --
 -- authorization.                                                            --
 -------------------------------------------------------------------------------
--- $Id: NEWS,v 1.4529 2026/09/05 19:52:15 tom Exp $
+-- $Id: NEWS,v 1.4534 2026/09/12 21:03:46 tom Exp $
 -------------------------------------------------------------------------------
 
 This is a log of changes that ncurses has gone through since Zeyd started
@@ -45,6 +45,12 @@ See the AUTHORS file for the corresponding full names.
 
 Changes through 1.9.9e did not credit all contributions;
 it is not possible to add this information.
+
+20260912
+	+ build-fix for sizeof(mmask_t) configure check (cf:20260829).
+	+ review/fix teraterm* (report by Jakub Horky)
+	+ modify flash for vt525 to use DECRARA (patch by Branden Robinson)
+	+ update config.guess, config.sub
 
 20260905
 	+ modify endwin() and doupdate() to save/restore keypad and meta modes
@@ -72,7 +78,7 @@ it is not possible to add this information.
 	+ add ich1 to several entries, providing for support of non-curses
 	  applications via termcap only -TD
 	+ add dch/dch1 to rxvt-basic -TD
-	+ drop redundant xterm=setaf2 (patch by Branden Robinson)
+	+ drop redundant xterm+256setaf2 (patch by Branden Robinson)
 	+ documentation improvements (patches by Branden Robinson).
 	  + improve color discussion in man pages
 	  + improve formatting/style of man pages

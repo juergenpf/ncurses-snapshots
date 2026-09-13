@@ -27,8 +27,8 @@
 .\" authorization.                                                           *
 .\"***************************************************************************
 .\"
-.\" $Id: curs_termcap.3x,v 1.110 2026/08/22 21:43:25 tom Exp $
-.TH curs_termcap 3X 2026-08-22 "ncurses @NCURSES_MAJOR@.@NCURSES_MINOR@" "Library calls"
+.\" $Id: curs_termcap.3x,v 1.112 2026/09/12 17:23:45 tom Exp $
+.TH curs_termcap 3X 2026-09-12 "ncurses @NCURSES_MAJOR@.@NCURSES_MINOR@" "Library calls"
 .ie \n(.g \{\
 .ds `` \(lq
 .ds '' \(rq
@@ -104,7 +104,7 @@
 \fB\%tgetstr\fP,
 \fB\%tgoto\fP,
 \fB\%tputs\fP \-
-\fIcurses\fR emulation of \fItermcap\fR
+\fI\%ncurses\fR emulation of \fItermcap\fR
 .SH SYNOPSIS
 .nf
 \fB#include <curses.h>
@@ -413,7 +413,7 @@ some
 .I termcap
 libraries print a warning message,
 .bP
-some exit if they find an entry that's longer than 1023 bytes,
+some exit if they find an entry longer than 1023 bytes,
 .bP
 some neither exit nor warn, doing nothing useful, and
 .bP
@@ -435,7 +435,10 @@ and after \*(``tc\*('' expansion.
 tacks on another
 .I termcap
 entry to the end of the current one,
-to add on its capabilities.
+to supplement,
+redefine,
+or cancel
+capabilities.
 If a
 .I termcap
 entry does not use the \*(``tc\*('' capability,
@@ -506,16 +509,16 @@ If a
 library truncates long entries,
 like OSF/1 3.0,
 it is immune to dying here
-but will return incorrect data for the terminal.
+but returns incorrect data for the terminal.
 .PP
-The \*(``after tc expansion\*('' length will have a similar effect to the
-above, but only for people who actually set
+The \*(``after tc expansion\*('' length has a similar effect,
+but only for people who actually set
 .I TERM
 to that terminal type,
 since
 .B \%tgetent
-only does \*(``tc\*('' expansion
-once it has found the terminal type it was looking for,
+performs \*(``tc\*('' expansion
+only when it has found the terminal type it seeks \(em
 not while searching.
 .PP
 In summary,
@@ -526,14 +529,15 @@ with various combinations of
 .I termcap
 libraries and applications,
 a core dump,
-warnings, or incorrect operation.
+warnings,
+or incorrect operation.
 If it is too long even before \*(``tc\*('' expansion,
 it will have this effect even for users of some other terminal types
 and users whose
 .I TERM
-variable does not have a
+variable contents lack a corresponding
 .I termcap
-entry.
+description.
 .PP
 When in \-C
 (translate to

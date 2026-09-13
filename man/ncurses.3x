@@ -28,8 +28,8 @@
 .\" authorization.                                                           *
 .\"***************************************************************************
 .\"
-.\" $Id: ncurses.3x,v 1.296 2026/08/15 22:15:03 tom Exp $
-.TH ncurses 3X 2026-08-15 "ncurses @NCURSES_MAJOR@.@NCURSES_MINOR@" "Library calls"
+.\" $Id: ncurses.3x,v 1.300 2026/09/12 18:19:21 tom Exp $
+.TH ncurses 3X 2026-09-12 "ncurses @NCURSES_MAJOR@.@NCURSES_MINOR@" "Library calls"
 .ie \n(.g \{\
 .ds `` \(lq
 .ds '' \(rq
@@ -613,6 +613,74 @@ analogously to the
 character manipulation functions of ISO C and its constant
 .IR \%EOF "."
 .RE
+.\"
+.SS Rendering
+.I curses
+combines the following data to render a character cell.
+Any of them can include color information.
+.bP
+.I curses
+character attributes,
+as from \fB\%waddch\fP(3X)
+.bP
+window attributes,
+as from \fB\%wattrset\fP(3X)
+.bP
+window background character attributes,
+as from \fB\%wbkgdset\fP(3X)
+.PP
+Per-character and window attributes are usually set through a function
+parameter containing attributes and/or a color pair identifier.
+Some functions,
+such as
+.BR \%wattr_set ","
+use a separate color pair identifier.
+.PP
+The background character is a special case:
+it includes a character code,
+as if it were passed to
+.BR \%waddch "."
+.PP
+The
+.I curses
+library does the actual work of combining these color pairs
+in an internal function called from
+.BR \%waddch "."
+.bP
+If the parameter passed to
+.B \%waddch
+is blank and it uses the special color pair 0,
+.I curses
+next checks the window attribute.
+.RS
+.bP
+If the window attribute does not use color pair 0,
+.I curses
+uses the color pair from the window attribute.
+.bP
+Otherwise,
+.I curses
+uses the background character.
+.RE
+.bP
+If the parameter passed to
+.B \%waddch
+is not blank,
+or it does not use the special color pair 0,
+.I curses
+prefers the color pair from the parameter,
+if it is nonzero.
+Otherwise,
+it tries the window attribute next,
+and finally the background character.
+.PP
+Some
+.I curses
+functions such as \fB\%wprintw\fP(3X) call
+.BR \%waddch "."
+Those do not combine its parameter with a color pair.
+Consequently those calls use only the window attribute
+or the background character.
 .\"
 .SS "Function Name Index"
 The following table lists the

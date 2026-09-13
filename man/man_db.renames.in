@@ -1,5 +1,5 @@
 ##############################################################################
-# Copyright 2019-2024,2025 Thomas E. Dickey                                  #
+# Copyright 2019-2025,2026 Thomas E. Dickey                                  #
 # Copyright 1998-2015,2017 Free Software Foundation, Inc.                    #
 #                                                                            #
 # Permission is hereby granted, free of charge, to any person obtaining a    #
@@ -26,7 +26,7 @@
 # use or other dealings in this Software without prior written               #
 # authorization.                                                             #
 ##############################################################################
-# $Id: man_db.renames.in,v 1.87 2025/08/16 19:36:29 Branden.Robinson Exp $
+# $Id: man_db.renames.in,v 1.89 2026/09/12 19:12:56 tom Exp $
 # Manual-page renamings for the man_db program
 #
 # Files:
@@ -304,6 +304,7 @@ wins_wch.3x			wins_wch.3ncurses
 winsch.3x			winsch.3ncurses
 wmove.3x			wmove.3ncurses
 wnoutrefresh.3x			wnoutrefresh.3ncurses
+wprintw.3x			wprintw.3ncurses
 wrefresh.3x			wrefresh.3ncurses
 wsetscrreg.3x			wsetscrreg.3ncurses
 wtimeout.3x			wtimeout.3ncurses
